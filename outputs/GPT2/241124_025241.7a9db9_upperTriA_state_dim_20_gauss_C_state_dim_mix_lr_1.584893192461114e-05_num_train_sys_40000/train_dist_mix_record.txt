@@ -1,0 +1,3 @@
+state dim 3 count: 13334.0
+state dim 10 count: 13333.0
+state dim 20 count: 13333.0
