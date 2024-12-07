@@ -1,0 +1,10 @@
+rsync -avz --include 'prediction_errors_gauss_C*/' --exclude '*' sultand@bliss1.ist.berkeley.edu:mop_modifications/streamlined_mop/outputs/GPT2/240619_070456.1e49ad_upperTriA_gauss_C/ /Users/sultandaniels/Documents/Transformer_Kalman/outputs/GPT2/240619_070456.1e49ad_upperTriA_gauss_C/
+
+line 31
+Q = to_complex(self.observation_IR.to(torch.float32))                                   # [B... x O_D x R x O_D]
+Q = to_complex(self.observation_IR)                                   # [B... x O_D x R x O_D]
+
+
+line 124
+self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transpose(0, 1).to(torch.float32) # [O_D x R x O_D]
+self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transpose(0, 1) # [O_D x R x O_D]
