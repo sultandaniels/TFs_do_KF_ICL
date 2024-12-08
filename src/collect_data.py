@@ -8,10 +8,10 @@ import numpy as np
 from models import GPT2
 import argparse
 
-def mix_ind(i, total_number, labels, counts):
+def mix_ind(i, total_number, labels, counts, max_ind=2):
     #currently function only works for 
-    if int(np.floor(len(labels)*i/total_number)) > 2:
-        index = 0
+    if int(np.floor(len(labels)*i/total_number)) > max_ind:
+        index = len(labels) - 1
         print("greater than 2")
     else:
         index = int(np.floor(len(labels)*i/total_number))
@@ -75,7 +75,16 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
                     config.override("dataset_typ", A_dists[dist_index]) #override the dataset_typ
                 
                 if train_mix_state_dim:
-                    state_index, state_counts = mix_ind(i, num_tasks, nxs, state_counts)
+                    if train_mix_dist:
+                        total_tasks = num_tasks/np.ceil(len(A_dists))
+                        ind = i
+                        while ind > total_tasks:
+                            ind -= total_tasks
+                    else:
+                        total_tasks = num_tasks
+                        ind = i
+                    
+                    state_index, state_counts = mix_ind(ind, total_tasks, nxs, state_counts)
                     config.override("nx", nxs[state_index]) #override the nx
                 
             fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None)
@@ -118,11 +127,16 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
             file.close()
 
     if train_mix_state_dim:
-        with open(output_dir + "/train_dist_mix_record.txt", 'w') as file:
+        if train_mix_dist:
+            mode = 'a'
+        else:
+            mode = 'w'
+        with open(output_dir + "/train_dist_mix_record.txt", mode) as file:
         # Write the print statement to the file
             for k in range(len(nxs)):
                 file.write(f"state dim {str(nxs[k])} count: {state_counts[k]}\n")
             file.close()
+
 
 if __name__ == "__main__":
 

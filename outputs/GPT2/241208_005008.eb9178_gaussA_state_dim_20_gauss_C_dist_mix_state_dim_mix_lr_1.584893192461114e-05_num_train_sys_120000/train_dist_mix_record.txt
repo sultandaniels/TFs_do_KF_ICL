@@ -1,0 +1,5 @@
+gaussA count: 60000.0
+upperTriA count: 60000.0
+state dim 3 count: 39999.0
+state dim 10 count: 40000.0
+state dim 20 count: 40001.0

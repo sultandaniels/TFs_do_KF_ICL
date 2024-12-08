@@ -70,7 +70,9 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
     excess = False #run the excess plots
     shade = True
     config.override("ckpt_path", ckpt_path)
-    print("config.ckpt_path:", config.ckpt_path)
+    print("\n\n\n config.ckpt_path:", config.ckpt_path)
+    print("testing config.nx:", config.nx)
+    print("\n\n")
 
     if resume_train:
         #get the parent directory of the ckpt_path
@@ -642,7 +644,7 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not train_conv) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/241203_014212.9ee182_upperTriA_state_dim_20_gauss_C_state_dim_mix_lr_1.584893192461114e-05_num_train_sys_120000/checkpoints/step=101050.ckpt"
+        ckpt_path = "../outputs/GPT2/241124_025241.7a9db9_upperTriA_state_dim_20_gauss_C_state_dim_mix_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=79000.ckpt"
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
     elif train_conv:

@@ -21,13 +21,13 @@ class Config(object, metaclass=Singleton):
 
     # Dataset settings
     num_tasks = 120000 #number of training systems
-    num_val_tasks = 2 #number of test systems
+    num_val_tasks = 1000 #number of test systems
     dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
     distinct_cond_nums = 10
     val_dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num"
     C_dist = "_gauss_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss"
-    nx = 20
+    nx = 10
     ny = 5
     n_noise = 1
     num_traces = {"train": 1, "val": 2000}
@@ -40,7 +40,7 @@ class Config(object, metaclass=Singleton):
     train_int = 5 #number of steps between logging (train interval)
     use_true_len = True #Flag for a dataset length to be num_tasks
     batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
-    train_data_workers = 254 #set to 1 (check if it changes the speed of the training process)
+    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
