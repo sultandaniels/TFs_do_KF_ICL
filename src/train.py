@@ -13,6 +13,7 @@ from pytorch_lightning.tuner import Tuner
 from pytorch_lightning.loggers import WandbLogger
 # from pytorch_lightning.utilities.exceptions import _TunerExitException
 import json
+import torch
 
 ##DO NOT MIX pytorch_lightning with lightning.pytorch in the import statements (it causes weird bugs with the boiler plate code)
 
@@ -45,6 +46,9 @@ def pl_lr_finder(config, model, trainer, datamodule):
 
 def train_gpt2(model, config, output_dir, train_mix_dist=False, train_mix_state_dim=False): #input emd_dim as a parameter for the embed dim experiment plots
     # a function to train GPT2 model
+
+    torch.set_float32_matmul_precision('high') #set the matmul performance for Tensor Cores (or 'medium' depending on your precision-performance trade-off preference)
+
     logger = logging.getLogger(__name__)
     print("batch_size:", config.batch_size)
     print("train_steps:", config.train_steps)

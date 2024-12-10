@@ -33,7 +33,6 @@ def wentinn_compute_errors(config):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     logger = logging.getLogger(__name__)  # get the logger
     config = Config()  # get the config
-    config.parse_args()  # parse the arguments
 
     num_systems = config.num_tasks["test"]
     num_trials = config.num_traces["test"]

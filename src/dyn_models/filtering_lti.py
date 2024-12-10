@@ -226,25 +226,8 @@ class FilterSim:
                     # A[0,0] = 0.95
                     # self.A = A
 
-            if C_dist == "_gauss_C":
-                normC = True
-            else:
-                normC = False
-            if C_dist == "_single_system":
-                self.C = np.array([
-                    [ 1.58306722,  0.08254489,  0.63563991, -0.75589141,  0.45347395,  1.52444272,
-                    0.19327427, -1.45641797,  1.31582812, -0.54842482],
-                    [-0.35336291, -1.66812014,  0.68527397, -1.33242619, -0.74728405, -0.42868647,
-                    0.88728522,  1.31609117,  1.16449376, -1.34126255],
-                    [ 0.08083017,  0.66527164,  0.94678362, -1.35538693, -0.42848464,  0.30631194,
-                    1.07822856,  0.56396537,  1.00666173,  0.29519488],
-                    [-1.05025071, -0.72655103, -1.37426337, -1.33609509, -1.43163071, -0.78321476,
-                    0.57989037, -0.93342293, -1.21680371, -1.39550893],
-                    [ 0.34049993, -1.39124344,  1.17060005, -0.52646281, -1.23408133, -0.67153237,
-                    1.51040147,  0.91665462, -1.1607541, -0.10762072]
-                ]) #generate a random specific matrix  
-            else:
-                self.C = np.eye(nx) if nx == ny else self.construct_C(self.A, ny, normC)
+            
+            self.C = self.construct_C(self.A, ny, C_dist)
 
             
 
@@ -350,19 +333,41 @@ class FilterSim:
     ####################################################################################################
 
     @staticmethod
-    def construct_C(A, ny, normC): #normC is a boolean that determines if the C matrix is sampled from a normal distribution or a uniform distribution
+    def construct_C(A, ny, C_type): 
         nx = A.shape[0]
         _O = [np.eye(nx)]
         for _ in range(nx - 1):
             _O.append(_O[-1] @ A)
         while True:
-            if normC:
+            if C_type == "_gauss_C":
                 C = np.random.normal(0, np.sqrt(0.333333333), (ny, nx))
 
                 #scale C by the reciprocal of its frobenius norm
                 # C = C/np.linalg.norm(C, ord='fro') #scale the matrix 
-            else:
+            elif C_type == "_unif_C":
                 C = np.random.rand(ny, nx) #uniform(0,1)
+            elif C_type == "_zero_C":
+                C = np.zeros((ny,nx))
+                break
+            elif C_type == "_single_system":
+                arr = np.array([
+                        [ 1.58306722,  0.08254489,  0.63563991, -0.75589141,  0.45347395,  1.52444272,
+                        0.19327427, -1.45641797,  1.31582812, -0.54842482],
+                        [-0.35336291, -1.66812014,  0.68527397, -1.33242619, -0.74728405, -0.42868647,
+                        0.88728522,  1.31609117,  1.16449376, -1.34126255],
+                        [ 0.08083017,  0.66527164,  0.94678362, -1.35538693, -0.42848464,  0.30631194,
+                        1.07822856,  0.56396537,  1.00666173,  0.29519488],
+                        [-1.05025071, -0.72655103, -1.37426337, -1.33609509, -1.43163071, -0.78321476,
+                        0.57989037, -0.93342293, -1.21680371, -1.39550893],
+                        [ 0.34049993, -1.39124344,  1.17060005, -0.52646281, -1.23408133, -0.67153237,
+                        1.51040147,  0.91665462, -1.1607541, -0.10762072]
+                    ]) #generate a random specific matrix
+                if ny == arr.shape[0] and nx == arr.shape[1]:
+                    C = arr          
+                else:
+                    raise ValueError(f"Single system C matrix is not the right dimension of {ny}x{nx}")
+            else:
+                raise ValueError("C_type did not match")
             O = np.concatenate([C @ o for o in _O], axis=0)
             if np.linalg.matrix_rank(O) == nx:  # checking if state is observable
                 break

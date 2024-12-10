@@ -21,7 +21,7 @@ def mix_ind(i, total_number, labels, counts, max_ind=2):
     return index, counts
 
 #modify collect data so that it can tolerate multiple traces for one system
-def collect_data(model, config, output_dir, only="", train_mix_dist=False, train_mix_state_dim=False):
+def collect_data(model, config, output_dir, only="", train_mix_dist=False, train_mix_state_dim=False, train_mix_C=False):
 
     logger = logging.getLogger(__name__)
     # config = Config()
@@ -53,6 +53,10 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
                 #different state dims
                 nxs = [3,10,20]
                 state_counts = np.zeros(len(nxs))
+            
+            if train_mix_C:
+                C_dists = ["_gauss_C", "_zero_C"]
+                C_counts = np.zeros(len(C_dists))
 
         elif name == "train" and not (train_mix_dist or train_mix_state_dim):
             print("Collecting training data from", config.dataset_typ, config.C_dist)
@@ -86,6 +90,12 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
                     
                     state_index, state_counts = mix_ind(ind, total_tasks, nxs, state_counts)
                     config.override("nx", nxs[state_index]) #override the nx
+                
+                if train_mix_C:
+                    C_index, C_counts = mix_ind(i, num_tasks, C_dists, C_counts)
+
+                    config.override("C_dist", C_dists[C_index]) #override the dataset_typ
+
                 
             fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None)
 
@@ -136,6 +146,18 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
             for k in range(len(nxs)):
                 file.write(f"state dim {str(nxs[k])} count: {state_counts[k]}\n")
             file.close()
+
+    if train_mix_C:
+        if train_mix_dist or train_mix_state_dim:
+            mode = 'a'
+        else:
+            mode = 'w'
+        with open(output_dir + "/train_dist_mix_record.txt", mode) as file:
+        # Write the print statement to the file
+            for k in range(len(C_dists)):
+                file.write(f"state dim {str(C_dists[k])} count: {C_counts[k]}\n")
+            file.close()
+
 
 
 if __name__ == "__main__":

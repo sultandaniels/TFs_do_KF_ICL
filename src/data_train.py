@@ -570,6 +570,7 @@ if __name__ == '__main__':
     parser.add_argument('--logscale_an', help='Boolean. plot the system test evaluations on a logscale divided by analytical KF err.', action='store_true')
     parser.add_argument('--train_mix_dist', help='Boolean. generate training data from a mixture of gaussian, uppertriA, and rotdiagA', action='store_true')
     parser.add_argument('--train_mix_state_dim', help='Boolean. generate training data from a mixture of state dimensions', action='store_true')
+    parser.add_argument('--train_mix_C', help='Boolean. generate training data from a mixture of C dists', action='store_true')
     parser.add_argument('--part_train_set', help='Boolean. train on a subset of a previous experiments train dataset', action='store_true')
 
     # Parse the arguments
@@ -600,6 +601,8 @@ if __name__ == '__main__':
     train_mix_dist = args.train_mix_dist
     print("train_mix_state_dim:", args.train_mix_state_dim)
     train_mix_state_dim = args.train_mix_state_dim
+    print("train_mix_state_dim:", args.train_mix_C)
+    train_mix_C = args.train_mix_C
     print("part_train_set arg", args.part_train_set)
     part_train_set = args.part_train_set
 
@@ -698,7 +701,7 @@ if __name__ == '__main__':
             gc.collect()
                
         else:
-            collect_data(model, config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # collect data
+            collect_data(model, config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
 
         # replace ckpt_path with the path to the checkpoint file
         config.override("ckpt_path", output_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
