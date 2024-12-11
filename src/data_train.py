@@ -645,7 +645,7 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not train_conv) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/241124_025401.65644e_gaussA_state_dim_20_gauss_C_state_dim_mix_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=79000.ckpt"
+        ckpt_path = "../outputs/GPT2/241208_005008.eb9178_gaussA_state_dim_20_gauss_C_dist_mix_state_dim_mix_lr_1.584893192461114e-05_num_train_sys_120000/checkpoints/step=145700.ckpt"
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
     elif train_conv:

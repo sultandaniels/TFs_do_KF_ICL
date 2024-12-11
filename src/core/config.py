@@ -16,24 +16,25 @@ class Config(object, metaclass=Singleton):
     # ckpt_path = "/Users/sultandaniels/Documents/Transformer_Kalman/outputs/GPT2/240529_111352.3b8b85_unifA_unif_C/checkpoints/step=7.ckpt"
     # ckpt_path = "../outputs/GPT2/240425_225022.52199c/checkpoints/batch_size_28_con_len_250_step=20000.ckpt" #20000 steps gaussA gaussC
     # ckpt_path = "../outputs/GPT2/240320_014524.c78f58/checkpoints/num_tasks_28_con_len_250_step=20000.ckpt" #checkpoint of dense A uniform C
+    seed = 0
     fully_reproducible = False
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
     num_val_tasks = 2 #number of test systems
-    dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
+    dataset_typ = "upperTriA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
     distinct_cond_nums = 10
     val_dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num"
     C_dist = "_gauss_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss"
-    nx = 10
+    nx = 20
     ny = 5
     n_noise = 1
     num_traces = {"train": 1, "val": 2000}
     changing = False #used only for plotting
 
     # Training settings
-    devices=[0,1] #which GPU
+    devices=1 #which GPU
     train_steps = 5530 #number of training steps (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 5 #number of steps between logging (train interval)
