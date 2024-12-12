@@ -645,11 +645,11 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not train_conv) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/241208_005008.eb9178_gaussA_state_dim_20_gauss_C_dist_mix_state_dim_mix_lr_1.584893192461114e-05_num_train_sys_120000/checkpoints/step=145700.ckpt"
+        ckpt_path = "../outputs/GPT2/241203_014212.9ee182_upperTriA_state_dim_20_gauss_C_state_dim_mix_lr_1.584893192461114e-05_num_train_sys_120000/checkpoints/step=235000.ckpt"
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
     elif train_conv:
-        output_dir = "../outputs/GPT2/241107_233959.102bf2_gaussA_gauss_C_mix_lr_0"
+        output_dir = "../outputs/GPT2/241210_180753.5991f3_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
         #241117_204226.922f5f_rotDiagA_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000" #241117_204332.cee615_upperTriA_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
         if make_preds:
             predict_all_checkpoints(config, output_dir, logscale)
