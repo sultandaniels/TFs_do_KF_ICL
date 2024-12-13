@@ -16,6 +16,10 @@ class Config(object, metaclass=Singleton):
     seed = 0
     fully_reproducible = False
 
+    #experiment settings
+    multi_sys_trace = True #have multiple systems in a single trace
+    multi_sys_trace_num = 2 #number of systems in a single trace (must be smaller than n_positions)
+
     # Dataset settings
     num_tasks = 40000 #number of training systems
     num_val_tasks = 2 #number of test systems
