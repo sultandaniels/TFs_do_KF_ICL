@@ -18,7 +18,6 @@ class Config(object, metaclass=Singleton):
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
-    multi_sys_trace_num = 2 #number of systems in a single trace (must be smaller than n_positions)
 
     # Dataset settings
     num_tasks = 40 #number of training systems
