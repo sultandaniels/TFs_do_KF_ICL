@@ -21,6 +21,7 @@ from core import Config
 from dyn_models import apply_kf
 from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv
+from datasources import filter_dataset as fd
 
 plt.rcParams['axes.titlesize'] = 20
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -944,6 +945,266 @@ def compute_errors_conv(config):
     return err_lss, irreducible_error
 
 
+def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
+    # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
+    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    logger = logging.getLogger(__name__)  # get the logger
+
+    print("val_dataset_typ:", config.val_dataset_typ)
+    num_systems = config.num_val_tasks  # number of validation tasks
+    print("Number of validation systems:", num_systems)
+    num_trials = config.num_traces["val"]  # number of traces
+    print("Number of traces:", num_trials)
+
+    model = GPT2.load_from_checkpoint(config.ckpt_path,
+                                      n_dims_in=config.n_dims_in, n_positions=config.n_positions,
+                                      n_dims_out=config.n_dims_out, n_embd=config.n_embd,
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+        device)  # load_from_checkpoint
+
+    
+    # get the parent directory of the ckpt_path
+    parent_dir = os.path.dirname(config.ckpt_path)
+
+    # get the parent directory of the parent directory
+    parent_parent_dir = os.path.dirname(parent_dir)
+
+    print("getting the validation data")
+    # open fsim file
+    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        sim_objs = pickle.load(f)
+
+    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        samples = pickle.load(f)
+        # for every 2000 entries in samples, get the observation values and append them to the ys list
+        ys = np.stack(
+            [entry["obs"] for entry in samples], axis=0
+        ).reshape((num_systems, num_trials, config.n_positions + 1, config.ny)).astype(np.float32)
+
+        prev_xs = np.concatenate([
+            np.zeros((num_systems, num_trials, 1, config.nx)),
+            np.stack(
+                [entry["states"][:-1] for entry in samples], axis=0
+            ).reshape((num_systems, num_trials, config.n_positions, config.nx)).astype(np.float32)
+        ], axis=2)
+        noiseless_ys = prev_xs @ np.stack([sim_obj.C @ sim_obj.A for sim_obj in sim_objs], axis=0)[:, None].transpose(0, 1, 3, 2)
+
+        gc.collect()  # Start the garbage collector
+
+    ckpt_steps = get_step_number(config.ckpt_path)
+    print("ckpt_steps:", ckpt_steps)
+
+    # if parent_parent_dir + f"/prediction_errors{config.C_dist}_step={str(ckpt_step)}.ckpt exists, load the prediction errors
+    if os.path.exists(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"):
+        print("\nerr_lss already exists\n")
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'rb') as f:
+            err_lss = pickle.load(f)
+
+        for key in err_lss.keys():
+            print(key, err_lss[key].shape)
+            print("\n\n")
+    else:
+        print("\n err_lss does not exist yet")
+        err_lss = collections.OrderedDict()
+
+
+    # print("no tf pred")
+    # Transformer Predictions
+    if not ("MOP" in err_lss.keys()):
+        # entry, tok_seg_lens, sys_inds, start_inds  = fd.populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
+
+        print("\nstart tf pred")
+        start = time.time()  # start the timer for transformer predictions
+        with torch.no_grad():  # no gradients
+            I = np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+
+            # print("before model.predict_step()")
+            batch_shape = I.shape[:-2]
+            # print("batch_shape:", batch_shape)
+            flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
+            # print("flattened_I.shape:", flattened_I.shape)
+            validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
+                                                            batch_size=config.test_batch_size)
+            preds_arr = []  # Store the predictions for all batches
+            for validation_batch in iter(validation_loader):
+                _, flattened_preds_tf = model.predict_step(
+                    {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
+                preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+            preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                                (*batch_shape, *I.shape[-2:]))  # Combine the predictions for all batches
+            # print("preds_tf.shape:", preds_tf.shape)
+            preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
+                                    axis=-2)  # concatenate the predictions
+            # print("preds_tf.shape:", preds_tf.shape)
+        end = time.time()  # end the timer for transformer predictions
+        print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
+
+        errs_tf = np.linalg.norm((ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
+        err_lss["MOP"] = errs_tf
+
+        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                pickle.dump(err_lss, f)  
+        
+        del errs_tf
+        del preds_tf
+
+        torch.cuda.empty_cache()
+        gc.collect()
+    else:
+        print("TF pred already in err_lss")
+
+    if tf: #only run transformer predictions
+        irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
+        return err_lss, irreducible_error
+    
+    # noiseless_errs_tf = np.linalg.norm((noiseless_ys - preds_tf), axis=-1) ** 2 + np.array([
+    #     (np.linalg.norm(sim_obj.C) * sim_obj.sigma_w) ** 2 + config.ny * (sim_obj.sigma_v ** 2)
+    #     for sim_obj in sim_objs
+    # ])[:, None, None]
+    # err_lss["Analytical_MOP"] = noiseless_errs_tf
+
+    # del noiseless_errs_tf
+    # del noiseless_ys
+
+    print("start zero predictor")
+    # zero predictor predictions
+    errs_zero = np.linalg.norm(ys, axis=-1) ** 2  # get the errors of zero predictions
+    err_lss["Zero"] = errs_zero
+
+    os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+    with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+            pickle.dump(err_lss, f)
+
+    del errs_zero
+
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    n_noise = config.n_noise
+
+
+
+    if not ("Kalman" in err_lss.keys()):
+        start = time.time()  # start the timer for kalman filter predictions
+        if run_deg_kf_test:  # degenerate system KF Predictions
+
+            #############################################################
+            # this portion can most likely be deleted
+            # Kalman Filter Predictions
+            preds_kf_list = []
+            for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2)):
+                inner_list = []
+                for __ys in _ys:
+                    result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
+                                    sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
+                    inner_list.append(result)
+                preds_kf_list.append(inner_list)
+            #############################################################
+
+            preds_kf = np.array(preds_kf_list)  # get kalman filter predictions
+
+            # create an array of zeros to hold the kalman filter predictions
+            preds_kf = np.zeros((num_systems, num_systems, num_trials, config.n_positions + 1,
+                                config.ny))  # first axis is the system that the kalman filter is being trained on, second axis is the system that the kalman filter is being tested on
+
+            errs_kf = np.zeros((num_systems, num_systems, num_trials,
+                                config.n_positions + 1))  # first axis is the system that the kalman filter is being trained on, second axis is the system that the kalman filter is being tested on
+            # iterate over sim_objs
+            kf_index = 0
+            for sim_obj in sim_objs:  # iterate over the training systems
+                for sys in range(num_systems):  # iterate over the test systems
+                    print("Kalman filter", kf_index, "testing on system", sys)
+                    for trial in range(num_trials):
+                        preds_kf[kf_index, sys, trial, :, :] = apply_kf(sim_obj, ys[sys, trial, :-1, :],
+                                                                        sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
+                                                                        sigma_v=sim_obj.sigma_v * np.sqrt(
+                                                                            n_noise))  # get the kalman filter predictions for the test system and the training system
+                    errs_kf[kf_index, sys] = np.linalg.norm((ys[sys] - preds_kf[kf_index, sys]), axis=-1) ** 2  # get the errors of the kalman filter predictions for the test system and the training system
+                kf_index += 1
+
+        else:  
+            # print("no kf pred")
+            # Kalman Predictions
+            print("start kf pred")
+            preds_kf = np.array([[
+                apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
+                        sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
+                for __ys in _ys
+            ] for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2))
+            ])  # get kalman filter predictions
+            errs_kf = np.linalg.norm((ys - preds_kf), axis=-1) ** 2
+            err_lss["Kalman"] = errs_kf
+
+            os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+            with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                    pickle.dump(err_lss, f)
+
+        end = time.time()  # end the timer for kalman filter predictions
+        print("time elapsed for KF Pred:", (end - start) / 60,
+            "min")  # print the time elapsed for kalman filter predictions
+
+
+        del preds_kf
+        del errs_kf
+
+        torch.cuda.empty_cache()
+        gc.collect()
+    else:
+        print("Kalman pred already in err_lss")
+
+    # # Check if CUDA is available
+    # if torch.cuda.is_available():
+
+    #     # Print memory usage
+    #     print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
+    #     print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
+    #     print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
+    #     print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
+    # else:
+    #     print("CUDA is not available.")
+
+
+    # Analytical Kalman Predictions
+    analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
+    err_lss["Analytical_Kalman"] = analytical_kf.reshape((num_systems, 1)) @ np.ones((1, config.n_positions))
+    
+
+    #Analytical simulation predictions
+    #generate config.n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
+    an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (config.num_traces["val"], config.n_positions+1)) for sim_obj in sim_objs])
+
+    # print("an_sims shape:", an_sims.shape)
+    err_lss["Analytical_Simulation"] = np.linalg.norm(an_sims, axis=-1) ** 2
+
+    os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+    with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+            pickle.dump(err_lss, f)
+
+    # print("no OLS")
+
+    if not ("OLS" in err_lss.keys()):
+        # Original OLS
+        # Clear the PyTorch cache
+        start = time.time()  # start the timer for OLS predictions
+        print("start OLS pred")
+        #print(torch.cuda.memory_summary())
+        err_lss = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss)
+
+
+        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                pickle.dump(err_lss, f)
+
+        end = time.time()  # end the timer for OLS predictions
+        print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
+    else:
+        print("OLS pred already in err_lss")
+
+    irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
+    return err_lss, irreducible_error
+
+
 
 
 def save_preds(run_deg_kf_test, config, train_conv, tf):
@@ -983,6 +1244,9 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
             parent_parent_dir + "/prediction_errors" + config.C_dist + "_"+ f"step={ckpt_steps}.ckpt" + f"/{config.val_dataset_typ}_state_dim_{config.nx}_irreducible_error.pkl",
             "wb") as f:
         pickle.dump(irreducible_error, f)
+
+    return None
+
 
 def save_preds_conv_helper(save_dir, run_deg_kf_test, config):
     os.makedirs(save_dir, exist_ok=True)

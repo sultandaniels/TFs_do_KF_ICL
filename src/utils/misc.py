@@ -58,16 +58,11 @@ def plot_errs(colors, sys, err_lss, err_irreducible, legend_loc="upper right", a
                 t = np.arange(err_ls.shape[-1])
                 
                 # if name != "Kalman" and name != "Analytical_Kalman":
-                if not (name == "Kalman" or name == "Analytical_Kalman"): 
-                    try:
-                        # normalized_err = (err_ls - err_lss["Kalman"])
-                        #elementwise division of err_ls by err_lss["Kalman"]
-                        normalized_err = err_ls/err_lss["Kalman"] # err_ls divided elementwise by the Kalman error
-
-                    except ValueError as e:
-                        print("name", name)
-                        print("Error: ", e)
-                        normalized_err = (err_ls - err_lss["Kalman"].mean(axis=1))
+                if not (name == "Kalman" or name == "Analytical_Kalman"):
+                        
+                    # normalized_err = (err_ls - err_lss["Kalman"])
+                    #elementwise division of err_ls by err_lss["Kalman"]
+                    normalized_err = err_ls/err_lss["Kalman"] # err_ls divided elementwise by the Kalman error
                     
 
                     q1, median, q3 = np.quantile(normalized_err[sys], [0.45, 0.5, 0.55], axis=-2)
