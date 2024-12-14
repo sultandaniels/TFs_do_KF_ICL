@@ -944,8 +944,64 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
+def populate_val_traces(n_positions, ny, num_tasks, entries, leader, tok_seg_lens=None, sys_inds=None, start_inds=None):
+    # a function to populate the validation traces
+    if leader: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
+        sys_inds = []
+        tok_seg_lens = []
+        start_inds = []
 
-def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
+        context_len = n_positions + 1
+        segments = np.zeros((context_len, ny)) #initialize the segments array
+        # print('segments.shape', segments.shape)
+        possible_space = context_len #the possible space for the system traces plus special tokens
+
+        while possible_space > 0:
+
+            # print('\npossible_space', possible_space)
+            tok_seg_len = np.random.randint(3, possible_space + 1) #randomly sample a segment length between 3 and the possible space (length of segment randomness) tok_seg_len includes space for the special tokens
+            if possible_space - tok_seg_len < 3:
+                tok_seg_len = possible_space #do not leave a block at the end that can't be filled
+
+            tok_seg_lens.append(tok_seg_len)
+            segment_len = tok_seg_len - 2 #actual trace segment length
+            # print('\nsegment_len', segment_len)
+
+            # select a random integer between 0 and len(entries)
+            sys_trace_ind = np.random.choice(num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
+            sys_inds.append(sys_trace_ind)
+
+            # print('\nsys_trace_ind', sys_trace_ind)
+            #get obs from the system trace corresponding to sys_trace_ind
+            sys_trace_obs = entries[sys_trace_ind]["obs"]
+            # print('sys_trace_obs.shape', sys_trace_obs.shape)
+            random_start = np.random.randint(0, sys_trace_obs.shape[-2] - segment_len) #randomly sample a starting index for each segment (random position)
+            start_inds.append(random_start)
+
+            # print('random_start', random_start)
+            segment = sys_trace_obs[..., random_start:random_start + segment_len, :]
+            # print('segment.shape orig:', segment.shape)
+            # print_matrix(segment, 'segment orig')
+
+            # Create the special tokens
+            start_token = (100 * (sys_trace_ind + 1)) * np.ones((1, segment.shape[1]))
+            end_token = (100 * (sys_trace_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+
+            
+            segment = np.concatenate([start_token, segment, end_token], axis=0)
+
+            # print('segment.shape post special tokens', segment.shape)
+            # print_matrix(segment, 'segment post special tokens')
+
+            segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
+            possible_space -= tok_seg_len #update the possible space for the next iteration
+
+        
+        entry = {"current": segments[:-1, :], "target": segments[1:, :]}
+        return entry, tok_seg_lens, sys_inds, start_inds
+
+
+def compute_errors_multi_sys(config, tf):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     logger = logging.getLogger(__name__)  # get the logger
@@ -981,14 +1037,6 @@ def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
             [entry["obs"] for entry in samples], axis=0
         ).reshape((num_systems, num_trials, config.n_positions + 1, config.ny)).astype(np.float32)
 
-        prev_xs = np.concatenate([
-            np.zeros((num_systems, num_trials, 1, config.nx)),
-            np.stack(
-                [entry["states"][:-1] for entry in samples], axis=0
-            ).reshape((num_systems, num_trials, config.n_positions, config.nx)).astype(np.float32)
-        ], axis=2)
-        noiseless_ys = prev_xs @ np.stack([sim_obj.C @ sim_obj.A for sim_obj in sim_objs], axis=0)[:, None].transpose(0, 1, 3, 2)
-
         gc.collect()  # Start the garbage collector
 
     ckpt_steps = get_step_number(config.ckpt_path)
@@ -1011,7 +1059,15 @@ def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
     # print("no tf pred")
     # Transformer Predictions
     if not ("MOP" in err_lss.keys()):
-        # entry, tok_seg_lens, sys_inds, start_inds  = fd.populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
+        print("len samples:", len(samples))
+        print("shape of samples[0]:", samples[0].shape)
+        print("len sim_objs:", len(sim_objs))
+        print("config.num_val_tasks:", config.num_val_tasks)
+        print("len samples/config.num_val_tasks:", len(samples)/config.num_val_tasks)
+        print("config.num_traces['val']:", config.num_traces['val'])
+
+        raise NotImplementedError("Need to implement the multi-system transformer predictions")
+        entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, samples) # get the first trace  which will set the testing structure
 
         print("\nstart tf pred")
         start = time.time()  # start the timer for transformer predictions
@@ -1087,58 +1143,22 @@ def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
 
     if not ("Kalman" in err_lss.keys()):
         start = time.time()  # start the timer for kalman filter predictions
-        if run_deg_kf_test:  # degenerate system KF Predictions
+        
+        # print("no kf pred")
+        # Kalman Predictions
+        print("start kf pred")
+        preds_kf = np.array([[
+            apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
+                    sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
+            for __ys in _ys
+        ] for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2))
+        ])  # get kalman filter predictions
+        errs_kf = np.linalg.norm((ys - preds_kf), axis=-1) ** 2
+        err_lss["Kalman"] = errs_kf
 
-            #############################################################
-            # this portion can most likely be deleted
-            # Kalman Filter Predictions
-            preds_kf_list = []
-            for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2)):
-                inner_list = []
-                for __ys in _ys:
-                    result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                                    sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
-                    inner_list.append(result)
-                preds_kf_list.append(inner_list)
-            #############################################################
-
-            preds_kf = np.array(preds_kf_list)  # get kalman filter predictions
-
-            # create an array of zeros to hold the kalman filter predictions
-            preds_kf = np.zeros((num_systems, num_systems, num_trials, config.n_positions + 1,
-                                config.ny))  # first axis is the system that the kalman filter is being trained on, second axis is the system that the kalman filter is being tested on
-
-            errs_kf = np.zeros((num_systems, num_systems, num_trials,
-                                config.n_positions + 1))  # first axis is the system that the kalman filter is being trained on, second axis is the system that the kalman filter is being tested on
-            # iterate over sim_objs
-            kf_index = 0
-            for sim_obj in sim_objs:  # iterate over the training systems
-                for sys in range(num_systems):  # iterate over the test systems
-                    print("Kalman filter", kf_index, "testing on system", sys)
-                    for trial in range(num_trials):
-                        preds_kf[kf_index, sys, trial, :, :] = apply_kf(sim_obj, ys[sys, trial, :-1, :],
-                                                                        sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                                                                        sigma_v=sim_obj.sigma_v * np.sqrt(
-                                                                            n_noise))  # get the kalman filter predictions for the test system and the training system
-                    errs_kf[kf_index, sys] = np.linalg.norm((ys[sys] - preds_kf[kf_index, sys]), axis=-1) ** 2  # get the errors of the kalman filter predictions for the test system and the training system
-                kf_index += 1
-
-        else:  
-            # print("no kf pred")
-            # Kalman Predictions
-            print("start kf pred")
-            preds_kf = np.array([[
-                apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                        sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
-                for __ys in _ys
-            ] for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2))
-            ])  # get kalman filter predictions
-            errs_kf = np.linalg.norm((ys - preds_kf), axis=-1) ** 2
-            err_lss["Kalman"] = errs_kf
-
-            os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-            with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-                    pickle.dump(err_lss, f)
+        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                pickle.dump(err_lss, f)
 
         end = time.time()  # end the timer for kalman filter predictions
         print("time elapsed for KF Pred:", (end - start) / 60,
@@ -1181,26 +1201,7 @@ def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
-    # print("no OLS")
-
-    if not ("OLS" in err_lss.keys()):
-        # Original OLS
-        # Clear the PyTorch cache
-        start = time.time()  # start the timer for OLS predictions
-        print("start OLS pred")
-        #print(torch.cuda.memory_summary())
-        err_lss = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss)
-
-
-        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-                pickle.dump(err_lss, f)
-
-        end = time.time()  # end the timer for OLS predictions
-        print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
-    else:
-        print("OLS pred already in err_lss")
-
+    
     irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
     return err_lss, irreducible_error
 
@@ -1210,6 +1211,8 @@ def compute_errors_multi_sys(config, C_dist, run_deg_kf_test, tf):
 def save_preds(run_deg_kf_test, config, train_conv, tf):
     if train_conv:
         err_lss, irreducible_error = compute_errors_conv(config)
+    elif config.multi_sys_trace:
+        err_lss, irreducible_error = compute_errors_multi_sys(config, tf)
     else:
         err_lss, irreducible_error = compute_errors(config, config.C_dist, run_deg_kf_test,
                                                 wentinn_data=False, tf=tf)

@@ -20,8 +20,8 @@ class Config(object, metaclass=Singleton):
     multi_sys_trace = True #have multiple systems in a single trace
 
     # Dataset settings
-    num_tasks = 40000 #number of training systems
-    num_val_tasks = 2 #number of test systems
+    num_tasks = 3 #number of training systems
+    num_val_tasks = 10 #number of test systems
     dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
     distinct_cond_nums = 10
@@ -30,7 +30,7 @@ class Config(object, metaclass=Singleton):
     nx = 10
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 2}
+    num_traces = {"train": 1, "val": 8}
     changing = False #used only for plotting
 
     # Training settings

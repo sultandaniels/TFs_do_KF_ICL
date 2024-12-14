@@ -1,5 +1,4 @@
 import numpy as np
-import cupy as cp
 import scipy as sc
 from numpy import linalg as lin
 from scipy import linalg as la
@@ -30,9 +29,9 @@ def is_symmetric(matrix, tol=1e-8):
 #             (Vinv @ W @ Vinv.T) / (1 - L[:, None] * L)
 #     ) @ V.T).real
     
-#     # if lin.trace(Pi) < 0:
+#     # if np.trace(Pi) < 0:
 
-#     #     print("\n\ntrace of Pi:", lin.trace(Pi))
+#     #     print("\n\ntrace of Pi:", np.trace(Pi))
 #     #     print("is symmetric:", is_symmetric((Vinv @ W @ Vinv.T) / (1 - L[:, None] * L)))
 #     #     print("eigs of inner mat:", lin.eig((Vinv @ W @ Vinv.T) / (1 - L[:, None] * L)))
 #     #     print("\nVinv:", Vinv)
@@ -244,7 +243,7 @@ class FilterSim:
 
                 # rescale C and V
                 V = np.eye(ny) * self.sigma_v ** 2
-                obs_tr = lin.trace(self.C @ self.S_state_inf @ self.C.T + V)
+                obs_tr = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
 
                 if obs_tr < 0:
                     print("obs_tr negative:", obs_tr)
@@ -262,7 +261,7 @@ class FilterSim:
                 self.sigma_v = alpha*self.sigma_v
                 V = np.eye(ny) * self.sigma_v ** 2
 
-                # obs_tr_new = lin.trace(self.C @ self.S_state_inf @ self.C.T + V)
+                # obs_tr_new = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
                 # print("new obs tr", obs_tr_new)
 
 

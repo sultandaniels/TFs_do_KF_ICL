@@ -25,10 +25,6 @@ def print_matrix(matrix, name):
 
 def populate_traces(n_positions, ny, num_tasks, entries):
 
-        sys_inds = []
-        tok_seg_lens = []
-        start_inds = []
-
         context_len = n_positions + 1
         segments = np.zeros((context_len, ny)) #initialize the segments array
         # print('segments.shape', segments.shape)
@@ -39,20 +35,20 @@ def populate_traces(n_positions, ny, num_tasks, entries):
             if possible_space - tok_seg_len < 3:
                 tok_seg_len = possible_space #do not leave a block at the end that can't be filled
 
-            tok_seg_lens.append(tok_seg_len)
+            
             segment_len = tok_seg_len - 2 #actual trace segment length
             # print('\nsegment_len', segment_len)
 
             # select a random integer between 0 and len(entries)
             sys_trace_ind = np.random.choice(num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
-            sys_inds.append(sys_trace_ind)
+            
 
             # print('\nsys_trace_ind', sys_trace_ind)
             #get obs from the system trace corresponding to sys_trace_ind
             sys_trace_obs = entries[sys_trace_ind]["obs"]
             # print('sys_trace_obs.shape', sys_trace_obs.shape)
             random_start = np.random.randint(0, sys_trace_obs.shape[-2] - segment_len) #randomly sample a starting index for each segment (random position)
-            start_inds.append(random_start)
+            
 
             # print('random_start', random_start)
             segment = sys_trace_obs[..., random_start:random_start + segment_len, :]
@@ -74,7 +70,7 @@ def populate_traces(n_positions, ny, num_tasks, entries):
 
         
         entry = {"current": segments[:-1, :], "target": segments[1:, :]}
-        return entry, tok_seg_lens, sys_inds, start_inds
+        return entry
 
 
 class FilterDataset(Dataset):
@@ -112,7 +108,7 @@ class FilterDataset(Dataset):
         #think about the case of not choosing the same system twice in a row
         #think about needing at least three indices of possible space
         if config.multi_sys_trace:
-            entry, tok_seg_lens, sys_inds, start_inds  = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
+            entry = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
             
         else:
             # generate random entries

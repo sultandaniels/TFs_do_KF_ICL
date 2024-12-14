@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import GPT2Model, GPT2Config, OlmoModel, OlmoConfig, TransfoXLConfig, TransfoXLModel
+from transformers import GPT2Model, GPT2Config, TransfoXLConfig, TransfoXLModel
 from models import BaseModel
 from core import Config
 
@@ -21,15 +21,15 @@ class GPT2(BaseModel):
             use_cache=False,
         )
         
-        olmo_configuration = OlmoConfig(
-            vocab_size=50304,
-            hidden_size=4096,
-            intermediate_size=11008,
-            num_hidden_layers=32,
-            num_attention_heads=32,
-            max_position_embeddings=2048,
-            use_cache=False
-        )
+        # olmo_configuration = OlmoConfig(
+        #     vocab_size=50304,
+        #     hidden_size=4096,
+        #     intermediate_size=11008,
+        #     num_hidden_layers=32,
+        #     num_attention_heads=32,
+        #     max_position_embeddings=2048,
+        #     use_cache=False
+        # )
 
         self.n_positions = n_positions
         self.n_dims_in = n_dims_in
@@ -42,8 +42,8 @@ class GPT2(BaseModel):
         elif config.model_type == "transfoXL":
             self._backbone = TransfoXLModel(gpt_configuration)
             self.name = f"transfoxl_embd={n_embd}_layer={n_layer}_head={n_head}"
-        elif config.model_type == "olmo":
-            self._backbone = OlmoModel(olmo_configuration)
+        # elif config.model_type == "olmo":
+        #     self._backbone = OlmoModel(olmo_configuration)
 
         self._read_out = nn.Linear(n_embd, n_dims_out)
 
