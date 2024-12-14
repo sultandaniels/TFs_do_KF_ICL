@@ -21,7 +21,7 @@ class Config(object, metaclass=Singleton):
     multi_sys_trace_num = 2 #number of systems in a single trace (must be smaller than n_positions)
 
     # Dataset settings
-    num_tasks = 40000 #number of training systems
+    num_tasks = 40 #number of training systems
     num_val_tasks = 2 #number of test systems
     dataset_typ = "upperTriA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
@@ -35,7 +35,7 @@ class Config(object, metaclass=Singleton):
     changing = False #used only for plotting
 
     # Training settings
-    devices=[1,2] #which GPU
+    devices=1 #which GPU
     train_steps = 5530 #number of training steps (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 5 #number of steps between logging (train interval)

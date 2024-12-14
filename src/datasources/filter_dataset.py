@@ -3,9 +3,25 @@ from dyn_models.filtering_lti import *
 from core import Config
 import torch
 import pickle
-import pdb
+
 
 config = Config()
+
+
+def print_matrix(matrix, name):
+    """
+    Print a matrix in a readable format.
+    
+    Parameters:
+    matrix (np.ndarray): The matrix to print.
+    name (str): The name of the matrix.
+    """
+    print(f"Matrix {name}:")
+    rows, cols = matrix.shape
+    for i in range(rows):
+        for j in range(cols):
+            print(f"{matrix[i, j]:>10.4f}", end=" ")
+        print()
 
 
 class FilterDataset(Dataset):
@@ -61,17 +77,25 @@ class FilterDataset(Dataset):
                 random_start = np.random.randint(0, obs.shape[-2] - segment_len) #randomly sample a starting index for each segment
                 print('random_start', random_start)
                 segment = obs[..., random_start:random_start + segment_len, :]
-                print('segment.shape', segment.shape)
-                print('segment', segment)
-                #append a special token to the beginning and end of each segment
-                segment = np.concatenate([(100*sys_count)*np.ones((segment.shape[0], 1, segment.shape[2])), segment, (100*sys_count + 1)*np.ones((segment.shape[0], 1, segment.shape[2]))], axis=1)
-                print('segment.shape', segment.shape)
-                print('segment', segment)
-                segments[(sys_count - 1) * segment_len:sys_count * segment_len, :] = segment
+                print('segment.shape orig:', segment.shape)
+                print_matrix(segment, 'segment orig')
+
+
+                # Create the special tokens
+                start_token = (100 * sys_count) * np.ones((1, segment.shape[1]))
+                end_token = (100 * sys_count + 1) * np.ones((1, segment.shape[1]))
+
+                # Concatenate the special tokens to the beginning and end of the segment
+                segment = np.concatenate([start_token, segment, end_token], axis=0)
+                print('segment.shape post special tokens', segment.shape)
+                print_matrix(segment, 'segment post special tokens')
+
+                tok_seg_len = segment_len + 2
+                segments[(sys_count - 1) * tok_seg_len:sys_count * tok_seg_len, :] = segment
                 sys_count += 1
 
             print('segments.shape', segments.shape)
-            print('segments', segments)
+            print_matrix(segments, "segments")
 
             entry = {"current": segments[:-1, :], "target": segments[1:, :]}
             print('entry["current"].shape', entry["target"].shape)
