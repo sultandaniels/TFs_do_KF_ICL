@@ -947,6 +947,7 @@ def compute_errors_conv(config):
 
 def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens=None, sys_inds=None, start_inds=None):
     # a function to populate the validation traces
+    # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
 
     context_len = n_positions + 1
@@ -1045,6 +1046,9 @@ def compute_errors_multi_sys(config, tf):
     num_trials = config.num_traces["val"]  # number of traces
     print("Number of traces:", num_trials)
 
+    num_test_traces_configs = config.num_test_traces_configs
+    print("Number of test trace configurations:", num_test_traces_configs)
+
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                       n_dims_out=config.n_dims_out, n_embd=config.n_embd,
@@ -1093,20 +1097,21 @@ def compute_errors_multi_sys(config, tf):
     # Transformer Predictions
     if not ("MOP" in err_lss.keys()):
 
-        multi_sys_ys = np.zeros((num_trials, config.n_positions + 1, config.ny)) #set up the array to hold the test traces
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #set up the array to hold the test traces
 
-        #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
-        tok_seg_lens = None
-        sys_inds = None
-        start_inds = None
-        for trial in range(num_trials):
-            entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
-            multi_sys_ys[trial] = entry
+        for trace_config in range(num_test_traces_configs):
+            #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
+            tok_seg_lens = None
+            sys_inds = None
+            start_inds = None
+            for trial in range(num_trials):
+                entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
+                multi_sys_ys[trace_config, trial] = entry
 
         print("\nstart tf pred")
         start = time.time()  # start the timer for transformer predictions
         with torch.no_grad():  # no gradients
-            I = np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+            I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
 
             # print("before model.predict_step()")
             batch_shape = I.shape[:-2]
@@ -1129,7 +1134,7 @@ def compute_errors_multi_sys(config, tf):
         end = time.time()  # end the timer for transformer predictions
         print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
 
-        errs_tf = np.linalg.norm((ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
+        errs_tf = np.linalg.norm((multi_sys_ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
         err_lss["MOP"] = errs_tf
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
