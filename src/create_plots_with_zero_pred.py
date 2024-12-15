@@ -1096,7 +1096,9 @@ def compute_errors_multi_sys(config, tf):
         multi_sys_ys = np.zeros((num_trials, config.n_positions + 1, config.ny)) #set up the array to hold the test traces
 
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
-        tok_seg_lens=None, sys_inds=None, start_inds=None
+        tok_seg_lens = None
+        sys_inds = None
+        start_inds = None
         for trial in range(num_trials):
             entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
             multi_sys_ys[trial] = entry
