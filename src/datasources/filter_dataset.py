@@ -105,8 +105,7 @@ class FilterDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        #think about the case of not choosing the same system twice in a row
-        #think about needing at least three indices of possible space
+        #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
             entry = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
             

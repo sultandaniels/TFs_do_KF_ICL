@@ -22,6 +22,7 @@ from dyn_models import apply_kf
 from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv
 from datasources import filter_dataset as fd
+import linalg_helpers as la
 
 plt.rcParams['axes.titlesize'] = 20
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
@@ -944,17 +945,20 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(n_positions, ny, num_tasks, entries, leader, tok_seg_lens=None, sys_inds=None, start_inds=None):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens=None, sys_inds=None, start_inds=None):
     # a function to populate the validation traces
-    if leader: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
+
+
+    context_len = n_positions + 1
+    segments = np.zeros((context_len, ny)) #initialize the segments array
+    # print('segments.shape', segments.shape)
+    possible_space = context_len #the possible space for the system traces plus special tokens
+
+
+    if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
         sys_inds = []
         tok_seg_lens = []
         start_inds = []
-
-        context_len = n_positions + 1
-        segments = np.zeros((context_len, ny)) #initialize the segments array
-        # print('segments.shape', segments.shape)
-        possible_space = context_len #the possible space for the system traces plus special tokens
 
         while possible_space > 0:
 
@@ -973,7 +977,7 @@ def populate_val_traces(n_positions, ny, num_tasks, entries, leader, tok_seg_len
 
             # print('\nsys_trace_ind', sys_trace_ind)
             #get obs from the system trace corresponding to sys_trace_ind
-            sys_trace_obs = entries[sys_trace_ind]["obs"]
+            sys_trace_obs = entries[sys_trace_ind,trial]
             # print('sys_trace_obs.shape', sys_trace_obs.shape)
             random_start = np.random.randint(0, sys_trace_obs.shape[-2] - segment_len) #randomly sample a starting index for each segment (random position)
             start_inds.append(random_start)
@@ -995,10 +999,39 @@ def populate_val_traces(n_positions, ny, num_tasks, entries, leader, tok_seg_len
 
             segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
             possible_space -= tok_seg_len #update the possible space for the next iteration
+        else:
+            count = 0
+            for sys_ind in sys_inds:
+                #get obs from the system trace corresponding to sys_trace_ind
+                sys_trace_obs = entries[sys_ind,trial]
+                # print('sys_trace_obs.shape', sys_trace_obs.shape)
 
-        
-        entry = {"current": segments[:-1, :], "target": segments[1:, :]}
-        return entry, tok_seg_lens, sys_inds, start_inds
+
+                random_start = start_inds[count]
+                tok_seg_len = tok_seg_lens[count]
+                segment_len = tok_seg_len - 2
+
+                # print('random_start', random_start)
+                segment = sys_trace_obs[..., random_start:random_start + segment_len, :]
+                # print('segment.shape orig:', segment.shape)
+                # print_matrix(segment, 'segment orig')
+
+                # Create the special tokens
+                start_token = (100 * (sys_trace_ind + 1)) * np.ones((1, segment.shape[1]))
+                end_token = (100 * (sys_trace_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+
+                
+                segment = np.concatenate([start_token, segment, end_token], axis=0)
+
+                # print('segment.shape post special tokens', segment.shape)
+                # print_matrix(segment, 'segment post special tokens')
+
+                segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
+                possible_space -= tok_seg_len #update the possible space for the next iteration
+
+                count += 1
+  
+        return segments, tok_seg_lens, sys_inds, start_inds
 
 
 def compute_errors_multi_sys(config, tf):
@@ -1059,15 +1092,14 @@ def compute_errors_multi_sys(config, tf):
     # print("no tf pred")
     # Transformer Predictions
     if not ("MOP" in err_lss.keys()):
-        print("len samples:", len(samples))
-        print("shape of samples[0]:", samples[0].shape)
-        print("len sim_objs:", len(sim_objs))
-        print("config.num_val_tasks:", config.num_val_tasks)
-        print("len samples/config.num_val_tasks:", len(samples)/config.num_val_tasks)
-        print("config.num_traces['val']:", config.num_traces['val'])
 
-        raise NotImplementedError("Need to implement the multi-system transformer predictions")
-        entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, samples) # get the first trace  which will set the testing structure
+        multi_sys_ys = np.zeros((num_trials, config.n_positions + 1, config.ny)) #set up the array to hold the test traces
+
+        #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
+        tok_seg_lens=None, sys_inds=None, start_inds=None
+        for trial in range(num_trials):
+            entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
+            multi_sys_ys[trial] = entry
 
         print("\nstart tf pred")
         start = time.time()  # start the timer for transformer predictions

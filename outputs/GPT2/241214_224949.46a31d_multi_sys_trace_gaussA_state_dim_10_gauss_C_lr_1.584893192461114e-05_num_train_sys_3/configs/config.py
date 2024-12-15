@@ -34,10 +34,10 @@ class Config(object, metaclass=Singleton):
     changing = False #used only for plotting
 
     # Training settings
-    devices=1 #which GPU
-    train_steps = 3 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
+    devices=[0,1,2] #which GPU
+    train_steps = 27000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
-    train_int = 3 #number of steps between logging (train interval)
+    train_int = 3000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
     batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)

@@ -87,7 +87,8 @@ def train_gpt2(model, config, output_dir, train_mix_dist=False, train_mix_state_
         gradient_clip_algorithm=config.gradient_clip_algorithm,
         gradient_clip_val=config.gradient_clip_val,
         log_every_n_steps=config.train_int,
-        min_epochs=config.num_epochs,
+        min_epochs=config.num_epochs if config.use_true_len else 0,
+        max_steps=-1 if config.use_true_len else config.train_steps,
         # max_epochs=config.num_epochs,
         strategy=DDPStrategy(find_unused_parameters=True) #only for BLISS GPUs
     )

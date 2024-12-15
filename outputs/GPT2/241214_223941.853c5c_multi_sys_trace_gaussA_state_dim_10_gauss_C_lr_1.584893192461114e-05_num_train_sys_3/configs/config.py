@@ -30,11 +30,11 @@ class Config(object, metaclass=Singleton):
     nx = 10
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 2}
+    num_traces = {"train": 1, "val": 5}
     changing = False #used only for plotting
 
     # Training settings
-    devices=1 #which GPU
+    devices=[3] #which GPU
     train_steps = 3 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 3 #number of steps between logging (train interval)
