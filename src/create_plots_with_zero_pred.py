@@ -705,8 +705,6 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
     torch.cuda.empty_cache()
     gc.collect()
 
-    n_noise = config.n_noise
-
 
 
     if not ("Kalman" in err_lss.keys()):
@@ -720,8 +718,8 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
             for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2)):
                 inner_list = []
                 for __ys in _ys:
-                    result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                                    sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
+                    result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w,
+                                    sigma_v=sim_obj.sigma_v)
                     inner_list.append(result)
                 preds_kf_list.append(inner_list)
             #############################################################
@@ -741,9 +739,8 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
                     print("Kalman filter", kf_index, "testing on system", sys)
                     for trial in range(num_trials):
                         preds_kf[kf_index, sys, trial, :, :] = apply_kf(sim_obj, ys[sys, trial, :-1, :],
-                                                                        sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                                                                        sigma_v=sim_obj.sigma_v * np.sqrt(
-                                                                            n_noise))  # get the kalman filter predictions for the test system and the training system
+                                                                        sigma_w=sim_obj.sigma_w,
+                                                                        sigma_v=sim_obj.sigma_v)  # get the kalman filter predictions for the test system and the training system
                     errs_kf[kf_index, sys] = np.linalg.norm((ys[sys] - preds_kf[kf_index, sys]), axis=-1) ** 2  # get the errors of the kalman filter predictions for the test system and the training system
                 kf_index += 1
 
@@ -752,8 +749,8 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
             # Kalman Predictions
             print("start kf pred")
             preds_kf = np.array([[
-                apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                        sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
+                apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w,
+                        sigma_v=sim_obj.sigma_v)
                 for __ys in _ys
             ] for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2))
             ])  # get kalman filter predictions
@@ -1099,6 +1096,9 @@ def compute_errors_multi_sys(config, tf):
 
         multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #set up the array to hold the test traces
 
+        sys_inds_per_config = []
+        start_inds_per_config = []
+        tok_seg_lens_per_config = []
         for trace_config in range(num_test_traces_configs):
             #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
             tok_seg_lens = None
@@ -1107,6 +1107,10 @@ def compute_errors_multi_sys(config, tf):
             for trial in range(num_trials):
                 entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = entry
+            
+            sys_inds_per_config.append(sys_inds)
+            start_inds_per_config.append(start_inds)
+            tok_seg_lens_per_config.append(tok_seg_lens)
 
         print("\nstart tf pred")
         start = time.time()  # start the timer for transformer predictions
@@ -1136,6 +1140,7 @@ def compute_errors_multi_sys(config, tf):
 
         errs_tf = np.linalg.norm((multi_sys_ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
         err_lss["MOP"] = errs_tf
+        print("shape of MOP errs_tf:", errs_tf.shape)
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
         with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
@@ -1152,15 +1157,6 @@ def compute_errors_multi_sys(config, tf):
     if tf: #only run transformer predictions
         irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
         return err_lss, irreducible_error
-    
-    # noiseless_errs_tf = np.linalg.norm((noiseless_ys - preds_tf), axis=-1) ** 2 + np.array([
-    #     (np.linalg.norm(sim_obj.C) * sim_obj.sigma_w) ** 2 + config.ny * (sim_obj.sigma_v ** 2)
-    #     for sim_obj in sim_objs
-    # ])[:, None, None]
-    # err_lss["Analytical_MOP"] = noiseless_errs_tf
-
-    # del noiseless_errs_tf
-    # del noiseless_ys
 
     print("start zero predictor")
     # zero predictor predictions
@@ -1176,24 +1172,44 @@ def compute_errors_multi_sys(config, tf):
     torch.cuda.empty_cache()
     gc.collect()
 
-    n_noise = config.n_noise
-
 
 
     if not ("Kalman" in err_lss.keys()):
         start = time.time()  # start the timer for kalman filter predictions
         
+        #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
+        sim_objs_per_config = []
+        for trace_config in range(num_test_traces_configs):
+            sim_objs_per_config.append([sim_objs[sys_ind] for sys_ind in sys_inds_per_config[trace_config]])
+
+
         # print("no kf pred")
         # Kalman Predictions
         print("start kf pred")
-        preds_kf = np.array([[
-            apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w * np.sqrt(n_noise),
-                    sigma_v=sim_obj.sigma_v * np.sqrt(n_noise))
-            for __ys in _ys
-        ] for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2))
-        ])  # get kalman filter predictions
-        errs_kf = np.linalg.norm((ys - preds_kf), axis=-1) ** 2
+        # preds_kf = np.array([[
+        #     apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w,
+        #             sigma_v=sim_obj.sigma_v)
+        #     for __ys in _ys
+        # ] for sim_obj, _ys in zip(sim_objs, np.take(multi_sys_ys, np.arange(ys.shape[-2] - 1), axis=-2))
+        # ])  # get kalman filter predictions
+
+        # Iterate over sim_objs and corresponding _ys
+        for sim_obj, _ys in zip(sim_objs, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)):
+            inner_list = []
+            # Iterate over each __ys in _ys
+            print("shape of _ys:", _ys.shape)
+            for __ys in _ys:
+                # Apply the Kalman filter and append the result to the inner list
+                result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
+                inner_list.append(result)
+            # Append the inner list to the preds_kf list
+            preds_kf.append(inner_list)
+
+        # Convert the preds_kf list to a numpy array
+        preds_kf = np.array(preds_kf)
+        errs_kf = np.linalg.norm((multi_sys_ys - preds_kf), axis=-1) ** 2
         err_lss["Kalman"] = errs_kf
+        print("shape of Kalman errs_kf:", errs_kf.shape)
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
         with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
@@ -1242,7 +1258,7 @@ def compute_errors_multi_sys(config, tf):
 
     
     irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-    return err_lss, irreducible_error
+    return err_lss, irreducible_error, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config
 
 
 
