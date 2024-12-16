@@ -997,7 +997,8 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
 
             segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
             possible_space -= tok_seg_len #update the possible space for the next iteration
-        else:
+    else:
+        if sys_inds:
             count = 0
             for sys_ind in sys_inds:
                 #get obs from the system trace corresponding to sys_trace_ind
@@ -1015,8 +1016,8 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
                 # print_matrix(segment, 'segment orig')
 
                 # Create the special tokens
-                start_token = (100 * (sys_trace_ind + 1)) * np.ones((1, segment.shape[1]))
-                end_token = (100 * (sys_trace_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+                start_token = (100 * (sys_ind + 1)) * np.ones((1, segment.shape[1]))
+                end_token = (100 * (sys_ind + 1) + 1) * np.ones((1, segment.shape[1]))
 
                 
                 segment = np.concatenate([start_token, segment, end_token], axis=0)
@@ -1028,8 +1029,13 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
                 possible_space -= tok_seg_len #update the possible space for the next iteration
 
                 count += 1
+        else:
+            if trial == 0:
+                raise ValueError(f"first conditional malfunction since trial = {trial}")
+            else:
+                raise ValueError(f"sys_inds is {sys_inds} when trial is {trial}")
   
-        return segments, tok_seg_lens, sys_inds, start_inds
+    return segments, tok_seg_lens, sys_inds, start_inds
 
 
 def compute_errors_multi_sys(config, tf):
@@ -1041,7 +1047,7 @@ def compute_errors_multi_sys(config, tf):
     num_systems = config.num_val_tasks  # number of validation tasks
     print("Number of validation systems:", num_systems)
     num_trials = config.num_traces["val"]  # number of traces
-    print("Number of traces:", num_trials)
+    print("Number of trials:", num_trials)
 
     num_test_traces_configs = config.num_test_traces_configs
     print("Number of test trace configurations:", num_test_traces_configs)
@@ -1092,9 +1098,10 @@ def compute_errors_multi_sys(config, tf):
 
     # print("no tf pred")
     # Transformer Predictions
-    if not ("MOP" in err_lss.keys()):
+    # if not ("MOP" in err_lss.keys()):
+    if True:
 
-        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #set up the array to hold the test traces
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)).astype(np.float32) #set up the array to hold the test traces
 
         sys_inds_per_config = []
         start_inds_per_config = []
@@ -1105,7 +1112,7 @@ def compute_errors_multi_sys(config, tf):
             sys_inds = None
             start_inds = None
             for trial in range(num_trials):
-                entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
+                entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = entry
             
             sys_inds_per_config.append(sys_inds)
@@ -1182,6 +1189,8 @@ def compute_errors_multi_sys(config, tf):
         for trace_config in range(num_test_traces_configs):
             sim_objs_per_config.append([sim_objs[sys_ind] for sys_ind in sys_inds_per_config[trace_config]])
 
+        print("len(sim_objs_per_config)", len(sim_objs_per_config))
+
 
         # print("no kf pred")
         # Kalman Predictions
@@ -1194,16 +1203,26 @@ def compute_errors_multi_sys(config, tf):
         # ])  # get kalman filter predictions
 
         # Iterate over sim_objs and corresponding _ys
-        for sim_obj, _ys in zip(sim_objs, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)):
+        preds_kf = []
+        for sim_obj_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
+
+            print("len(sim_obj_conf)", len(sim_obj_conf))
             inner_list = []
             # Iterate over each __ys in _ys
             print("shape of _ys:", _ys.shape)
-            for __ys in _ys:
-                # Apply the Kalman filter and append the result to the inner list
-                result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
-                inner_list.append(result)
+
+            for __ys in _ys: #loop over trial in trace configuration
+                seg_count = 0 #count of which segment
+                for sim_obj in sim_obj_conf: #loop over systems in sim_objs_conf
+                    # Apply the Kalman filter and append the result to the inner list
+                    result = apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
+                    inner_list.append(result)
+
+                    seg_count += 1
             # Append the inner list to the preds_kf list
             preds_kf.append(inner_list)
+
+        raise NotImplementedError
 
         # Convert the preds_kf list to a numpy array
         preds_kf = np.array(preds_kf)
