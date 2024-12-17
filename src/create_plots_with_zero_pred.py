@@ -20,7 +20,7 @@ from datetime import datetime
 from core import Config
 from dyn_models import apply_kf
 from models import GPT2, CnnKF
-from utils import RLS, plot_errs, plot_errs_conv
+from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
 from datasources import filter_dataset as fd
 import linalg_helpers as la
 
@@ -1099,75 +1099,71 @@ def compute_errors_multi_sys(config, tf):
     # print("no tf pred")
     # Transformer Predictions
     # if not ("MOP" in err_lss.keys()):
-    if True:
 
-        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)).astype(np.float32) #set up the array to hold the test traces
+    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)).astype(np.float32) #set up the array to hold the test traces
 
-        sys_inds_per_config = []
-        start_inds_per_config = []
-        tok_seg_lens_per_config = []
-        for trace_config in range(num_test_traces_configs):
-            #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
-            tok_seg_lens = None
-            sys_inds = None
-            start_inds = None
-            for trial in range(num_trials):
-                entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
-                multi_sys_ys[trace_config, trial] = entry
-            
-            sys_inds_per_config.append(sys_inds)
-            start_inds_per_config.append(start_inds)
-            tok_seg_lens_per_config.append(tok_seg_lens)
-
-        print("\nstart tf pred")
-        start = time.time()  # start the timer for transformer predictions
-        with torch.no_grad():  # no gradients
-            I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
-
-            # print("before model.predict_step()")
-            batch_shape = I.shape[:-2]
-            # print("batch_shape:", batch_shape)
-            flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
-            # print("flattened_I.shape:", flattened_I.shape)
-            validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
-                                                            batch_size=config.test_batch_size)
-            preds_arr = []  # Store the predictions for all batches
-            for validation_batch in iter(validation_loader):
-                _, flattened_preds_tf = model.predict_step(
-                    {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
-                preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
-            preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
-                                (*batch_shape, *I.shape[-2:]))  # Combine the predictions for all batches
-            # print("preds_tf.shape:", preds_tf.shape)
-            preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
-                                    axis=-2)  # concatenate the predictions
-            # print("preds_tf.shape:", preds_tf.shape)
-        end = time.time()  # end the timer for transformer predictions
-        print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
-
-        errs_tf = np.linalg.norm((multi_sys_ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
-        err_lss["MOP"] = errs_tf
-        print("shape of MOP errs_tf:", errs_tf.shape)
-
-        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-                pickle.dump(err_lss, f)  
+    sys_inds_per_config = []
+    start_inds_per_config = []
+    tok_seg_lens_per_config = []
+    for trace_config in range(num_test_traces_configs):
+        #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
+        tok_seg_lens = None
+        sys_inds = None
+        start_inds = None
+        for trial in range(num_trials):
+            entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
+            multi_sys_ys[trace_config, trial] = entry
         
-        del errs_tf
-        del preds_tf
+        sys_inds_per_config.append(sys_inds)
+        start_inds_per_config.append(start_inds)
+        tok_seg_lens_per_config.append(tok_seg_lens)
 
-        torch.cuda.empty_cache()
-        gc.collect()
-    else:
-        print("TF pred already in err_lss")
+    print("\nstart tf pred")
+    start = time.time()  # start the timer for transformer predictions
+    with torch.no_grad():  # no gradients
+        I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+
+        # print("before model.predict_step()")
+        batch_shape = I.shape[:-2]
+        # print("batch_shape:", batch_shape)
+        flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
+        # print("flattened_I.shape:", flattened_I.shape)
+        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
+                                                        batch_size=config.test_batch_size)
+        preds_arr = []  # Store the predictions for all batches
+        for validation_batch in iter(validation_loader):
+            _, flattened_preds_tf = model.predict_step(
+                {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
+            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                            (*batch_shape, *I.shape[-2:]))  # Combine the predictions for all batches
+        # print("preds_tf.shape:", preds_tf.shape)
+        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
+                                axis=-2)  # concatenate the predictions
+        # print("preds_tf.shape:", preds_tf.shape)
+    end = time.time()  # end the timer for transformer predictions
+    print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
+
+    errs_tf = np.linalg.norm((multi_sys_ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
+    err_lss["MOP"] = errs_tf
+    print("shape of MOP errs_tf:", errs_tf.shape)
+
+    os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+    with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+            pickle.dump(err_lss, f)  
+    
+    del errs_tf
+    del preds_tf
+
+    torch.cuda.empty_cache()
+    gc.collect()
 
     if tf: #only run transformer predictions
-        irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-        return err_lss, irreducible_error
+        return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config
 
     print("start zero predictor")
     # zero predictor predictions
-    errs_zero = np.linalg.norm(ys, axis=-1) ** 2  # get the errors of zero predictions
+    errs_zero = np.linalg.norm(multi_sys_ys, axis=-1) ** 2  # get the errors of zero predictions
     err_lss["Zero"] = errs_zero
 
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
@@ -1194,6 +1190,8 @@ def compute_errors_multi_sys(config, tf):
         # Kalman Predictions
         print("start kf pred")
         preds_kf = np.zeros(multi_sys_ys.shape)
+        an_kf_errs = np.zeros((num_test_traces_configs, config.n_positions + 1)) #initialize the array to hold the analytical kalman filter errors
+        an_sim_preds = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #initialize the array to hold the analytical simulation predictions
         conf_count = 0
         for sim_obj_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
 
@@ -1214,6 +1212,12 @@ def compute_errors_multi_sys(config, tf):
                     result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
                     inner_result[trial_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] = result[:-1,:] #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
+
+                    #analytical kalman filter errors
+                    an_kf_errs[conf_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(tok_seg_lens_conf[seg_count]) #get the analytical kalman filter error for the segment
+
+                    #analytical simulation predicions
+                    an_sim_preds[conf_count, trial_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (tok_seg_lens_conf[seg_count], config.ny)) #get the analytical simulation predictions for the segment
 
                     seg_count += 1
                 trial_count += 1
@@ -1245,37 +1249,15 @@ def compute_errors_multi_sys(config, tf):
     else:
         print("Kalman pred already in err_lss")
 
-    # # Check if CUDA is available
-    # if torch.cuda.is_available():
-
-    #     # Print memory usage
-    #     print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
-    #     print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
-    #     print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
-    #     print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
-    # else:
-    #     print("CUDA is not available.")
-
-
-    # Analytical Kalman Predictions
-    analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-    err_lss["Analytical_Kalman"] = analytical_kf.reshape((num_test_traces_configs, 1)) @ np.ones((1, config.n_positions))
     
-
-    #Analytical simulation predictions
-    #generate config.n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
-    an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (config.num_traces["val"], config.n_positions+1)) for sim_obj in sim_objs])
-
-    # print("an_sims shape:", an_sims.shape)
-    err_lss["Analytical_Simulation"] = np.linalg.norm(an_sims, axis=-1) ** 2
+    err_lss["Analytical_Kalman"] = an_kf_errs #set the analytical kalman filter errors in the err_lss dictionary
+    err_lss["Analytical_Simulation"] = np.linalg.norm(an_sim_preds, axis=-1) ** 2 #set the analytical simulation predictions in the err_lss dictionary
 
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
-    
-    irreducible_error = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-    return err_lss, irreducible_error, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config
+    return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config
 
 
 
@@ -1284,7 +1266,11 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     if train_conv:
         err_lss, irreducible_error = compute_errors_conv(config)
     elif config.multi_sys_trace:
-        err_lss, irreducible_error = compute_errors_multi_sys(config, tf)
+        err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config = compute_errors_multi_sys(config, tf)
+        
+        #save the system indices, starting indices, and token segment lengths to npz file
+        np.savez(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens.npz", sys_inds_per_config=sys_inds_per_config, start_inds_per_config=start_inds_per_config, tok_seg_lens_per_config=tok_seg_lens_per_config)
+        return None
     else:
         err_lss, irreducible_error = compute_errors(config, config.C_dist, run_deg_kf_test,
                                                 wentinn_data=False, tf=tf)
@@ -1461,7 +1447,63 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             return None
 
     # load the prediction errors from the file
-    err_lss_load, irreducible_error_load, fir_bounds, rnn_errors, rnn_an_errors = load_preds(run_deg_kf_test, excess,
+    if config.multi_sys_trace:
+
+        #load the system indices, starting indices, and token segment lengths from the npz file
+        with np.load(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens.npz") as data:
+            sys_inds_per_config = data['sys_inds_per_config']
+            start_inds_per_config = data['start_inds_per_config']
+            tok_seg_lens_per_config = data['tok_seg_lens_per_config']
+
+        #load the err_lss dict from teh pkl file
+        with open(
+                parent_parent_dir + "/prediction_errors" + config.C_dist + "_"+ f"step={ckpt_steps}.ckpt" + f"/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl",
+                "rb") as f:
+            err_lss_load = pickle.load(f)
+
+        for trace_conf in range(len(sys_inds_per_config)):
+
+            handles = plot_errs_multi_sys(trace_conf, err_lss_load)
+
+            ax.legend(fontsize=16, loc="upper right", ncol=max(1, math.floor(len(handles) / 2)))
+            ax.set_xlabel("i", fontsize=30)
+
+            ax.set_ylabel("MSE", fontsize=30)
+            # ax.set_ylabel("Err - Empirical KF Err" if logscale else "Prediction Error", fontsize=30)
+            # ax.set_ylabel("Median Error" if logscale else "Avg Error", fontsize=30)
+
+            ax.grid(which="both")
+            ax.tick_params(axis='both', which='major', labelsize=30)
+            ax.tick_params(axis='both', which='minor', labelsize=20)
+            if logscale:
+                ax.set_yscale('log')
+                ax.set_xscale('log')
+
+            ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
+
+            # get the parent directory of the ckpt_path
+            parent_dir = os.path.dirname(config.ckpt_path)
+
+            # get the parent directory of the parent directory
+            parent_parent_dir = os.path.dirname(parent_dir)
+            os.makedirs(parent_parent_dir + "/figures", exist_ok=True)
+            #add the date and time to the filename
+            now = datetime.now()
+            timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+            #get only the ckpt step from the ckpt_path
+            ckpt_step = config.ckpt_path.split("=")[1].split(".")[0]
+
+            #add a caption to the bottom of the figure
+            fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
+            fig.savefig(
+                parent_parent_dir + f"/figures/multi_sys_trace/{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}_" + (
+                    "logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
+        return None
+
+
+    else:
+        err_lss_load, irreducible_error_load, fir_bounds, rnn_errors, rnn_an_errors = load_preds(run_deg_kf_test, excess,
                                                                                              num_systems, config)
 
     # colors = [ '#EE7733', '#0077BB', '#EE3377', '#CC3311', '#009988', '#DDDDDD', '#33BBEE', '#EEDD88', '#BBBBBB','#7D00BD', '#d00960', '#006400', '#ff1493', '#00ff00', '#ff4500', '#8a2be2', '#5f9ea0', '#d2691e','#ff6347', '#4682b4', '#daa520', '#7fff00']
