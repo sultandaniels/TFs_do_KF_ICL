@@ -1189,53 +1189,38 @@ def compute_errors_multi_sys(config, tf):
         for trace_config in range(num_test_traces_configs):
             sim_objs_per_config.append([sim_objs[sys_ind] for sys_ind in sys_inds_per_config[trace_config]])
 
-        print("len(sim_objs_per_config)", len(sim_objs_per_config))
-
 
         # print("no kf pred")
         # Kalman Predictions
         print("start kf pred")
-        # preds_kf = np.array([[
-        #     apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w,
-        #             sigma_v=sim_obj.sigma_v)
-        #     for __ys in _ys
-        # ] for sim_obj, _ys in zip(sim_objs, np.take(multi_sys_ys, np.arange(ys.shape[-2] - 1), axis=-2))
-        # ])  # get kalman filter predictions
-
-        # Iterate over sim_objs and corresponding _ys
-        preds_kf = []
+        preds_kf = np.zeros(multi_sys_ys.shape)
         conf_count = 0
         for sim_obj_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
-            print(f"\n\nconf_count: {conf_count}")
 
             start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
             tok_seg_lens_conf = tok_seg_lens_per_config[conf_count] #get the token segment lengths for the trace configuration
-            print("len(sim_obj_conf)", len(sim_obj_conf))
-            inner_list = []
-            # Iterate over each __ys in _ys
-            print("shape of _ys:", _ys.shape)
 
+            inner_result = np.zeros(multi_sys_ys[0].shape) # initialize the kf pred array holder for this trace configuration
+
+            trial_count = 0
             for __ys in _ys: #loop over trial in trace configuration
+
                 seg_count = 0 #count of which segment
                 for sim_obj in sim_obj_conf: #loop over systems in sim_objs_conf
-                    print(f"\nseg_count: {seg_count}")
 
                     ys_seg = __ys[start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] #get the observation values for the segment
 
-                    print("shape of ys:", ys_seg.shape)
                     # Apply the Kalman filter and append the result to the inner list
                     result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
-                    inner_list.append(result)
+
+                    inner_result[trial_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] = result[:-1,:] #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
 
                     seg_count += 1
+                trial_count += 1
+
             # Append the inner list to the preds_kf list
-            preds_kf.append(inner_list)
-
-            print("shape of preds_kf:", np.array(preds_kf).shape)
-
+            preds_kf[conf_count] = inner_result
             conf_count += 1
-
-        raise NotImplementedError
 
         # Convert the preds_kf list to a numpy array
         preds_kf = np.array(preds_kf)
@@ -1274,7 +1259,7 @@ def compute_errors_multi_sys(config, tf):
 
     # Analytical Kalman Predictions
     analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-    err_lss["Analytical_Kalman"] = analytical_kf.reshape((num_systems, 1)) @ np.ones((1, config.n_positions))
+    err_lss["Analytical_Kalman"] = analytical_kf.reshape((num_test_traces_configs, 1)) @ np.ones((1, config.n_positions))
     
 
     #Analytical simulation predictions
