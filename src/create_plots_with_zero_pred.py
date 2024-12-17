@@ -970,7 +970,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
             # print('\nsegment_len', segment_len)
 
             # select a random integer between 0 and len(entries)
-            sys_trace_ind = np.random.choice(num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
+            sys_trace_ind = np.random.randint(0, num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
             sys_inds.append(sys_trace_ind)
 
             # print('\nsys_trace_ind', sys_trace_ind)
@@ -988,7 +988,6 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
             # Create the special tokens
             start_token = (100 * (sys_trace_ind + 1)) * np.ones((1, segment.shape[1]))
             end_token = (100 * (sys_trace_ind + 1) + 1) * np.ones((1, segment.shape[1]))
-
             
             segment = np.concatenate([start_token, segment, end_token], axis=0)
 
@@ -1176,8 +1175,9 @@ def compute_errors_multi_sys(config, tf):
     gc.collect()
 
 
-
-    if not ("Kalman" in err_lss.keys()):
+    if True:
+    # if not ("Kalman" in err_lss.keys()):
+        next_start_inds_per_config = []
         start = time.time()  # start the timer for kalman filter predictions
         
         #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
@@ -1195,35 +1195,48 @@ def compute_errors_multi_sys(config, tf):
         conf_count = 0
         for sim_obj_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
 
+            next_start_inds_conf = []
             start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
             tok_seg_lens_conf = tok_seg_lens_per_config[conf_count] #get the token segment lengths for the trace configuration
 
             inner_result = np.zeros(multi_sys_ys[0].shape) # initialize the kf pred array holder for this trace configuration
-
             trial_count = 0
             for __ys in _ys: #loop over trial in trace configuration
 
+                # la.print_matrix(__ys, "ys")
+
+                next_start = 0 #next start index for inner result
                 seg_count = 0 #count of which segment
                 for sim_obj in sim_obj_conf: #loop over systems in sim_objs_conf
 
-                    ys_seg = __ys[start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] #get the observation values for the segment
+                    inner_result[trial_count, next_start, :] = np.inf #set the kalman prediction error for start token to be infinite
+                    inner_result[trial_count, next_start + tok_seg_lens_conf[seg_count]-1, :] #set the kalman prediction error for end token to be infinite
+
+                    ys_seg = __ys[next_start + 1:next_start + tok_seg_lens_conf[seg_count] - 2, :] #get the observation values for the segment of ys without the special tokens
+
+                    # la.print_matrix(ys_seg, "ys_seg")
 
                     # Apply the Kalman filter and append the result to the inner list
                     result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
-                    inner_result[trial_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] = result[:-1,:] #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
+                    inner_result[trial_count, next_start + 1:next_start + tok_seg_lens_conf[seg_count] - 2, :] = result[:-1,:] #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
 
                     #analytical kalman filter errors
-                    an_kf_errs[conf_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(tok_seg_lens_conf[seg_count]) #get the analytical kalman filter error for the segment
+                    an_kf_errs[conf_count, next_start:next_start + tok_seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(tok_seg_lens_conf[seg_count]) #get the analytical kalman filter error for the segment
 
                     #analytical simulation predicions
-                    an_sim_preds[conf_count, trial_count, start_inds_conf[seg_count]:start_inds_conf[seg_count] + tok_seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (tok_seg_lens_conf[seg_count], config.ny)) #get the analytical simulation predictions for the segment
+                    an_sim_preds[conf_count, trial_count, next_start:next_start + tok_seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (tok_seg_lens_conf[seg_count])) #get the analytical simulation predictions for the segment
+                    next_start_inds_conf.append(next_start)
+
+                    next_start += tok_seg_lens_conf[seg_count]
 
                     seg_count += 1
                 trial_count += 1
 
             # Append the inner list to the preds_kf list
             preds_kf[conf_count] = inner_result
+
+            next_start_inds_per_config.append(next_start_inds_conf)
             conf_count += 1
 
         # Convert the preds_kf list to a numpy array
@@ -1257,24 +1270,12 @@ def compute_errors_multi_sys(config, tf):
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
-    return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config
+    return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config
 
 
 
 
 def save_preds(run_deg_kf_test, config, train_conv, tf):
-    if train_conv:
-        err_lss, irreducible_error = compute_errors_conv(config)
-    elif config.multi_sys_trace:
-        err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config = compute_errors_multi_sys(config, tf)
-        
-        #save the system indices, starting indices, and token segment lengths to npz file
-        np.savez(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens.npz", sys_inds_per_config=sys_inds_per_config, start_inds_per_config=start_inds_per_config, tok_seg_lens_per_config=tok_seg_lens_per_config)
-        return None
-    else:
-        err_lss, irreducible_error = compute_errors(config, config.C_dist, run_deg_kf_test,
-                                                wentinn_data=False, tf=tf)
-
     # make the prediction errors directory
     # get the parent directory of the ckpt_path
     parent_dir = os.path.dirname(config.ckpt_path)
@@ -1286,6 +1287,26 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     print("ckpt_steps:", ckpt_steps)
 
     os.makedirs(parent_parent_dir + "/prediction_errors" + config.C_dist + "_"+ f"step={ckpt_steps}.ckpt", exist_ok=True)
+
+    if train_conv:
+        err_lss, irreducible_error = compute_errors_conv(config)
+    elif config.multi_sys_trace:
+        err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config = compute_errors_multi_sys(config, tf)
+        
+        #save the system indices, starting indices, and token segment lengths to pickle file
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens_next_start_inds.pkl", 'wb') as f:
+            pickle.dump({
+                'sys_inds_per_config': sys_inds_per_config,
+                'start_inds_per_config': start_inds_per_config,
+                'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                'next_start_inds_per_config': next_start_inds_per_config
+            }, f)
+        return None
+    else:
+        err_lss, irreducible_error = compute_errors(config, config.C_dist, run_deg_kf_test,
+                                                wentinn_data=False, tf=tf)
+
+    
     if run_deg_kf_test:
         # save err_lss and irreducible_error to a file
         with open(
@@ -1448,22 +1469,36 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
     # load the prediction errors from the file
     if config.multi_sys_trace:
+        # get the parent directory of the ckpt_path
+        parent_dir = os.path.dirname(config.ckpt_path)
 
-        #load the system indices, starting indices, and token segment lengths from the npz file
-        with np.load(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens.npz") as data:
+        # get the parent directory of the parent directory
+        parent_parent_dir = os.path.dirname(parent_dir)
+        os.makedirs(parent_parent_dir + "/figures/multi_sys_trace/", exist_ok=True)
+
+        # get the step size from the ckpt_path
+        ckpt_steps = get_step_number(config.ckpt_path)
+        print("ckpt_steps:", ckpt_steps)
+
+        #load the system indices, starting indices, and token segment lengths from the pickle file
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens_next_start_inds.pkl", 'rb') as f:
+            data = pickle.load(f)
             sys_inds_per_config = data['sys_inds_per_config']
             start_inds_per_config = data['start_inds_per_config']
             tok_seg_lens_per_config = data['tok_seg_lens_per_config']
+            next_start_inds_per_config = data['next_start_inds_per_config']
 
-        #load the err_lss dict from teh pkl file
+        #load the err_lss dict from the pkl file
         with open(
                 parent_parent_dir + "/prediction_errors" + config.C_dist + "_"+ f"step={ckpt_steps}.ckpt" + f"/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl",
                 "rb") as f:
             err_lss_load = pickle.load(f)
 
         for trace_conf in range(len(sys_inds_per_config)):
+            fig = plt.figure(figsize=(15, 15)) # create a figure with a size of 15x15
+            ax = fig.add_subplot(111)
 
-            handles = plot_errs_multi_sys(trace_conf, err_lss_load)
+            handles = plot_errs_multi_sys(trace_conf, err_lss_load, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config, ax=ax)
 
             ax.legend(fontsize=16, loc="upper right", ncol=max(1, math.floor(len(handles) / 2)))
             ax.set_xlabel("i", fontsize=30)
@@ -1481,12 +1516,14 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
             ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
 
-            # get the parent directory of the ckpt_path
-            parent_dir = os.path.dirname(config.ckpt_path)
+            ax.set_ylim([0,2])
+            # Set major and minor gridlines
+            ax.grid(which='both', linestyle='--', linewidth=0.5)
 
-            # get the parent directory of the parent directory
-            parent_parent_dir = os.path.dirname(parent_dir)
-            os.makedirs(parent_parent_dir + "/figures", exist_ok=True)
+            # Optionally, customize major and minor ticks
+            ax.minorticks_on()
+            ax.tick_params(axis='both', which='major', length=7, width=1)
+            ax.tick_params(axis='both', which='minor', length=4, width=0.5)
             #add the date and time to the filename
             now = datetime.now()
             timestamp = now.strftime("%Y%m%d_%H%M%S")
@@ -1497,8 +1534,8 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             #add a caption to the bottom of the figure
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
             fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}_" + (
-                    "logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
+                parent_parent_dir + f"/figures/multi_sys_trace/{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
+                    "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
         return None
 
 

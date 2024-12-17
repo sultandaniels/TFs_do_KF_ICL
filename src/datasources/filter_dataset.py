@@ -40,7 +40,7 @@ def populate_traces(n_positions, ny, num_tasks, entries):
             # print('\nsegment_len', segment_len)
 
             # select a random integer between 0 and len(entries)
-            sys_trace_ind = np.random.choice(num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
+            sys_trace_ind = np.random.randint(num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
             
 
             # print('\nsys_trace_ind', sys_trace_ind)

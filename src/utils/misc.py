@@ -139,7 +139,9 @@ def plot_errs(colors, sys, err_lss, err_irreducible, legend_loc="upper right", a
     return handles, err_rat
 
 
-def plot_errs_multi_sys(trace_conf, err_lss, legend_loc="upper right", ax=None, shade=True, normalized=False):
+def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config, legend_loc="upper right", ax=None, shade=True, normalized=False):
+
+    next_start_inds = next_start_inds_per_config[trace_conf]
     names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman"]
     print("\n\n\nTrace Config", trace_conf)
     err_rat = np.zeros(2)
@@ -219,17 +221,20 @@ def plot_errs_multi_sys(trace_conf, err_lss, legend_loc="upper right", ax=None, 
                         avg, std = err_ls[trace_conf,:,:].mean(axis=(0)), (3/np.sqrt(err_ls.shape[1]))*err_ls[trace_conf,:,:].std(axis=0)
                         handles.extend(ax.plot(avg, 
                                             label=name, 
-                                            linewidth=1, 
+                                            linewidth=2, 
                                             marker='x' if name == "MOP" or name == "Kalman" else ".", 
                                             color=colors[color_count], 
                                             markersize=5 if name == "MOP" or name == "Kalman" or name == "Zero" else 1))
                         if shade:
-                            ax.fill_between(np.arange(err_ls.shape[-1]), avg - std, avg + std, facecolor=handles[-1].get_color(), alpha=0.2)
+                            ax.fill_between(np.arange(err_ls.shape[-1]), avg - std, avg + std, facecolor=handles[-1].get_color(), alpha=0.05)
 
                         color_count += 1
 
                     else: #plot the analytical kalman filter
-                        handles.extend(ax.plot(err_ls[trace_conf], label=name, linewidth=1, color='#000000'))
+                        handles.extend(ax.plot(err_ls[trace_conf], label=name, linewidth=2, color='#000000'))
+
+    for next_start in next_start_inds:
+        ax.axvline(x=next_start, color='r', linestyle='--', linewidth=2)
 
     return handles
 
