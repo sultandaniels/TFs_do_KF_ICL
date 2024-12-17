@@ -986,8 +986,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
             # print_matrix(segment, 'segment orig')
 
             # Create the special tokens
-            start_token = (100 * (sys_trace_ind + 1)) * np.ones((1, segment.shape[1]))
-            end_token = (100 * (sys_trace_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+            start_token, end_token = fd.special_tokens(segment, sys_ind, style="frac")
             
             segment = np.concatenate([start_token, segment, end_token], axis=0)
 
@@ -1015,8 +1014,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
                 # print_matrix(segment, 'segment orig')
 
                 # Create the special tokens
-                start_token = (100 * (sys_ind + 1)) * np.ones((1, segment.shape[1]))
-                end_token = (100 * (sys_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+                start_token, end_token = fd.special_tokens(segment, sys_ind, style="frac")
 
                 
                 segment = np.concatenate([start_token, segment, end_token], axis=0)

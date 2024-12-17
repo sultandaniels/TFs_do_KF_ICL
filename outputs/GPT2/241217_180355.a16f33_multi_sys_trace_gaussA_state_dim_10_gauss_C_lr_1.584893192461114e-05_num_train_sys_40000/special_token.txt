@@ -1,0 +1,3 @@
+for this training run the special tokens were
+start: system index/(system index + 1)
+end: -system index/(system index + 1)

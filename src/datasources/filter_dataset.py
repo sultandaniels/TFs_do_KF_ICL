@@ -23,6 +23,19 @@ def print_matrix(matrix, name):
             print(f"{matrix[i, j]:>10.4f}", end=" ")
         print()
 
+def special_tokens(segment, sys_ind, style):
+    # Create the special tokens
+    if style == "big_num":
+        start_token = (100 * (sys_ind + 1)) * np.ones((1, segment.shape[1]))
+        end_token = (100 * (sys_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+    elif style == "frac":
+        start_token = (sys_ind/(sys_ind + 1)) * np.ones((1, segment.shape[1]))
+        end_token = (-sys_ind/(sys_ind + 1)) * np.ones((1, segment.shape[1]))
+    else:
+        raise ValueError(f"Special token style {style} has not been implemented.")
+    
+    return start_token, end_token
+
 def populate_traces(n_positions, ny, num_tasks, entries):
 
         context_len = n_positions + 1
@@ -55,10 +68,8 @@ def populate_traces(n_positions, ny, num_tasks, entries):
             # print('segment.shape orig:', segment.shape)
             # print_matrix(segment, 'segment orig')
 
-            # Create the special tokens
-            start_token = (100 * (sys_trace_ind + 1)) * np.ones((1, segment.shape[1]))
-            end_token = (100 * (sys_trace_ind + 1) + 1) * np.ones((1, segment.shape[1]))
-
+            
+            start_token, end_token = special_tokens(segment, sys_trace_ind, style="frac")
             
             segment = np.concatenate([start_token, segment, end_token], axis=0)
 
