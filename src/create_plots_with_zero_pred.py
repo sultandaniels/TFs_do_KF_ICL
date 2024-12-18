@@ -342,6 +342,84 @@ def compute_OLS_ir(config, ys, sim_objs, max_ir_length, err_lss):
     torch.set_default_dtype(torch.float32)
     return err_lss
 
+def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_lens_per_config, sim_obs_per_config, config, multi_sys_ys, sim_objs, max_ir_length, err_lss):
+    # set torch precision to float64
+    torch.set_default_dtype(torch.float64)
+
+    for ir_length in range(1, max_ir_length + 1):
+        # Initialize the err_lss ols and ols analytical values to infinity shaped like the multi_sys_ys
+        err_lss[f"OLS_ir_{ir_length}"] = np.full(multi_sys_ys.shape[:-1], np.inf)
+        err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full(multi_sys_ys.shape[:-1], np.inf)
+
+        if ir_length == 2:
+            err_lss[f"OLS_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
+            err_lss[f"OLS_analytical_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
+
+
+    for trace_conf in range(num_trace_configs):
+        print(f"Trace config: {trace_conf}")
+        seg_count = 0
+        for next_start in next_start_per_config[trace_conf]:
+            tok_seg_len = tok_seg_lens_per_config[trace_conf][seg_count]
+            sim_objs = sim_obs_per_config[trace_conf][seg_count]
+            print(f"\tNext start: {next_start}")
+            print(f"\tToken segment length: {tok_seg_len}")
+            ys = multi_sys_ys[trace_conf, next_start_per_config[trace_conf] + 1:next_start_per_config[trace_conf] + tok_seg_lens_per_config[trace_conf] - 2]
+            print(f"\tys shape: {ys.shape}")
+            err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss)
+            seg_count += 1
+
+    return err_lss
+
+
+def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss):
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+
+    # set torch precision to float64
+    torch.set_default_dtype(torch.float64)
+    print("max_ir_length + 1:", max_ir_length + 1)
+    for ir_length in range(1, max_ir_length + 1):
+        start = time.time()
+        print(f"\tIR length: {ir_length}")
+
+        if ir_length == 2:
+            preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 0.0)
+
+            err_lss[f"OLS_ir_{ir_length}_unreg"][trace_conf, next_start + 1:next_start + tok_seg_len - 2] = np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2
+            err_lss[f"OLS_analytical_ir_{ir_length}_unreg"][trace_conf, next_start + 1:next_start + tok_seg_len - 2] = np.array(preds_rls_wentinn_analytical.cpu())
+
+            del preds_rls_wentinn
+            del preds_rls_wentinn_analytical
+            torch.cuda.empty_cache()
+            gc.collect()
+
+        preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 1.0)
+
+        err_lss[f"OLS_ir_{ir_length}"][trace_conf, next_start + 1:next_start + tok_seg_len - 2] = np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2
+        err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, next_start + 1:next_start + tok_seg_len - 2] = np.array(preds_rls_wentinn_analytical.cpu())
+        end = time.time()
+        print("\ttime elapsed:", (end - start) / 60, "min\n")
+
+        del preds_rls_wentinn
+        del preds_rls_wentinn_analytical   
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        # Check if CUDA is available
+        if torch.cuda.is_available():
+
+            # Print memory usage
+            print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
+            print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
+            print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
+            print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
+        else:
+            print("CUDA is not available.")
+    # set torch precision back to float32
+    torch.set_default_dtype(torch.float32)
+    return err_lss
+
 def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
@@ -1275,8 +1353,8 @@ def compute_errors_multi_sys(config, tf):
         # Clear the PyTorch cache
         start = time.time()  # start the timer for OLS predictions
         print("start OLS pred")
-        #print(torch.cuda.memory_summary())
-        err_lss = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss)
+
+        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, next_start_inds_per_config, tok_seg_lens_per_config, sim_objs_per_config, config, multi_sys_ys, max_ir_length=3, err_lss=err_lss)
 
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
