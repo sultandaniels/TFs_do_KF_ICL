@@ -986,7 +986,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens
             # print_matrix(segment, 'segment orig')
 
             # Create the special tokens
-            start_token, end_token = fd.special_tokens(segment, sys_ind, style="frac")
+            start_token, end_token = fd.special_tokens(segment, sys_trace_ind, style="frac")
             
             segment = np.concatenate([start_token, segment, end_token], axis=0)
 
@@ -1257,6 +1257,7 @@ def compute_errors_multi_sys(config, tf):
 
         torch.cuda.empty_cache()
         gc.collect()
+
     else:
         print("Kalman pred already in err_lss")
 
@@ -1267,6 +1268,25 @@ def compute_errors_multi_sys(config, tf):
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
+
+
+    if not ("OLS" in err_lss.keys()):
+        # Original OLS
+        # Clear the PyTorch cache
+        start = time.time()  # start the timer for OLS predictions
+        print("start OLS pred")
+        #print(torch.cuda.memory_summary())
+        err_lss = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss)
+
+
+        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                pickle.dump(err_lss, f)
+
+        end = time.time()  # end the timer for OLS predictions
+        print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
+    else:
+        print("OLS pred already in err_lss")
 
     return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config
 
@@ -1510,7 +1530,8 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             ax.tick_params(axis='both', which='minor', labelsize=20)
             if logscale:
                 ax.set_yscale('log')
-                ax.set_xscale('log')
+            
+            ax.set_xscale('log')
 
             ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
 

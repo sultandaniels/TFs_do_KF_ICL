@@ -35,7 +35,7 @@ class Config(object, metaclass=Singleton):
     changing = False #used only for plotting
 
     # Training settings
-    devices=[0,1,2,3] #which GPU
+    devices=[1,2] #which GPU
     train_steps = 84000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 3000 #number of steps between logging (train interval)
