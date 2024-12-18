@@ -3,6 +3,7 @@ import torch.nn as nn
 from transformers import GPT2Model, GPT2Config, TransfoXLConfig, TransfoXLModel
 from models import BaseModel
 from core import Config
+from linalg_helpers import print_matrix
 
 config = Config()
 
@@ -72,8 +73,25 @@ class GPT2(BaseModel):
     def calculate_losses_and_metrics(self, input_dict, intermediate_dict):
         # Calculate loss
         ys = input_dict["target"]
+        print('ys.shape', ys.shape)
+
+        print_matrix(ys, "ys")
+
         preds = intermediate_dict["preds"]
-        res_sq = (preds - ys) ** 2
+        res_sq = (preds - ys) ** 2 #residuals squared
+
+        print_matrix(res_sq, "res_sq")
+
+        # Create a mask to identify rows of ys that are all zeros
+        mask = torch.all(ys == 0, dim=-1, keepdim=True)
+        print_matrix(mask, "mask")
+        
+        # Apply the mask to res_sq to disregard the residuals for rows of ys that are all zeros
+        res_sq = res_sq.masked_fill(mask, 0)
+
+        print_matrix(res_sq, "res_sq masked")
+
+        raise NotImplementedError("Implement the rest of the function")
 
         output_dict = {"loss_mse": torch.mean(res_sq)} #mean squared error loss function
         for i in range(ys.shape[1]):

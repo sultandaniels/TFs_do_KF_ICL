@@ -19,7 +19,7 @@ class Config(object, metaclass=Singleton):
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
     num_test_traces_configs = 3 #number of test traces configurations to generate
-    max_tasks_trace = 25 #
+    max_sys_trace = 25 #maximum number of systems in a trace
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
@@ -52,7 +52,7 @@ class Config(object, metaclass=Singleton):
     n_embd = 128
     n_layer = 12
     n_head = 8
-    n_dims_in = 5
+    n_dims_in = int(ny + (2*max_sys_trace) + 1) #input dimension is the observation dimension + special token parentheses + special start token
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
     #transfoXL specific
