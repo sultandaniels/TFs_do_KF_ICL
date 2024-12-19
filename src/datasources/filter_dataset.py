@@ -3,6 +3,7 @@ from dyn_models.filtering_lti import *
 from core import Config
 import torch
 import pickle
+from linalg_helpers import print_matrix
 
 
 config = Config()
@@ -43,17 +44,20 @@ def print_matrix(matrix, name):
             print(f"{matrix[i, j]:>10.4f}", end=" ")
         print()
 
-def special_tokens(segment, sys_ind, style):
+def special_tokens(segment, sys_name, style):
     # Create the special tokens
     if style == "big_num":
-        start_token = (100 * (sys_ind + 1)) * np.ones((1, segment.shape[1]))
-        end_token = (100 * (sys_ind + 1) + 1) * np.ones((1, segment.shape[1]))
+        start_token = (100 * (sys_name + 1)) * np.ones((1, segment.shape[1]))
+        end_token = (100 * (sys_name + 1) + 1) * np.ones((1, segment.shape[1]))
     elif style == "frac":
-        start_token = (sys_ind/(sys_ind + 1)) * np.ones((1, segment.shape[1]))
-        end_token = (-sys_ind/(sys_ind + 1)) * np.ones((1, segment.shape[1]))
+        start_token = (sys_name/(sys_name + 1)) * np.ones((1, segment.shape[1]))
+        end_token = (-sys_name/(sys_name + 1)) * np.ones((1, segment.shape[1]))
     elif style == "zeros":
-        start_token = 0 * np.ones((1, segment.shape[1]))
-        end_token = 0 * np.ones((1, segment.shape[1]))
+        # create an array of zeros with the same number of columns as the segment, but with a 1 in the column corresponding to the 2*system name
+        start_token = np.zeros((1, segment.shape[1]))
+        start_token[0, 2*sys_name] = 1
+        end_token = np.zeros((1, segment.shape[1]))
+        end_token[0, 2*sys_name + 1] = 1
     else:
         raise ValueError(f"Special token style {style} has not been implemented.")
     
@@ -61,55 +65,79 @@ def special_tokens(segment, sys_ind, style):
 
 def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
         
-        sys_in_trace = generate_zipf_integer(max_sys_trace,2) #
+        sys_names = np.arange(max_sys_trace) #system names
+        print('sys_names', sys_names)
+        #randomly shuffle the system names
+        np.random.shuffle(sys_names)
+        print('sys_names', sys_names)
+        
+        sys_in_trace = generate_zipf_integer(max_sys_trace,2) #number of systems to include in the context
 
+        #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
+        sys_inds = np.random.randint(0, num_tasks, sys_in_trace)
 
+        #create a tuple that matches the system names to the system indices
+        sys_dict = dict(zip(sys_inds, sys_names))
+        print('sys_dict', sys_dict)
 
-
+        seg_lens = [] #initialize the list of segment lengths
+        while sum(seg_lens) < n_positions:
+            seg_lens = np.random.binomial(n_positions, 1/sys_in_trace, size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/sys_in_trace, so that when sys_in_trace = 1, there will only be one segment)
 
         context_len = n_positions + 1
-        segments = np.zeros((context_len, ny)) #initialize the segments array
-        # print('segments.shape', segments.shape)
-        possible_space = context_len #the possible space for the system traces plus special tokens
-        while possible_space > 0:
-            # print('\npossible_space', possible_space)
-            tok_seg_len = np.random.randint(3, possible_space + 1) #randomly sample a segment length between 3 and the possible space (length of segment randomness) tok_seg_len includes space for the special tokens
-            if possible_space - tok_seg_len < 3:
-                tok_seg_len = possible_space #do not leave a block at the end that can't be filled
+        segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
+        segments[0, 2*max_sys_trace] = 1 #set the start token for the first segment
+        print_matrix(segments, 'segments at the beginning')
 
-            
-            segment_len = tok_seg_len - 2 #actual trace segment length
-            # print('\nsegment_len', segment_len)
+        #initialize a dictionary to hold the next starting index for each system trace
+        next_start = {sys_ind: 0 for sys_ind in sys_inds} 
 
-            # select a random integer between 0 and len(entries)
-            sys_trace_ind = np.random.randint(num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
-            
+        seg_start = 1 #initialize the starting index for the segment at 1 to account for the start token
+        for seg_len in seg_lens:
+            #pick a random system index
+            sys_ind = np.random.choice(sys_inds)
 
-            # print('\nsys_trace_ind', sys_trace_ind)
             #get obs from the system trace corresponding to sys_trace_ind
-            sys_trace_obs = entries[sys_trace_ind]["obs"]
-            # print('sys_trace_obs.shape', sys_trace_obs.shape)
-            random_start = np.random.randint(0, sys_trace_obs.shape[-2] - segment_len) #randomly sample a starting index for each segment (random position)
-            
+            sys_trace_obs = entries[sys_ind]["obs"]
 
-            # print('random_start', random_start)
-            segment = sys_trace_obs[..., random_start:random_start + segment_len, :]
-            # print('segment.shape orig:', segment.shape)
-            # print_matrix(segment, 'segment orig')
+            segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :]
+            next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
+            print('segment.shape orig:', segment.shape)
 
-            
-            start_token, end_token = special_tokens(segment, sys_trace_ind, style="zeros")
-            
-            segment = np.concatenate([start_token, segment, end_token], axis=0)
+            #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+            zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+            segment = np.concatenate((segment, zeros), axis=1)
+            print('segment.shape post zeros:', segment.shape)
 
-            # print('segment.shape post special tokens', segment.shape)
-            # print_matrix(segment, 'segment post special tokens')
+            start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 
-            segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
-            possible_space -= tok_seg_len #update the possible space for the next iteration
+            segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
 
-        
-        entry = {"current": segments[:-1, :], "target": segments[1:, :]}
+            print('segment.shape post special tokens:', segment.shape)
+            print_matrix(segment, 'segment post special tokens')
+
+            if seg_start + seg_len + 2 > context_len:
+                #truncate the segment if it is too long so that it fits in the context
+                segment = segment[:context_len - seg_start, :]
+                tok_seg_len = segment.shape[0]
+                print('segment.shape post truncation:', segment.shape)
+                break
+
+            segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+
+            if seg_start + tok_seg_len == context_len:
+                break
+
+            seg_start += tok_seg_len #update the starting index for the next segment
+
+        print_matrix(segments, 'segments at the end')
+
+        print("shape of segments[:, 2*max_sys_trace+1:]", segments[:, 2*max_sys_trace+1:].shape)
+
+
+
+        entry = {"current": segments[:-1, :], "target": segments[1:, 2*max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
+
         return entry
 
 
