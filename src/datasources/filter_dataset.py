@@ -25,7 +25,7 @@ def generate_zipf_integer(n, a):
     # Clip the samples to the desired range (1 to n)
     sample = np.clip(sample, 0, n)
 
-    return sample
+    return sample[0]
 
 
 
@@ -65,80 +65,83 @@ def special_tokens(segment, sys_name, style):
 
 def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
         
-        sys_names = np.arange(max_sys_trace) #system names
-        print('sys_names', sys_names)
-        #randomly shuffle the system names
-        np.random.shuffle(sys_names)
-        print('sys_names', sys_names)
+    sys_names = np.arange(max_sys_trace) #system names
+    #randomly shuffle the system names
+    np.random.shuffle(sys_names)
+    
+    sys_in_trace = generate_zipf_integer(max_sys_trace,2) #number of systems to include in the context
+
+    #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
+    sys_inds = np.random.randint(0, num_tasks, sys_in_trace).tolist()
+
+    #create a tuple that matches the system names to the system indices
+    sys_dict = {}
+    for i in range(len(sys_inds)):
+        sys_dict[sys_inds[i]] = sys_names[i]
         
-        sys_in_trace = generate_zipf_integer(max_sys_trace,2) #number of systems to include in the context
 
-        #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
-        sys_inds = np.random.randint(0, num_tasks, sys_in_trace)
+    seg_lens = [] #initialize the list of segment lengths
+    while sum(seg_lens) < n_positions:
+        seg_lens = np.random.binomial(n_positions, 1/sys_in_trace, size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/sys_in_trace, so that when sys_in_trace = 1, there will only be one segment)
 
-        #create a tuple that matches the system names to the system indices
-        sys_dict = dict(zip(sys_inds, sys_names))
-        print('sys_dict', sys_dict)
+    context_len = n_positions + 1
+    segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
+    segments[0, 2*max_sys_trace] = 1 #set the start token for the first segment
 
-        seg_lens = [] #initialize the list of segment lengths
-        while sum(seg_lens) < n_positions:
-            seg_lens = np.random.binomial(n_positions, 1/sys_in_trace, size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/sys_in_trace, so that when sys_in_trace = 1, there will only be one segment)
+    #initialize a dictionary to hold the next starting index for each system trace
+    next_start = {sys_ind: 0 for sys_ind in sys_inds} 
 
-        context_len = n_positions + 1
-        segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
-        segments[0, 2*max_sys_trace] = 1 #set the start token for the first segment
-        print_matrix(segments, 'segments at the beginning')
+    seg_start = 1 #initialize the starting index for the segment at 1 to account for the start token
+    for seg_len in seg_lens:
 
-        #initialize a dictionary to hold the next starting index for each system trace
-        next_start = {sys_ind: 0 for sys_ind in sys_inds} 
+        if seg_start > 1:
+            old_sys_ind = sys_ind
 
-        seg_start = 1 #initialize the starting index for the segment at 1 to account for the start token
-        for seg_len in seg_lens:
-            #pick a random system index
-            sys_ind = np.random.choice(sys_inds)
+        #pick a random system index
+        sys_ind = np.random.choice(sys_inds)
 
-            #get obs from the system trace corresponding to sys_trace_ind
-            sys_trace_obs = entries[sys_ind]["obs"]
+        sys_inds.remove(sys_ind)
 
-            segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :]
-            next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
-            print('segment.shape orig:', segment.shape)
+        if seg_start > 1:
+            sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)\
 
-            #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
-            zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
-            segment = np.concatenate((segment, zeros), axis=1)
-            print('segment.shape post zeros:', segment.shape)
+        #get obs from the system trace corresponding to sys_trace_ind
+        sys_trace_obs = entries[sys_ind]["obs"]
 
-            start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
+        segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :]
+        next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
+        # print('segment.shape orig:', segment.shape)
 
-            segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
+        #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+        zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+        segment = np.concatenate((zeros, segment), axis=1)
+        # print('segment.shape post zeros:', segment.shape)
 
-            print('segment.shape post special tokens:', segment.shape)
-            print_matrix(segment, 'segment post special tokens')
+        start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 
-            if seg_start + seg_len + 2 > context_len:
-                #truncate the segment if it is too long so that it fits in the context
-                segment = segment[:context_len - seg_start, :]
-                tok_seg_len = segment.shape[0]
-                print('segment.shape post truncation:', segment.shape)
-                break
+        segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
 
-            segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
-
-            if seg_start + tok_seg_len == context_len:
-                break
-
-            seg_start += tok_seg_len #update the starting index for the next segment
-
-        print_matrix(segments, 'segments at the end')
-
-        print("shape of segments[:, 2*max_sys_trace+1:]", segments[:, 2*max_sys_trace+1:].shape)
+        if seg_start + seg_len + 2 > context_len:
+            #truncate the segment if it is too long so that it fits in the context
+            segment = segment[:context_len - seg_start, :]
+            # print('segment.shape post truncation:', segment.shape)
+            break
 
 
+        tok_seg_len = segment.shape[0]
 
-        entry = {"current": segments[:-1, :], "target": segments[1:, 2*max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
+        segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+        # print_matrix(segments[seg_start:seg_start + tok_seg_len, :], "seg")
 
-        return entry
+        if seg_start + tok_seg_len == context_len:
+            break
+
+        seg_start += tok_seg_len #update the starting index for the next segment
+
+
+    entry = {"current": segments[:-1, :], "target": segments[1:, 2*max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
+
+    return entry
 
 
 class FilterDataset(Dataset):
@@ -175,12 +178,7 @@ class FilterDataset(Dataset):
 
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
-            entry = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
-            zeros = np.zeros((entry["current"].shape[0], 2*config.max_sys_trace + 1))
-
-            # Concatenate the original tensor with the zeros tensor along the second dimension (columns)
-            entry["current"] = np.concatenate((entry["current"], zeros), axis=1)
-            
+            entry = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
         else:
             # generate random entries
             entry = self.entries[idx % len(self.entries)].copy()

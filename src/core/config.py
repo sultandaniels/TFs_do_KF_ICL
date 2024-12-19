@@ -16,13 +16,8 @@ class Config(object, metaclass=Singleton):
     seed = 0
     fully_reproducible = False
 
-    #experiment settings
-    multi_sys_trace = True #have multiple systems in a single trace
-    num_test_traces_configs = 3 #number of test traces configurations to generate
-    max_sys_trace = 25 #maximum number of systems in a trace
-
     # Dataset settings
-    num_tasks = 3 #number of training systems
+    num_tasks = 40000 #number of training systems
     num_val_tasks = 1 #number of test systems
     dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
@@ -35,8 +30,13 @@ class Config(object, metaclass=Singleton):
     num_traces = {"train": 1, "val": 1}
     changing = False #used only for plotting
 
+    #experiment settings
+    multi_sys_trace = True #have multiple systems in a single trace
+    num_test_traces_configs = 3 #number of test traces configurations to generate
+    max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
+
     # Training settings
-    devices=1 #which GPU
+    devices=[1,2] #which GPU
     train_steps = 84000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 3000 #number of steps between logging (train interval)
