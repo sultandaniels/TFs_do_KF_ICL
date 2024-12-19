@@ -63,8 +63,9 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
+def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False):
     sys_choices = [] #list that will hold the order of the system choices for the trace
+    seg_starts = []
 
 
     sys_names = np.arange(max_sys_trace) #system names
@@ -95,6 +96,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
 
     seg_start = 1 #initialize the starting index for the segment at 1 to account for the start token
     for seg_len in seg_lens:
+        seg_starts.append(seg_start)
 
         if seg_start > 1:
             old_sys_ind = sys_ind
@@ -109,7 +111,10 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
             sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)
 
         #get obs from the system trace corresponding to sys_trace_ind
-        sys_trace_obs = entries[sys_ind]["obs"]
+        if test:
+            sys_trace_obs = entries[sys_ind]
+        else:
+            sys_trace_obs = entries[sys_ind]["obs"]
 
         if next_start[sys_ind] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
             if next_start[sys_ind] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
@@ -144,7 +149,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
 
         seg_start += tok_seg_len #update the starting index for the next segment
 
-    return segments, sys_choices, sys_dict, seg_lens
+    return segments, sys_choices, sys_dict, seg_lens, seg_starts
 
 
 class FilterDataset(Dataset):
@@ -181,7 +186,7 @@ class FilterDataset(Dataset):
 
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
-            segments, sys_choices, sys_dict, seg_lens = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
+            segments, sys_choices, sys_dict, seg_lens, seg_starts = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
             entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
         else:
             # generate random entries

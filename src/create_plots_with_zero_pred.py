@@ -22,7 +22,7 @@ from dyn_models import apply_kf
 from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
 from datasources import filter_dataset
-from datasources.filter_dataset import populate_traces, special_parens
+from datasources.filter_dataset import populate_traces, special_tokens
 import linalg_helpers as la
 
 plt.rcParams['axes.titlesize'] = 20
@@ -1050,7 +1050,7 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, seg_lens=None):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, seg_lens=None, seg_starts=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
@@ -1060,7 +1060,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
     print("shape of ys_trial:", ys_trial.shape)
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-       segments, sys_choices, sys_dict, seg_lens = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace)
+       segments, sys_choices, sys_dict, seg_lens, seg_starts = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True)
     else:
         if sys_dict:
             context_len = n_positions + 1 #the length of the context
@@ -1114,7 +1114,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
             else:
                 raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
   
-    return segments, sys_choices, sys_dict, seg_lens
+    return segments, sys_choices, sys_dict, seg_lens, seg_starts
 
 
 def compute_errors_multi_sys(config, tf):
@@ -1179,23 +1179,26 @@ def compute_errors_multi_sys(config, tf):
     # Transformer Predictions
     # if not ("MOP" in err_lss.keys()):
 
-    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)).astype(np.float32) #set up the array to hold the test traces
+    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 1)).astype(np.float32) #set up the array to hold the test traces
 
-    sys_inds_per_config = []
-    start_inds_per_config = []
-    tok_seg_lens_per_config = []
+    sys_choices_per_config = []
+    sys_dict_per_config = []
+    seg_lens_per_config = []
+    seg_starts_per_config = []
     for trace_config in range(num_test_traces_configs):
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
-        tok_seg_lens = None
-        sys_inds = None
-        start_inds = None
+        seg_lens = None
+        sys_dict = None
+        sys_choices = None
+        seg_starts= None
         for trial in range(num_trials):
-            entry, tok_seg_lens, sys_inds, start_inds  = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, tok_seg_lens, sys_inds, start_inds) # get the first trace  which will set the testing structure
-            multi_sys_ys[trace_config, trial] = entry
+            segments, sys_choices, sys_dict, seg_lens, seg_starts = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, seg_lens, seg_starts) # get the first trace  which will set the testing structure
+            multi_sys_ys[trace_config, trial] = segments
         
-        sys_inds_per_config.append(sys_inds)
-        start_inds_per_config.append(start_inds)
-        tok_seg_lens_per_config.append(tok_seg_lens)
+        sys_choices_per_config.append(sys_choices)
+        sys_dict_per_config.append(sys_dict)
+        seg_lens_per_config.append(seg_lens)
+        seg_starts_per_config.append(seg_starts)
 
     print("\nstart tf pred")
     start = time.time()  # start the timer for transformer predictions
@@ -1238,7 +1241,7 @@ def compute_errors_multi_sys(config, tf):
     gc.collect()
 
     if tf: #only run transformer predictions
-        return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config
+        return err_lss, sys_choices_per_config, sys_dict_per_config, seg_lens_per_config, seg_starts_per_config
 
     print("start zero predictor")
     # zero predictor predictions
@@ -1257,13 +1260,12 @@ def compute_errors_multi_sys(config, tf):
 
     if True:
     # if not ("Kalman" in err_lss.keys()):
-        next_start_inds_per_config = []
         start = time.time()  # start the timer for kalman filter predictions
         
         #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
         sim_objs_per_config = []
         for trace_config in range(num_test_traces_configs):
-            sim_objs_per_config.append([sim_objs[sys_ind] for sys_ind in sys_inds_per_config[trace_config]])
+            sim_objs_per_config.append([{sys_ind: sim_objs[sys_ind]} for sys_ind in sys_dict_per_config[trace_config].keys()])
 
 
         # print("no kf pred")
@@ -1273,50 +1275,56 @@ def compute_errors_multi_sys(config, tf):
         an_kf_errs = np.zeros((num_test_traces_configs, config.n_positions + 1)) #initialize the array to hold the analytical kalman filter errors
         an_sim_preds = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #initialize the array to hold the analytical simulation predictions
         conf_count = 0
-        for sim_obj_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
+        for sim_obj_dict_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
+            
+            seg_starts_conf = seg_starts_per_config[conf_count]
+            # start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
+            seg_lens_conf = seg_lens_per_config[conf_count]
+            sys_choices_conf = sys_choices_per_config[conf_count]
 
-            next_start_inds_conf = []
-            start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
-            tok_seg_lens_conf = tok_seg_lens_per_config[conf_count] #get the token segment lengths for the trace configuration
+            print(len(seg_starts_conf))
+            print(len(seg_lens_conf))
+            print(len(sys_choices_conf))
 
             inner_result = np.zeros(multi_sys_ys[0].shape) # initialize the kf pred array holder for this trace configuration
+            inner_result[:, 0, :] = np.inf #set the kalman prediction error for start token to be infinite
             trial_count = 0
             for __ys in _ys: #loop over trial in trace configuration
 
                 # la.print_matrix(__ys, "ys")
-
-                next_start = 0 #next start index for inner result
                 seg_count = 0 #count of which segment
-                for sim_obj in sim_obj_conf: #loop over systems in sim_objs_conf
+                for seg_start in seg_starts_conf: #loop over systems in sim_objs_conf
+                    sim_obj = sim_objs[sys_choices_conf[seg_count]]
 
-                    inner_result[trial_count, next_start, :] = np.inf #set the kalman prediction error for start token to be infinite
-                    inner_result[trial_count, next_start + tok_seg_lens_conf[seg_count]-1, :] = np.inf #set the kalman prediction error for end token to be infinite
+                    #set the kalman prediction error for start paren to be infinite
+                    inner_result[trial_count, seg_start, :] = np.inf 
+                    #set the kalman prediction error for end paren to be infinite
+                    inner_result[trial_count, seg_start + seg_lens_conf[seg_count]-1, :] = np.inf 
 
-                    ys_seg = __ys[next_start + 1:next_start + tok_seg_lens_conf[seg_count] - 1, :] #get the observation values for the segment of ys without the special tokens
+                    #get the observation values for the segment of ys without the special tokens
+                    ys_seg = __ys[seg_start + 1:seg_start + seg_lens_conf[seg_count] - 1, :] 
 
                     # la.print_matrix(ys_seg, "ys_seg")
 
                     # Apply the Kalman filter and append the result to the inner list
                     result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
-                    inner_result[trial_count, next_start + 1:next_start + tok_seg_lens_conf[seg_count] - 1, :] = result[:-1,:] #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
+                    #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
+                    inner_result[trial_count, seg_start + 1:seg_start + seg_lens_conf[seg_count] - 1, :] = result[:-1,:] 
 
                     #analytical kalman filter errors
-                    an_kf_errs[conf_count, next_start:next_start + tok_seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(tok_seg_lens_conf[seg_count]) #get the analytical kalman filter error for the segment
+                    #get the analytical kalman filter error for the segment
+                    an_kf_errs[conf_count, seg_start:seg_start + seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(seg_lens_conf[seg_count]) 
 
                     #analytical simulation predicions
-                    an_sim_preds[conf_count, trial_count, next_start:next_start + tok_seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (tok_seg_lens_conf[seg_count])) #get the analytical simulation predictions for the segment
-                    next_start_inds_conf.append(next_start)
-
-                    next_start += tok_seg_lens_conf[seg_count]
+                    #get the analytical simulation predictions for the segment
+                    an_sim_preds[conf_count, trial_count, seg_start:seg_start + seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (seg_lens_conf[seg_count])) 
 
                     seg_count += 1
                 trial_count += 1
 
             # Append the inner list to the preds_kf list
             preds_kf[conf_count] = inner_result
-
-            next_start_inds_per_config.append(next_start_inds_conf)
             conf_count += 1
 
         # Convert the preds_kf list to a numpy array
@@ -1358,7 +1366,7 @@ def compute_errors_multi_sys(config, tf):
         start = time.time()  # start the timer for OLS predictions
         print("start OLS pred")
 
-        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, next_start_inds_per_config, tok_seg_lens_per_config, sim_objs_per_config, config, multi_sys_ys, max_ir_length=3, err_lss=err_lss)
+        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, seg_lens_per_config, sim_objs_per_config, config, multi_sys_ys, max_ir_length=3, err_lss=err_lss)
 
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
@@ -1370,7 +1378,7 @@ def compute_errors_multi_sys(config, tf):
     else:
         print("OLS pred already in err_lss")
 
-    return err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config
+    return err_lss, sys_choices_per_config, sys_dict_per_config, seg_lens_per_config, seg_starts_per_config
 
 
 
@@ -1644,7 +1652,6 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         err_lss_load, irreducible_error_load, fir_bounds, rnn_errors, rnn_an_errors = load_preds(run_deg_kf_test, excess,
                                                                                              num_systems, config)
 
-    # colors = [ '#EE7733', '#0077BB', '#EE3377', '#CC3311', '#009988', '#DDDDDD', '#33BBEE', '#EEDD88', '#BBBBBB','#7D00BD', '#d00960', '#006400', '#ff1493', '#00ff00', '#ff4500', '#8a2be2', '#5f9ea0', '#d2691e','#ff6347', '#4682b4', '#daa520', '#7fff00']
 
    # Define the dark colors in hex format
     colors = [
