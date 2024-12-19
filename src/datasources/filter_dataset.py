@@ -61,7 +61,7 @@ def special_tokens(segment, sys_ind, style):
 
 def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
         
-        print(generate_zipf_integer(max_sys_trace,2))
+        sys_in_trace = generate_zipf_integer(max_sys_trace,2) #
 
 
 
