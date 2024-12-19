@@ -7,6 +7,26 @@ import pickle
 
 config = Config()
 
+def generate_zipf_integer(n, a):
+    """
+    Generate integer number between 1 and n (inclusive) from a Zipf's power law distribution.
+
+    Parameters:
+    n (int): The upper limit (inclusive) for the range of integers.
+    a (float): The parameter of the Zipf distribution (a > 1).
+
+    Returns:
+    np.ndarray: An array of integers between 0 and n.
+    """
+    # Generate samples from a Zipf distribution
+    sample = np.random.zipf(a, 1)
+
+    # Clip the samples to the desired range (1 to n)
+    sample = np.clip(sample, 0, n)
+
+    return sample
+
+
 
 def print_matrix(matrix, name):
     """
@@ -31,12 +51,21 @@ def special_tokens(segment, sys_ind, style):
     elif style == "frac":
         start_token = (sys_ind/(sys_ind + 1)) * np.ones((1, segment.shape[1]))
         end_token = (-sys_ind/(sys_ind + 1)) * np.ones((1, segment.shape[1]))
+    elif style == "zeros":
+        start_token = 0 * np.ones((1, segment.shape[1]))
+        end_token = 0 * np.ones((1, segment.shape[1]))
     else:
         raise ValueError(f"Special token style {style} has not been implemented.")
     
     return start_token, end_token
 
-def populate_traces(n_positions, ny, num_tasks, entries):
+def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
+        
+        print(generate_zipf_integer(max_sys_trace,2))
+
+
+
+
 
         context_len = n_positions + 1
         segments = np.zeros((context_len, ny)) #initialize the segments array
@@ -69,7 +98,7 @@ def populate_traces(n_positions, ny, num_tasks, entries):
             # print_matrix(segment, 'segment orig')
 
             
-            start_token, end_token = special_tokens(segment, sys_trace_ind, style="frac")
+            start_token, end_token = special_tokens(segment, sys_trace_ind, style="zeros")
             
             segment = np.concatenate([start_token, segment, end_token], axis=0)
 
@@ -119,6 +148,10 @@ class FilterDataset(Dataset):
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
             entry = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries)
+            zeros = np.zeros((entry["current"].shape[0], 2*config.max_sys_trace + 1))
+
+            # Concatenate the original tensor with the zeros tensor along the second dimension (columns)
+            entry["current"] = np.concatenate((entry["current"], zeros), axis=1)
             
         else:
             # generate random entries
