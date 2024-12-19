@@ -21,7 +21,8 @@ from core import Config
 from dyn_models import apply_kf
 from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
-from datasources import filter_dataset as fd
+from datasources import filter_dataset
+from datasources.filter_dataset import populate_traces, special_parens
 import linalg_helpers as la
 
 plt.rcParams['axes.titlesize'] = 20
@@ -1049,97 +1050,71 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, tok_seg_lens=None, sys_inds=None, start_inds=None):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, seg_lens=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
+    
+    ys_trial = entries[:, trial] #get the observations for the first trial
 
-    context_len = n_positions + 1
-    segments = np.zeros((context_len, ny)) #initialize the segments array
-    # print('segments.shape', segments.shape)
-    possible_space = context_len #the possible space for the system traces plus special tokens
-
+    print("shape of ys_trial:", ys_trial.shape)
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-        sys_inds = []
-        tok_seg_lens = []
-        start_inds = []
-
-        while possible_space > 0:
-
-            # print('\npossible_space', possible_space)
-            tok_seg_len = np.random.randint(3, possible_space + 1) #randomly sample a segment length between 3 and the possible space (length of segment randomness) tok_seg_len includes space for the special tokens
-            if possible_space - tok_seg_len < 3:
-                tok_seg_len = possible_space #do not leave a block at the end that can't be filled
-
-            tok_seg_lens.append(tok_seg_len)
-            segment_len = tok_seg_len - 2 #actual trace segment length
-            # print('\nsegment_len', segment_len)
-
-            # select a random integer between 0 and len(entries)
-            sys_trace_ind = np.random.randint(0, num_tasks) #randomly sample a number between 0 and num_tasks (random system index)
-            sys_inds.append(sys_trace_ind)
-
-            # print('\nsys_trace_ind', sys_trace_ind)
-            #get obs from the system trace corresponding to sys_trace_ind
-            sys_trace_obs = entries[sys_trace_ind,trial]
-            # print('sys_trace_obs.shape', sys_trace_obs.shape)
-            random_start = np.random.randint(0, sys_trace_obs.shape[-2] - segment_len) #randomly sample a starting index for each segment (random position)
-            start_inds.append(random_start)
-
-            # print('random_start', random_start)
-            segment = sys_trace_obs[..., random_start:random_start + segment_len, :]
-            # print('segment.shape orig:', segment.shape)
-            # print_matrix(segment, 'segment orig')
-
-            # Create the special tokens
-            start_token, end_token = fd.special_tokens(segment, sys_trace_ind, style="frac")
-            
-            segment = np.concatenate([start_token, segment, end_token], axis=0)
-
-            # print('segment.shape post special tokens', segment.shape)
-            # print_matrix(segment, 'segment post special tokens')
-
-            segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
-            possible_space -= tok_seg_len #update the possible space for the next iteration
+       segments, sys_choices, sys_dict, seg_lens = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace)
     else:
-        if sys_inds:
+        if sys_dict:
+            context_len = n_positions + 1 #the length of the context
+
+            segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
+            segments[0, 2*max_sys_trace] = 1 #set the start token for the first segment
+
+            #initialize a dictionary to hold the next starting index for each system trace
+            next_start = {sys_ind: 0 for sys_ind in sys_dict.keys()}
+            seg_start = 1
             count = 0
-            for sys_ind in sys_inds:
+            for sys in sys_choices:
                 #get obs from the system trace corresponding to sys_trace_ind
-                sys_trace_obs = entries[sys_ind,trial]
-                # print('sys_trace_obs.shape', sys_trace_obs.shape)
+                sys_trace_obs = ys_trial[sys]
+                seg_len = seg_lens[count]
 
-
-                random_start = start_inds[count]
-                tok_seg_len = tok_seg_lens[count]
-                segment_len = tok_seg_len - 2
-
-                # print('random_start', random_start)
-                segment = sys_trace_obs[..., random_start:random_start + segment_len, :]
-                # print('segment.shape orig:', segment.shape)
-                # print_matrix(segment, 'segment orig')
+                if next_start[sys] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
+                    if next_start[sys] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
+                        continue
+                    else:
+                        segment = sys_trace_obs[next_start[sys]:, :] #get the segment from the next starting index to the end of the trace
+                        seg_len = segment.shape[0] #update the segment length to the length of the segment
+                else:
+                    segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
+                
+                next_start[sys] += seg_len #update the next starting index for the trace from this system index
 
                 # Create the special tokens
-                start_token, end_token = fd.special_tokens(segment, sys_ind, style="frac")
-
+                start_paren, end_paren = special_parens(segment, sys_dict[sys], style="zeros")
                 
-                segment = np.concatenate([start_token, segment, end_token], axis=0)
+                segment = np.concatenate([start_paren, segment, end_paren], axis=0)
 
-                # print('segment.shape post special tokens', segment.shape)
-                # print_matrix(segment, 'segment post special tokens')
+                if seg_start + seg_len + 2 > context_len:
+                    #truncate the segment if it is too long so that it fits in the context
+                    segment = segment[:context_len - seg_start, :]
+                    break
 
-                segments[context_len - possible_space:context_len - possible_space + tok_seg_len, :] = segment
-                possible_space -= tok_seg_len #update the possible space for the next iteration
+                tok_seg_len = segment.shape[0]
+
+                segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+
+                if seg_start + tok_seg_len == context_len:
+                    break
+
+                seg_start += tok_seg_len #update the starting index for the next segment
 
                 count += 1
         else:
             if trial == 0:
                 raise ValueError(f"first conditional malfunction since trial = {trial}")
             else:
-                raise ValueError(f"sys_inds is {sys_inds} when trial is {trial}")
+                raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
   
-    return segments, tok_seg_lens, sys_inds, start_inds
+    return segments, sys_choices, sys_dict, seg_lens
 
 
 def compute_errors_multi_sys(config, tf):

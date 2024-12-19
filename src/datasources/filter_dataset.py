@@ -64,7 +64,9 @@ def special_tokens(segment, sys_name, style):
     return start_token, end_token
 
 def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
-        
+    sys_choices = [] #list that will hold the order of the system choices for the trace
+
+
     sys_names = np.arange(max_sys_trace) #system names
     #randomly shuffle the system names
     np.random.shuffle(sys_names)
@@ -99,24 +101,30 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
 
         #pick a random system index
         sys_ind = np.random.choice(sys_inds)
+        sys_choices.append(sys_ind) #add the system index to the list of system choices
 
         sys_inds.remove(sys_ind)
 
         if seg_start > 1:
-            sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)\
+            sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)
 
         #get obs from the system trace corresponding to sys_trace_ind
         sys_trace_obs = entries[sys_ind]["obs"]
 
+        if next_start[sys_ind] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
+            if next_start[sys_ind] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
+                continue
+            else:
+                segment = sys_trace_obs[next_start[sys_ind]:, :] #get the segment from the next starting index to the end of the trace
+                seg_len = segment.shape[0] #update the segment length to the length of the segment
+        else:
+            segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
         
-        segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :]
         next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
-        # print('segment.shape orig:', segment.shape)
 
         #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
         zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
         segment = np.concatenate((zeros, segment), axis=1)
-        # print('segment.shape post zeros:', segment.shape)
 
         start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 
@@ -125,24 +133,18 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
         if seg_start + seg_len + 2 > context_len:
             #truncate the segment if it is too long so that it fits in the context
             segment = segment[:context_len - seg_start, :]
-            # print('segment.shape post truncation:', segment.shape)
             break
-
 
         tok_seg_len = segment.shape[0]
 
         segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
-        # print_matrix(segments[seg_start:seg_start + tok_seg_len, :], "seg")
 
         if seg_start + tok_seg_len == context_len:
             break
 
         seg_start += tok_seg_len #update the starting index for the next segment
 
-
-    entry = {"current": segments[:-1, :], "target": segments[1:, 2*max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
-
-    return entry
+    return segments, sys_choices, sys_dict, seg_lens
 
 
 class FilterDataset(Dataset):
@@ -179,7 +181,8 @@ class FilterDataset(Dataset):
 
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
-            entry = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
+            segments, sys_choices, sys_dict, seg_lens = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
+            entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
         else:
             # generate random entries
             entry = self.entries[idx % len(self.entries)].copy()
