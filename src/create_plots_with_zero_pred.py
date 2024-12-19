@@ -362,7 +362,7 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_l
         for next_start in next_start_per_config[trace_conf]:
             sys = sys_choices_per_config[trace_conf][seg_count]
             tok_seg_len = tok_seg_lens_per_config[trace_conf][seg_count]
-            sim_objs = sim_obs_per_config[trace_conf][0][sys]
+            sim_objs = sim_obs_per_config[trace_conf][sys]
             ys = np.expand_dims(multi_sys_ys[trace_conf, :, next_start + 1:next_start + tok_seg_len - 1,:], axis=0)
             err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss)
             seg_count += 1
@@ -1088,6 +1088,10 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
                 
                 next_start[sys] += seg_len #update the next starting index for the trace from this system index
 
+                #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+                zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+                segment = np.concatenate((zeros, segment), axis=1)
+
                 # Create the special tokens
                 start_paren, end_paren = special_tokens(segment, sys_dict[sys], style="zeros")
                 
@@ -1267,7 +1271,11 @@ def compute_errors_multi_sys(config, tf):
         #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
         sim_objs_per_config = []
         for trace_config in range(num_test_traces_configs):
-            sim_objs_per_config.append([{sys_ind: sim_objs[sys_ind]} for sys_ind in sys_dict_per_config[trace_config].keys()])
+            sim_obj_conf = {}
+            for sys_ind in sys_dict_per_config[trace_config].keys():
+                sim_obj_conf[sys_ind] = sim_objs[sys_ind] 
+
+            sim_objs_per_config.append(sim_obj_conf)
 
 
         # print("no kf pred")
@@ -1617,8 +1625,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             ax.tick_params(axis='both', which='minor', labelsize=20)
             if logscale:
                 ax.set_yscale('log')
-            
-            ax.set_xscale('log')
+                ax.set_xscale('log')
 
             ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
 

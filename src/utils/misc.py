@@ -150,7 +150,7 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per
     ax.grid()
     handles = []
     #generate a list of colors with a variable length using a colormap that is good for plotting
-    colors = plt.cm.viridis(np.linspace(0, 1, len(names)))
+    colors = plt.cm.plasma(np.linspace(0, 1, len(names)))
 
     
     color_count = 0
