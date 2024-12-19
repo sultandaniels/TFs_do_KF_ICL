@@ -1218,7 +1218,7 @@ def compute_errors_multi_sys(config, tf):
                 {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
             preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
         preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
-                            (*batch_shape, *I.shape[-2:]))  # Combine the predictions for all batches
+                            (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
         # print("preds_tf.shape:", preds_tf.shape)
         preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
                                 axis=-2)  # concatenate the predictions
@@ -1226,7 +1226,11 @@ def compute_errors_multi_sys(config, tf):
     end = time.time()  # end the timer for transformer predictions
     print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
 
-    errs_tf = np.linalg.norm((multi_sys_ys - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
+    #take the last config.ny columns of axis=-1 as the true test observations
+    multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
+    print("shape of multi_sys_ys_true:", multi_sys_ys_true.shape)
+
+    errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
     err_lss["MOP"] = errs_tf
     print("shape of MOP errs_tf:", errs_tf.shape)
 
@@ -1245,7 +1249,7 @@ def compute_errors_multi_sys(config, tf):
 
     print("start zero predictor")
     # zero predictor predictions
-    errs_zero = np.linalg.norm(multi_sys_ys, axis=-1) ** 2  # get the errors of zero predictions
+    errs_zero = np.linalg.norm(multi_sys_ys_true, axis=-1) ** 2  # get the errors of zero predictions
     err_lss["Zero"] = errs_zero
 
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
@@ -1275,7 +1279,7 @@ def compute_errors_multi_sys(config, tf):
         an_kf_errs = np.zeros((num_test_traces_configs, config.n_positions + 1)) #initialize the array to hold the analytical kalman filter errors
         an_sim_preds = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #initialize the array to hold the analytical simulation predictions
         conf_count = 0
-        for sim_obj_dict_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)): #loop over trace_configuration
+        for sim_obj_dict_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys_true, np.arange(multi_sys_ys_true.shape[-2] - 1), axis=-2)): #loop over trace_configuration
             
             seg_starts_conf = seg_starts_per_config[conf_count]
             # start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
@@ -1329,7 +1333,7 @@ def compute_errors_multi_sys(config, tf):
 
         # Convert the preds_kf list to a numpy array
         preds_kf = np.array(preds_kf)
-        errs_kf = np.linalg.norm((multi_sys_ys - preds_kf), axis=-1) ** 2
+        errs_kf = np.linalg.norm((multi_sys_ys_true - preds_kf), axis=-1) ** 2
         err_lss["Kalman"] = errs_kf
         print("shape of Kalman errs_kf:", errs_kf.shape)
 
@@ -1366,7 +1370,7 @@ def compute_errors_multi_sys(config, tf):
         start = time.time()  # start the timer for OLS predictions
         print("start OLS pred")
 
-        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, seg_lens_per_config, sim_objs_per_config, config, multi_sys_ys, max_ir_length=3, err_lss=err_lss)
+        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, seg_lens_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
 
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
