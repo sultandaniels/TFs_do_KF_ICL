@@ -66,6 +66,7 @@ def special_tokens(segment, sys_name, style):
 def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
+    tok_seg_lens = []
 
 
     sys_names = np.arange(max_sys_trace) #system names
@@ -96,6 +97,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
     seg_start = 1 #initialize the starting index for the segment at 1 to account for the start token
     for seg_len in seg_lens:
+
         seg_starts.append(seg_start)
 
         if seg_start > 1:
@@ -138,9 +140,12 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         if seg_start + seg_len + 2 > context_len:
             #truncate the segment if it is too long so that it fits in the context
             segment = segment[:context_len - seg_start, :]
+            tok_seg_len = segment.shape[0]
+            tok_seg_lens.append(tok_seg_len)
             break
 
         tok_seg_len = segment.shape[0]
+        tok_seg_lens.append(tok_seg_len)
 
         segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
 
@@ -149,7 +154,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
         seg_start += tok_seg_len #update the starting index for the next segment
 
-    return segments, sys_choices, sys_dict, seg_lens, seg_starts
+    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts
 
 
 class FilterDataset(Dataset):

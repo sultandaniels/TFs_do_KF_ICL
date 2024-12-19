@@ -329,21 +329,21 @@ def compute_OLS_ir(config, ys, sim_objs, max_ir_length, err_lss):
         torch.cuda.empty_cache()
         gc.collect()
 
-        # Check if CUDA is available
-        if torch.cuda.is_available():
+        # # Check if CUDA is available
+        # if torch.cuda.is_available():
 
-            # Print memory usage
-            print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
-            print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
-            print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
-            print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
-        else:
-            print("CUDA is not available.")
+        #     # Print memory usage
+        #     print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
+        #     print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
+        #     print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
+        #     print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
+        # else:
+        #     print("CUDA is not available.")
     # set torch precision back to float32
     torch.set_default_dtype(torch.float32)
     return err_lss
 
-def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_lens_per_config, sim_obs_per_config, config, multi_sys_ys, max_ir_length, err_lss):
+def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_lens_per_config, sys_choices_per_config, sim_obs_per_config, config, multi_sys_ys, max_ir_length, err_lss):
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
 
@@ -352,22 +352,18 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_l
         err_lss[f"OLS_ir_{ir_length}"] = np.full(multi_sys_ys.shape[:-1], np.inf)
         err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full(multi_sys_ys.shape[:-1], np.inf)
 
-        if ir_length == 2:
-            err_lss[f"OLS_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
-            err_lss[f"OLS_analytical_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
-
+        # if ir_length == 2:
+        #     err_lss[f"OLS_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
+        #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
 
     for trace_conf in range(num_trace_configs):
         # print(f"Trace config: {trace_conf}")
         seg_count = 0
         for next_start in next_start_per_config[trace_conf]:
+            sys = sys_choices_per_config[trace_conf][seg_count]
             tok_seg_len = tok_seg_lens_per_config[trace_conf][seg_count]
-            sim_objs = sim_obs_per_config[trace_conf][seg_count]
-            # print(f"\tNext start: {next_start}")
-            # print(f"\tToken segment length: {tok_seg_len}")
-            print(range(next_start + 1, next_start + tok_seg_len - 1))
+            sim_objs = sim_obs_per_config[trace_conf][0][sys]
             ys = np.expand_dims(multi_sys_ys[trace_conf, :, next_start + 1:next_start + tok_seg_len - 1,:], axis=0)
-            # print(f"\tys shape: {ys.shape}")
             err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss)
             seg_count += 1
 
@@ -375,49 +371,50 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_l
 
 
 def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss):
-
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
-    print("max_ir_length + 1:", max_ir_length + 1)
     for ir_length in range(1, max_ir_length + 1):
         start = time.time()
-        print(f"\tIR length: {ir_length}")
+        # print(f"\tIR length: {ir_length}")
 
-        if ir_length == 2:
-            preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 0.0, multi_sys_trace=config.multi_sys_trace)
+        # if ir_length == 2:
+        #     print("unreg")
+        #     preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 0.0, multi_sys_trace=config.multi_sys_trace)
 
-            err_lss[f"OLS_ir_{ir_length}_unreg"][trace_conf, next_start + 1:next_start + tok_seg_len - 1] = np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2
-            err_lss[f"OLS_analytical_ir_{ir_length}_unreg"][trace_conf, next_start + 1:next_start + tok_seg_len - 1] = np.array(preds_rls_wentinn_analytical.cpu())
+        #     print("finished unreg")
 
-            del preds_rls_wentinn
-            del preds_rls_wentinn_analytical
-            torch.cuda.empty_cache()
-            gc.collect()
+        #     err_lss[f"OLS_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
+        #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = np.array(preds_rls_wentinn_analytical.cpu())[0]
+
+        #     del preds_rls_wentinn
+        #     del preds_rls_wentinn_analytical
+        #     torch.cuda.empty_cache()
+        #     gc.collect()
 
         preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 1.0, multi_sys_trace=config.multi_sys_trace)
 
-        err_lss[f"OLS_ir_{ir_length}"][trace_conf, next_start + 1:next_start + tok_seg_len - 1] = np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2
-        err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, next_start + 1:next_start + tok_seg_len - 1] = np.array(preds_rls_wentinn_analytical.cpu())
+        err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
+        err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = np.array(preds_rls_wentinn_analytical.cpu())
         end = time.time()
-        print("\ttime elapsed:", (end - start) / 60, "min\n")
+        # print("\ttime elapsed:", (end - start) / 60, "min\n")
 
         del preds_rls_wentinn
         del preds_rls_wentinn_analytical   
         torch.cuda.empty_cache()
         gc.collect()
 
-        # Check if CUDA is available
-        if torch.cuda.is_available():
+        # # Check if CUDA is available
+        # if torch.cuda.is_available():
 
-            # Print memory usage
-            print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
-            print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
-            print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
-            print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
-        else:
-            print("CUDA is not available.")
+        #     # Print memory usage
+        #     print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
+        #     print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
+        #     print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
+        #     print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
+        # else:
+        #     print("CUDA is not available.")
     # set torch precision back to float32
     torch.set_default_dtype(torch.float32)
     return err_lss
@@ -556,11 +553,17 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge, multi_sys_trace=F
                 observation_IRs,            # [n_systems x n_traces x (n_positions - 1) x ...]
                 sim_objs_td[sys, None, None]  # [n_systems x 1 x 1 x ...]
             )   # [n_systems x n_traces x (n_positions - 1)]
-
-            preds_rls_wentinn_analytical_sys = torch.cat([
-                torch.norm(torch_ys[..., :2, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
-                preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
-            ], dim=-1)  # [n_systems x n_traces x (n_positions + 1)]
+            
+            if multi_sys_trace:
+                preds_rls_wentinn_analytical_sys = torch.cat([
+                    torch.norm(torch_ys[..., :1, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
+                    preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
+                ], dim=-1)  # [n_systems x n_traces x (n_positions)]
+            else:
+                preds_rls_wentinn_analytical_sys = torch.cat([
+                    torch.norm(torch_ys[..., :2, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
+                    preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
+                ], dim=-1)  # [n_systems x n_traces x (n_positions + 1)]
 
             # preds_rls_wentinn_analytical[sys] = preds_rls_wentinn_analytical_sys
             if torch.all(preds_rls_wentinn_analytical == 0):
@@ -1050,17 +1053,14 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, seg_lens=None, seg_starts=None):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
-    
     ys_trial = entries[:, trial] #get the observations for the first trial
 
-    print("shape of ys_trial:", ys_trial.shape)
-
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-       segments, sys_choices, sys_dict, seg_lens, seg_starts = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True)
+       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True)
     else:
         if sys_dict:
             context_len = n_positions + 1 #the length of the context
@@ -1075,7 +1075,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
             for sys in sys_choices:
                 #get obs from the system trace corresponding to sys_trace_ind
                 sys_trace_obs = ys_trial[sys]
-                seg_len = seg_lens[count]
+                seg_len = tok_seg_lens[count]
 
                 if next_start[sys] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
                     if next_start[sys] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
@@ -1089,7 +1089,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
                 next_start[sys] += seg_len #update the next starting index for the trace from this system index
 
                 # Create the special tokens
-                start_paren, end_paren = special_parens(segment, sys_dict[sys], style="zeros")
+                start_paren, end_paren = special_tokens(segment, sys_dict[sys], style="zeros")
                 
                 segment = np.concatenate([start_paren, segment, end_paren], axis=0)
 
@@ -1114,7 +1114,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
             else:
                 raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
   
-    return segments, sys_choices, sys_dict, seg_lens, seg_starts
+    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts
 
 
 def compute_errors_multi_sys(config, tf):
@@ -1183,21 +1183,21 @@ def compute_errors_multi_sys(config, tf):
 
     sys_choices_per_config = []
     sys_dict_per_config = []
-    seg_lens_per_config = []
+    tok_seg_lens_per_config = []
     seg_starts_per_config = []
     for trace_config in range(num_test_traces_configs):
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
-        seg_lens = None
+        tok_seg_lens = None
         sys_dict = None
         sys_choices = None
         seg_starts= None
         for trial in range(num_trials):
-            segments, sys_choices, sys_dict, seg_lens, seg_starts = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, seg_lens, seg_starts) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
         sys_dict_per_config.append(sys_dict)
-        seg_lens_per_config.append(seg_lens)
+        tok_seg_lens_per_config.append(tok_seg_lens)
         seg_starts_per_config.append(seg_starts)
 
     print("\nstart tf pred")
@@ -1228,11 +1228,9 @@ def compute_errors_multi_sys(config, tf):
 
     #take the last config.ny columns of axis=-1 as the true test observations
     multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
-    print("shape of multi_sys_ys_true:", multi_sys_ys_true.shape)
 
     errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
     err_lss["MOP"] = errs_tf
-    print("shape of MOP errs_tf:", errs_tf.shape)
 
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
@@ -1245,7 +1243,7 @@ def compute_errors_multi_sys(config, tf):
     gc.collect()
 
     if tf: #only run transformer predictions
-        return err_lss, sys_choices_per_config, sys_dict_per_config, seg_lens_per_config, seg_starts_per_config
+        return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
     print("start zero predictor")
     # zero predictor predictions
@@ -1275,7 +1273,7 @@ def compute_errors_multi_sys(config, tf):
         # print("no kf pred")
         # Kalman Predictions
         print("start kf pred")
-        preds_kf = np.zeros(multi_sys_ys.shape)
+        preds_kf = np.zeros(multi_sys_ys_true.shape)
         an_kf_errs = np.zeros((num_test_traces_configs, config.n_positions + 1)) #initialize the array to hold the analytical kalman filter errors
         an_sim_preds = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #initialize the array to hold the analytical simulation predictions
         conf_count = 0
@@ -1283,14 +1281,10 @@ def compute_errors_multi_sys(config, tf):
             
             seg_starts_conf = seg_starts_per_config[conf_count]
             # start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
-            seg_lens_conf = seg_lens_per_config[conf_count]
+            tok_seg_lens_conf = tok_seg_lens_per_config[conf_count]
             sys_choices_conf = sys_choices_per_config[conf_count]
 
-            print(len(seg_starts_conf))
-            print(len(seg_lens_conf))
-            print(len(sys_choices_conf))
-
-            inner_result = np.zeros(multi_sys_ys[0].shape) # initialize the kf pred array holder for this trace configuration
+            inner_result = np.zeros(multi_sys_ys_true[0].shape) # initialize the kf pred array holder for this trace configuration
             inner_result[:, 0, :] = np.inf #set the kalman prediction error for start token to be infinite
             trial_count = 0
             for __ys in _ys: #loop over trial in trace configuration
@@ -1303,10 +1297,10 @@ def compute_errors_multi_sys(config, tf):
                     #set the kalman prediction error for start paren to be infinite
                     inner_result[trial_count, seg_start, :] = np.inf 
                     #set the kalman prediction error for end paren to be infinite
-                    inner_result[trial_count, seg_start + seg_lens_conf[seg_count]-1, :] = np.inf 
+                    inner_result[trial_count, seg_start + tok_seg_lens_conf[seg_count]-1, :] = np.inf 
 
                     #get the observation values for the segment of ys without the special tokens
-                    ys_seg = __ys[seg_start + 1:seg_start + seg_lens_conf[seg_count] - 1, :] 
+                    ys_seg = __ys[seg_start + 1:seg_start + tok_seg_lens_conf[seg_count] - 1, :] 
 
                     # la.print_matrix(ys_seg, "ys_seg")
 
@@ -1314,15 +1308,15 @@ def compute_errors_multi_sys(config, tf):
                     result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
                     #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
-                    inner_result[trial_count, seg_start + 1:seg_start + seg_lens_conf[seg_count] - 1, :] = result[:-1,:] 
+                    inner_result[trial_count, seg_start + 1:seg_start + tok_seg_lens_conf[seg_count] - 1, :] = result[:-1,:] 
 
                     #analytical kalman filter errors
                     #get the analytical kalman filter error for the segment
-                    an_kf_errs[conf_count, seg_start:seg_start + seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(seg_lens_conf[seg_count]) 
+                    an_kf_errs[conf_count, seg_start:seg_start + tok_seg_lens_conf[seg_count]] = np.trace(sim_obj.S_observation_inf) * np.ones(tok_seg_lens_conf[seg_count]) 
 
                     #analytical simulation predicions
                     #get the analytical simulation predictions for the segment
-                    an_sim_preds[conf_count, trial_count, seg_start:seg_start + seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (seg_lens_conf[seg_count])) 
+                    an_sim_preds[conf_count, trial_count, seg_start:seg_start + tok_seg_lens_conf[seg_count], :] = np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (tok_seg_lens_conf[seg_count])) 
 
                     seg_count += 1
                 trial_count += 1
@@ -1335,7 +1329,6 @@ def compute_errors_multi_sys(config, tf):
         preds_kf = np.array(preds_kf)
         errs_kf = np.linalg.norm((multi_sys_ys_true - preds_kf), axis=-1) ** 2
         err_lss["Kalman"] = errs_kf
-        print("shape of Kalman errs_kf:", errs_kf.shape)
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
         with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
@@ -1370,7 +1363,7 @@ def compute_errors_multi_sys(config, tf):
         start = time.time()  # start the timer for OLS predictions
         print("start OLS pred")
 
-        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, seg_lens_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
+        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, tok_seg_lens_per_config, sys_choices_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
 
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
@@ -1382,7 +1375,7 @@ def compute_errors_multi_sys(config, tf):
     else:
         print("OLS pred already in err_lss")
 
-    return err_lss, sys_choices_per_config, sys_dict_per_config, seg_lens_per_config, seg_starts_per_config
+    return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
 
 
@@ -1997,7 +1990,6 @@ if __name__ == '__main__':
                     print("rnn_an_errors.shape:", rnn_an_errors.shape)
                     # plot Analytical RNN errors
                     rnn_an_er = rnn_an_errors[sys].detach().numpy()
-                    print("shape of err_lss_load[Kalman]:", err_lss_load["Kalman"][sys, :, ::5].shape)
                     kalman_err = err_lss_load["Kalman"][sys, :, ::5].mean(axis=(0))
                     # figure out how to take median and quantiles of the rnn errors
                     rnn_an_q1, rnn_an_median, rnn_an_q3 = np.quantile((rnn_an_er - kalman_err), [0.25, 0.5, 0.75],
