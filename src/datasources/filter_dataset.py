@@ -108,6 +108,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace):
         #get obs from the system trace corresponding to sys_trace_ind
         sys_trace_obs = entries[sys_ind]["obs"]
 
+        
         segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :]
         next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
         # print('segment.shape orig:', segment.shape)
