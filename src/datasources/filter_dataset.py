@@ -20,7 +20,8 @@ def generate_zipf_integer(n, a):
     np.ndarray: An array of integers between 0 and n.
     """
     # Generate samples from a Zipf distribution
-    sample = np.random.zipf(a, 1)
+    rng = np.random.default_rng()
+    sample = rng.zipf(a, 1)
 
     # Clip the samples to the desired range (1 to n)
     sample = np.clip(sample, 0, n)
@@ -67,13 +68,14 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
+    real_seg_lens = []
 
 
     sys_names = np.arange(max_sys_trace) #system names
     #randomly shuffle the system names
     np.random.shuffle(sys_names)
     
-    sys_in_trace = generate_zipf_integer(max_sys_trace,2) #number of systems to include in the context
+    sys_in_trace = generate_zipf_integer(max_sys_trace, 1.5) #number of systems to include in the context
 
     #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
     sys_inds = np.random.randint(0, num_tasks, sys_in_trace).tolist()
@@ -86,7 +88,11 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
     seg_lens = [] #initialize the list of segment lengths
     while sum(seg_lens) < n_positions:
-        seg_lens = np.random.binomial(n_positions, 1/sys_in_trace, size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/sys_in_trace, so that when sys_in_trace = 1, there will only be one segment)
+
+        if sys_in_trace == 1:
+            seg_lens = [n_positions] #one full trace
+        else:
+            seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(1.5*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
 
     context_len = n_positions + 1
     segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
@@ -126,8 +132,6 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
                 seg_len = segment.shape[0] #update the segment length to the length of the segment
         else:
             segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
-        
-        next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
 
         #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
         zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
@@ -140,21 +144,22 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         if seg_start + seg_len + 2 > context_len:
             #truncate the segment if it is too long so that it fits in the context
             segment = segment[:context_len - seg_start, :]
-            tok_seg_len = segment.shape[0]
-            tok_seg_lens.append(tok_seg_len)
-            break
+            seg_len = segment.shape[0] - 1
 
         tok_seg_len = segment.shape[0]
         tok_seg_lens.append(tok_seg_len)
+        real_seg_lens.append(seg_len)
 
         segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+
+        next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
 
         if seg_start + tok_seg_len == context_len:
             break
 
         seg_start += tok_seg_len #update the starting index for the next segment
 
-    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts
+    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens
 
 
 class FilterDataset(Dataset):
@@ -191,7 +196,7 @@ class FilterDataset(Dataset):
 
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
-            segments, sys_choices, sys_dict, seg_lens, seg_starts = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
+            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
             entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
         else:
             # generate random entries

@@ -343,7 +343,7 @@ def compute_OLS_ir(config, ys, sim_objs, max_ir_length, err_lss):
     torch.set_default_dtype(torch.float32)
     return err_lss
 
-def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_lens_per_config, sys_choices_per_config, sim_obs_per_config, config, multi_sys_ys, max_ir_length, err_lss):
+def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_per_config, sys_choices_per_config, sim_obs_per_config, config, multi_sys_ys, max_ir_length, err_lss):
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
 
@@ -357,21 +357,26 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, tok_seg_l
         #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
 
     for trace_conf in range(num_trace_configs):
-        # print(f"Trace config: {trace_conf}")
+        print(f"\n\nTrace config: {trace_conf}")
+        print(seg_lens_per_config[trace_conf])
         seg_count = 0
         for next_start in next_start_per_config[trace_conf]:
             sys = sys_choices_per_config[trace_conf][seg_count]
-            tok_seg_len = tok_seg_lens_per_config[trace_conf][seg_count]
+            seg_len = seg_lens_per_config[trace_conf][seg_count]
             sim_objs = sim_obs_per_config[trace_conf][sys]
-            ys = np.expand_dims(multi_sys_ys[trace_conf, :, next_start + 1:next_start + tok_seg_len - 1,:], axis=0)
-            err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss)
+            ys = np.expand_dims(multi_sys_ys[trace_conf, :, next_start + 1:next_start + 1 + seg_len,:], axis=0)
+            print(f"\tseg_len: {seg_len}")
+            print(f"\tseg_start: {next_start}")
+            print(f"ys context: {ys.shape[2]}")
+            err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, seg_len, config, ys, sim_objs, max_ir_length, err_lss)
             seg_count += 1
 
     return err_lss
 
 
-def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config, ys, sim_objs, max_ir_length, err_lss):
+def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, seg_len, config, ys, sim_objs, max_ir_length, err_lss):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+
 
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
@@ -385,8 +390,8 @@ def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config,
 
         #     print("finished unreg")
 
-        #     err_lss[f"OLS_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
-        #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = np.array(preds_rls_wentinn_analytical.cpu())[0]
+        #     err_lss[f"OLS_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + seg_len] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
+        #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + seg_len] = np.array(preds_rls_wentinn_analytical.cpu())[0]
 
         #     del preds_rls_wentinn
         #     del preds_rls_wentinn_analytical
@@ -395,8 +400,8 @@ def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config,
 
         preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 1.0, multi_sys_trace=config.multi_sys_trace)
 
-        err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
-        err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + tok_seg_len - 1] = np.array(preds_rls_wentinn_analytical.cpu())
+        err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
+        err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = np.array(preds_rls_wentinn_analytical.cpu())
         end = time.time()
         # print("\ttime elapsed:", (end - start) / 60, "min\n")
 
@@ -422,6 +427,9 @@ def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, tok_seg_len, config,
 def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge, multi_sys_trace=False):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
+    # print('shape of ys', ys.shape)
+    # print(f"sum of ys: {np.sum(ys)}")
+
     torch.set_default_device(device)
     preds_rls_wentinn = torch.zeros(np.expand_dims(ys[0],axis=0).shape)
     preds_rls_wentinn_analytical = torch.zeros(np.expand_dims(ys[0,:,:,0], axis=0).shape)
@@ -433,147 +441,154 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge, multi_sys_trace=F
 
     with torch.no_grad():
         for sys in range(max_iter):
+
             ys_sys = np.expand_dims(ys[sys], axis=0)
         
             # [n_systems x n_traces x (n_positions + 1) x O_D]
             torch_ys = torch.Tensor(ys_sys).to(device)
 
-
-            # [n_systems x n_traces x (n_positions + ir_length) x O_D]
-            padded_ys = torch.cat([
-                torch.zeros((*torch_ys.shape[:2], ir_length - 1, config.ny)).to(device), torch_ys.to(device)
-            ], dim=-2)
-
-            Y_indices = torch.arange(ir_length, (ys.shape[-2] - 1) + ir_length)[:, None]  # [(n_positions - 1) x 1]
-            X_indices = Y_indices - 1 - torch.arange(ir_length)
-
-            del torch_ys
-            torch.cuda.empty_cache()
-            gc.collect()
-
-            X, Y = padded_ys[..., X_indices, :], padded_ys[..., Y_indices, :]   # [n_systems x n_traces x (n_positions - 1) x ir_length x O_D], [n_systems x n_traces x (n_positions - 1) x 1 x O_D]
-
-            flattened_X, flattened_Y = X.flatten(-2, -1), Y.flatten(-2, -1)     # [n_systems x n_traces x (n_positions - 1) x (ir_length * O_D)], [n_systems x n_traces x (n_positions - 1) x O_D]
-
-            # [n_systems x n_traces x (n_positions - 1) x (ir_length * I_D) x (ir_length * O_D)]
-            cumulative_XTX = torch.cumsum(flattened_X[..., :, None].to(device) * flattened_X[..., None, :], dim=-3).to(device) + ridge * torch.eye(ir_length * config.ny).to(device)
-            # [n_systems x n_traces x (n_positions - 1) x (ir_length * I_D) x O_D]
-            cumulative_XTY = torch.cumsum(flattened_X[..., :, None] * flattened_Y[..., None, :], dim=-3)
-
-            min_eqs = config.ny if ridge == 0.0 else 1
-
-            _rank_full = torch.inverse(cumulative_XTX[..., min_eqs - 1:, :, :]) @ cumulative_XTY[..., min_eqs - 1:, :, :]
-            _rank_deficient = []
-            for n_eqs in range(1, min_eqs):
-                _rank_deficient.append(torch.linalg.pinv(flattened_X[..., :n_eqs, :]) @ flattened_Y[..., :n_eqs, :])
-            if len(_rank_deficient) == 0:
-                _rank_deficient = torch.zeros_like(_rank_full[..., :0, :, :])
+            if multi_sys_trace and ys.shape[-2] == 1:
+                preds_rls_wentinn = torch.zeros_like(torch_ys[..., :1, :])
+                preds_rls_wentinn_analytical = torch.norm(torch_ys[..., :1, :], dim=-1) ** 2
+                print(f"\t\tshape of rls: {preds_rls_wentinn_sys.shape}, shape of rls_an {preds_rls_wentinn_analytical.shape}")
+                return preds_rls_wentinn, preds_rls_wentinn_analytical
             else:
-                _rank_deficient = torch.stack(_rank_deficient, dim=-3)
 
-            # [n_systems x n_traces x (n_positions - 1) x (ir_length * O_D) x O_D]
-            # -> [n_systems x n_traces x (n_positions - 1) x ir_length x O_D x O_D]
-            # -> [n_systems x n_traces x (n_positions - 1) x O_D x ir_length x O_D]
-            observation_IRs = torch.cat([_rank_deficient, _rank_full], dim=-3).unflatten(-2, (ir_length, config.ny)).transpose(dim0=-3, dim1=-2)
+                # [n_systems x n_traces x (n_positions + ir_length) x O_D]
+                padded_ys = torch.cat([
+                    torch.zeros((*torch_ys.shape[:2], ir_length - 1, config.ny)).to(device), torch_ys.to(device)
+                ], dim=-2)
 
-            # SECTION: Compute the empirical output
-            shifted_X = padded_ys[..., X_indices + 1, :]    # [n_systems x n_traces x (n_positions - 1) x ir_length x O_D]
+                Y_indices = torch.arange(ir_length, (ys.shape[-2] - 1) + ir_length)[:, None]  # [(n_positions - 1) x 1]
+                X_indices = Y_indices - 1 - torch.arange(ir_length)
 
-            # Clean up padded_ys to free memory
-            del padded_ys
-            torch.cuda.empty_cache()
-            gc.collect()
+                del torch_ys
+                torch.cuda.empty_cache()
+                gc.collect()
 
-            flattened_observation_IRs = observation_IRs.flatten(0, 2)   # [B x O_D x ir_length x O_D]
-            flattened_shifted_X = shifted_X.flatten(0, 2)               # [B x ir_length x O_D]
+                X, Y = padded_ys[..., X_indices, :], padded_ys[..., Y_indices, :]   # [n_systems x n_traces x (n_positions - 1) x ir_length x O_D], [n_systems x n_traces x (n_positions - 1) x 1 x O_D]
 
-            # [n_systems x n_traces x (n_positions + 1) x O_D]
-            torch_ys = torch.Tensor(ys_sys).to(device)
+                flattened_X, flattened_Y = X.flatten(-2, -1), Y.flatten(-2, -1)     # [n_systems x n_traces x (n_positions - 1) x (ir_length * O_D)], [n_systems x n_traces x (n_positions - 1) x O_D]
 
-            del ys_sys
-            torch.cuda.empty_cache()
-            gc.collect()
+                # [n_systems x n_traces x (n_positions - 1) x (ir_length * I_D) x (ir_length * O_D)]
+                cumulative_XTX = torch.cumsum(flattened_X[..., :, None].to(device) * flattened_X[..., None, :], dim=-3).to(device) + ridge * torch.eye(ir_length * config.ny).to(device)
+                # [n_systems x n_traces x (n_positions - 1) x (ir_length * I_D) x O_D]
+                cumulative_XTY = torch.cumsum(flattened_X[..., :, None] * flattened_Y[..., None, :], dim=-3)
 
-            preds_rls_wentinn_sys = torch.vmap(Fn.conv2d)(
-                flattened_observation_IRs,                                              # [B x O_D x ir_length x O_D]
-                flattened_shifted_X.transpose(dim0=-2, dim1=-1)[..., None, :, :, None]  # [B x 1 x O_D x ir_length x 1]
-            ).reshape(*torch_ys.shape[:2], ys.shape[-2] - 1, config.ny) # [n_systems x n_traces x (n_positions - 1)]
+                min_eqs = config.ny if ridge == 0.0 else 1
 
-            if multi_sys_trace:
-                preds_rls_wentinn_sys = torch.cat([
-                torch.zeros_like(torch_ys[..., :1, :]),
-                preds_rls_wentinn_sys
-            ], dim=-2)  # [n_systems x n_traces x (n_positions) x O_D]
-            else:
-                preds_rls_wentinn_sys = torch.cat([
-                    torch.zeros_like(torch_ys[..., :2, :]),
+                _rank_full = torch.inverse(cumulative_XTX[..., min_eqs - 1:, :, :]) @ cumulative_XTY[..., min_eqs - 1:, :, :]
+                _rank_deficient = []
+                for n_eqs in range(1, min_eqs):
+                    _rank_deficient.append(torch.linalg.pinv(flattened_X[..., :n_eqs, :]) @ flattened_Y[..., :n_eqs, :])
+                if len(_rank_deficient) == 0:
+                    _rank_deficient = torch.zeros_like(_rank_full[..., :0, :, :])
+                else:
+                    _rank_deficient = torch.stack(_rank_deficient, dim=-3)
+
+                # [n_systems x n_traces x (n_positions - 1) x (ir_length * O_D) x O_D]
+                # -> [n_systems x n_traces x (n_positions - 1) x ir_length x O_D x O_D]
+                # -> [n_systems x n_traces x (n_positions - 1) x O_D x ir_length x O_D]
+                observation_IRs = torch.cat([_rank_deficient, _rank_full], dim=-3).unflatten(-2, (ir_length, config.ny)).transpose(dim0=-3, dim1=-2)
+
+                # SECTION: Compute the empirical output
+                shifted_X = padded_ys[..., X_indices + 1, :]    # [n_systems x n_traces x (n_positions - 1) x ir_length x O_D]
+
+                # Clean up padded_ys to free memory
+                del padded_ys
+                torch.cuda.empty_cache()
+                gc.collect()
+
+                flattened_observation_IRs = observation_IRs.flatten(0, 2)   # [B x O_D x ir_length x O_D]
+                flattened_shifted_X = shifted_X.flatten(0, 2)               # [B x ir_length x O_D]
+
+                # [n_systems x n_traces x (n_positions + 1) x O_D]
+                torch_ys = torch.Tensor(ys_sys).to(device)
+
+                del ys_sys
+                torch.cuda.empty_cache()
+                gc.collect()
+
+                preds_rls_wentinn_sys = torch.vmap(Fn.conv2d)(
+                    flattened_observation_IRs,                                              # [B x O_D x ir_length x O_D]
+                    flattened_shifted_X.transpose(dim0=-2, dim1=-1)[..., None, :, :, None]  # [B x 1 x O_D x ir_length x 1]
+                ).reshape(*torch_ys.shape[:2], ys.shape[-2] - 1, config.ny) # [n_systems x n_traces x (n_positions - 1)]
+
+                if multi_sys_trace:
+                    preds_rls_wentinn_sys = torch.cat([
+                    torch.zeros_like(torch_ys[..., :1, :]),
                     preds_rls_wentinn_sys
-                ], dim=-2)  # [n_systems x n_traces x (n_positions + 1) x O_D]
+                ], dim=-2)  # [n_systems x n_traces x (n_positions) x O_D]
+                else:
+                    preds_rls_wentinn_sys = torch.cat([
+                        torch.zeros_like(torch_ys[..., :2, :]),
+                        preds_rls_wentinn_sys
+                    ], dim=-2)  # [n_systems x n_traces x (n_positions + 1) x O_D]
 
 
-            if torch.all(preds_rls_wentinn == 0):
-                preds_rls_wentinn = preds_rls_wentinn_sys
-            else:
-                preds_rls_wentinn = torch.vstack((preds_rls_wentinn, preds_rls_wentinn_sys))
+                if torch.all(preds_rls_wentinn == 0):
+                    preds_rls_wentinn = preds_rls_wentinn_sys
+                else:
+                    preds_rls_wentinn = torch.vstack((preds_rls_wentinn, preds_rls_wentinn_sys))
 
-            if multi_sys_trace:
-                sim_objs_td = TensorDict({
-                    "F": torch.Tensor(np.stack([
-                        sim_objs.A
-                    ], axis=0)),
-                    "H": torch.Tensor(np.stack([
-                        sim_objs.C
-                    ], axis=0)),
-                    "sqrt_S_W": torch.stack([
-                        torch.eye(config.nx) * sim_objs.sigma_w
-                    ]),
-                    "sqrt_S_V": torch.stack([
-                        torch.eye(config.ny) * sim_objs.sigma_v
-                    ]),
-                }, batch_size=(1,)).to(device)
-            else:
+                if multi_sys_trace:
+                    sim_objs_td = TensorDict({
+                        "F": torch.Tensor(np.stack([
+                            sim_objs.A
+                        ], axis=0)),
+                        "H": torch.Tensor(np.stack([
+                            sim_objs.C
+                        ], axis=0)),
+                        "sqrt_S_W": torch.stack([
+                            torch.eye(config.nx) * sim_objs.sigma_w
+                        ]),
+                        "sqrt_S_V": torch.stack([
+                            torch.eye(config.ny) * sim_objs.sigma_v
+                        ]),
+                    }, batch_size=(1,)).to(device)
+                else:
 
-                sim_objs_td = TensorDict({
-                    "F": torch.Tensor(np.stack([
-                        sim_obj.A for sim_obj in sim_objs
-                    ], axis=0)),
-                    "H": torch.Tensor(np.stack([
-                        sim_obj.C for sim_obj in sim_objs
-                    ], axis=0)),
-                    "sqrt_S_W": torch.stack([
-                        torch.eye(config.nx) * sim_obj.sigma_w for sim_obj in sim_objs
-                    ]),
-                    "sqrt_S_V": torch.stack([
-                        torch.eye(config.ny) * sim_obj.sigma_v for sim_obj in sim_objs
-                    ]),
-                }, batch_size=(len(sim_objs),)).to(device)
+                    sim_objs_td = TensorDict({
+                        "F": torch.Tensor(np.stack([
+                            sim_obj.A for sim_obj in sim_objs
+                        ], axis=0)),
+                        "H": torch.Tensor(np.stack([
+                            sim_obj.C for sim_obj in sim_objs
+                        ], axis=0)),
+                        "sqrt_S_W": torch.stack([
+                            torch.eye(config.nx) * sim_obj.sigma_w for sim_obj in sim_objs
+                        ]),
+                        "sqrt_S_V": torch.stack([
+                            torch.eye(config.ny) * sim_obj.sigma_v for sim_obj in sim_objs
+                        ]),
+                    }, batch_size=(len(sim_objs),)).to(device)
 
-            # SECTION: Compute analytical errors
-            preds_rls_wentinn_analytical_sys = CnnKF.analytical_error(
-                observation_IRs,            # [n_systems x n_traces x (n_positions - 1) x ...]
-                sim_objs_td[sys, None, None]  # [n_systems x 1 x 1 x ...]
-            )   # [n_systems x n_traces x (n_positions - 1)]
-            
-            if multi_sys_trace:
-                preds_rls_wentinn_analytical_sys = torch.cat([
-                    torch.norm(torch_ys[..., :1, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
-                    preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
-                ], dim=-1)  # [n_systems x n_traces x (n_positions)]
-            else:
-                preds_rls_wentinn_analytical_sys = torch.cat([
-                    torch.norm(torch_ys[..., :2, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
-                    preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
-                ], dim=-1)  # [n_systems x n_traces x (n_positions + 1)]
+                # SECTION: Compute analytical errors
+                preds_rls_wentinn_analytical_sys = CnnKF.analytical_error(
+                    observation_IRs,            # [n_systems x n_traces x (n_positions - 1) x ...]
+                    sim_objs_td[sys, None, None]  # [n_systems x 1 x 1 x ...]
+                )   # [n_systems x n_traces x (n_positions - 1)]
+                
+                if multi_sys_trace:
+                    preds_rls_wentinn_analytical_sys = torch.cat([
+                        torch.norm(torch_ys[..., :1, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
+                        preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
+                    ], dim=-1)  # [n_systems x n_traces x (n_positions)]
+                else:
+                    preds_rls_wentinn_analytical_sys = torch.cat([
+                        torch.norm(torch_ys[..., :2, :], dim=-1) ** 2,    # [n_systems x n_traces x 2]
+                        preds_rls_wentinn_analytical_sys,               # [n_systems x n_traces x (n_positions - 1)]
+                    ], dim=-1)  # [n_systems x n_traces x (n_positions + 1)]
 
-            # preds_rls_wentinn_analytical[sys] = preds_rls_wentinn_analytical_sys
-            if torch.all(preds_rls_wentinn_analytical == 0):
-                preds_rls_wentinn_analytical = preds_rls_wentinn_analytical_sys
-            else:
-                preds_rls_wentinn_analytical = torch.vstack((preds_rls_wentinn_analytical, preds_rls_wentinn_analytical_sys))
+                # preds_rls_wentinn_analytical[sys] = preds_rls_wentinn_analytical_sys
+                if torch.all(preds_rls_wentinn_analytical == 0):
+                    preds_rls_wentinn_analytical = preds_rls_wentinn_analytical_sys
+                else:
+                    preds_rls_wentinn_analytical = torch.vstack((preds_rls_wentinn_analytical, preds_rls_wentinn_analytical_sys))
 
-            del torch_ys
-            torch.cuda.empty_cache()
-            gc.collect()
+                del torch_ys
+                torch.cuda.empty_cache()
+                gc.collect()
 
     return preds_rls_wentinn, preds_rls_wentinn_analytical
 
@@ -1053,14 +1068,14 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
     ys_trial = entries[:, trial] #get the observations for the first trial
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True)
+       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True)
     else:
         if sys_dict:
             context_len = n_positions + 1 #the length of the context
@@ -1075,18 +1090,10 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
             for sys in sys_choices:
                 #get obs from the system trace corresponding to sys_trace_ind
                 sys_trace_obs = ys_trial[sys]
-                seg_len = tok_seg_lens[count]
-
-                if next_start[sys] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
-                    if next_start[sys] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
-                        continue
-                    else:
-                        segment = sys_trace_obs[next_start[sys]:, :] #get the segment from the next starting index to the end of the trace
-                        seg_len = segment.shape[0] #update the segment length to the length of the segment
-                else:
-                    segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
+                tok_seg_len = tok_seg_lens[count]
+                seg_len = real_seg_lens[count]
                 
-                next_start[sys] += seg_len #update the next starting index for the trace from this system index
+                segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
                 #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
                 zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
@@ -1100,11 +1107,10 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
                 if seg_start + seg_len + 2 > context_len:
                     #truncate the segment if it is too long so that it fits in the context
                     segment = segment[:context_len - seg_start, :]
-                    break
-
-                tok_seg_len = segment.shape[0]
 
                 segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+                
+                next_start[sys] += seg_len #update the next starting index for the trace from this system index
 
                 if seg_start + tok_seg_len == context_len:
                     break
@@ -1118,7 +1124,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
             else:
                 raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
   
-    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts
+    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens
 
 
 def compute_errors_multi_sys(config, tf):
@@ -1189,20 +1195,23 @@ def compute_errors_multi_sys(config, tf):
     sys_dict_per_config = []
     tok_seg_lens_per_config = []
     seg_starts_per_config = []
+    real_seg_lens_per_config = []
     for trace_config in range(num_test_traces_configs):
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
         tok_seg_lens = None
         sys_dict = None
         sys_choices = None
         seg_starts= None
+        real_seg_lens=None
         for trial in range(num_trials):
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
         sys_dict_per_config.append(sys_dict)
         tok_seg_lens_per_config.append(tok_seg_lens)
         seg_starts_per_config.append(seg_starts)
+        real_seg_lens_per_config.append(real_seg_lens)
 
     print("\nstart tf pred")
     start = time.time()  # start the timer for transformer predictions
@@ -1254,6 +1263,11 @@ def compute_errors_multi_sys(config, tf):
     errs_zero = np.linalg.norm(multi_sys_ys_true, axis=-1) ** 2  # get the errors of zero predictions
     err_lss["Zero"] = errs_zero
 
+    for i in range(len(sys_choices_per_config)):
+        print(f"trace config: {i}")
+        print(f"len of sys_choices: {len(sys_choices_per_config[i])}")
+        print("sum of zero err:", np.sum(errs_zero[i]))
+
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
@@ -1285,12 +1299,13 @@ def compute_errors_multi_sys(config, tf):
         an_kf_errs = np.zeros((num_test_traces_configs, config.n_positions + 1)) #initialize the array to hold the analytical kalman filter errors
         an_sim_preds = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny)) #initialize the array to hold the analytical simulation predictions
         conf_count = 0
-        for sim_obj_dict_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys_true, np.arange(multi_sys_ys_true.shape[-2] - 1), axis=-2)): #loop over trace_configuration
+        for sim_obj_dict_conf, _ys in zip(sim_objs_per_config, np.take(multi_sys_ys_true, np.arange(multi_sys_ys_true.shape[-2]), axis=-2)): #loop over trace_configuration
             
             seg_starts_conf = seg_starts_per_config[conf_count]
             # start_inds_conf = start_inds_per_config[conf_count] #get the starting indices for the trace configuration
             tok_seg_lens_conf = tok_seg_lens_per_config[conf_count]
             sys_choices_conf = sys_choices_per_config[conf_count]
+            real_seg_lens_conf = real_seg_lens_per_config[conf_count]
 
             inner_result = np.zeros(multi_sys_ys_true[0].shape) # initialize the kf pred array holder for this trace configuration
             inner_result[:, 0, :] = np.inf #set the kalman prediction error for start token to be infinite
@@ -1308,7 +1323,8 @@ def compute_errors_multi_sys(config, tf):
                     inner_result[trial_count, seg_start + tok_seg_lens_conf[seg_count]-1, :] = np.inf 
 
                     #get the observation values for the segment of ys without the special tokens
-                    ys_seg = __ys[seg_start + 1:seg_start + tok_seg_lens_conf[seg_count] - 1, :] 
+                    ys_seg = __ys[seg_start + 1:seg_start + 1 + real_seg_lens_conf[seg_count], :]
+
 
                     # la.print_matrix(ys_seg, "ys_seg")
 
@@ -1316,7 +1332,7 @@ def compute_errors_multi_sys(config, tf):
                     result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
                     #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
-                    inner_result[trial_count, seg_start + 1:seg_start + tok_seg_lens_conf[seg_count] - 1, :] = result[:-1,:] 
+                    inner_result[trial_count, seg_start + 1:seg_start + 1 + real_seg_lens_conf[seg_count], :] = result[:-1,:] #if last index was not an end_paren the infinity will be overwritten here
 
                     #analytical kalman filter errors
                     #get the analytical kalman filter error for the segment
@@ -1371,7 +1387,7 @@ def compute_errors_multi_sys(config, tf):
         start = time.time()  # start the timer for OLS predictions
         print("start OLS pred")
 
-        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, tok_seg_lens_per_config, sys_choices_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
+        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, real_seg_lens_per_config, sys_choices_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
 
 
         os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
