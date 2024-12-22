@@ -142,7 +142,7 @@ def plot_errs(colors, sys, err_lss, err_irreducible, legend_loc="upper right", a
 def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config, legend_loc="upper right", ax=None, shade=True, normalized=False):
 
     next_start_inds = next_start_inds_per_config[trace_conf]
-    names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
+    names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman"]#, "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
     print("\n\n\nTrace Config", trace_conf)
     if ax is None:
         fig = plt.figure(figsize=(15, 30))
@@ -150,7 +150,7 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per
     ax.grid()
     handles = []
     #generate a list of colors with a variable length using a colormap that is good for plotting
-    colors = plt.cm.plasma(np.linspace(0, 1, len(names)))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(names)))
 
     
     color_count = 0
@@ -225,7 +225,7 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per
                                             color=colors[color_count], 
                                             markersize=5 if name == "MOP" or name == "Kalman" or name == "Zero" else 1))
                         if shade:
-                            ax.fill_between(np.arange(err_ls.shape[-1]), avg - std, avg + std, facecolor=handles[-1].get_color(), alpha=0.1)
+                            ax.fill_between(np.arange(err_ls.shape[-1]), avg - std, avg + std, facecolor=handles[-1].get_color(), alpha=0.2)
 
                         color_count += 1
 

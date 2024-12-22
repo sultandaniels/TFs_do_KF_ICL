@@ -1624,35 +1624,46 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             err_lss_load = pickle.load(f)
 
         for trace_conf in range(len(sys_inds_per_config)):
-            fig = plt.figure(figsize=(15, 15)) # create a figure with a size of 15x15
+            fig = plt.figure(figsize=(40, 15)) # create a figure with a size of 15x15
             ax = fig.add_subplot(111)
 
             handles = plot_errs_multi_sys(trace_conf, err_lss_load, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config, ax=ax)
 
             ax.legend(fontsize=16, loc="upper right", ncol=max(1, math.floor(len(handles) / 2)))
-            ax.set_xlabel("i", fontsize=30)
+            ax.set_xlabel("Context", fontsize=30)
 
             ax.set_ylabel("MSE", fontsize=30)
             # ax.set_ylabel("Err - Empirical KF Err" if logscale else "Prediction Error", fontsize=30)
             # ax.set_ylabel("Median Error" if logscale else "Avg Error", fontsize=30)
 
             ax.grid(which="both")
-            ax.tick_params(axis='both', which='major', labelsize=30)
-            ax.tick_params(axis='both', which='minor', labelsize=20)
             if logscale:
                 ax.set_yscale('log')
                 ax.set_xscale('log')
 
             ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
 
-            ax.set_ylim([0,2])
+            # ax.set_ylim([0,2])
             # Set major and minor gridlines
-            ax.grid(which='both', linestyle='--', linewidth=0.5)
+
+            ax.set_xlim(left=0, right=251)
+
 
             # Optionally, customize major and minor ticks
             ax.minorticks_on()
-            ax.tick_params(axis='both', which='major', length=7, width=1)
-            ax.tick_params(axis='both', which='minor', length=4, width=0.5)
+
+            # Set minor vertical grid lines to be on intervals of 1
+            # Set major ticks on every interval of 50
+            ax.set_xticks(range(int(ax.get_xlim()[0]), int(ax.get_xlim()[1]) + 1, 50))
+
+            # Set minor vertical grid lines to be on intervals of 1
+            ax.set_xticks(range(int(ax.get_xlim()[0]), int(ax.get_xlim()[1]) + 1, 1), minor=True)
+
+            ax.tick_params(axis='both', which='major', length=7, width=1, labelsize=30)
+            ax.tick_params(axis='both', which='minor', length=4, width=0.5, labelsize=0)
+            ax.grid(which='major', linestyle='-', linewidth=1)
+            ax.grid(which='minor', linestyle='--', linewidth=0.5)
+
             #add the date and time to the filename
             now = datetime.now()
             timestamp = now.strftime("%Y%m%d_%H%M%S")
