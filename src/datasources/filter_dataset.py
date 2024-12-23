@@ -89,7 +89,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         sys_in_trace = generate_zipf_integer(max_sys_trace, 1.5) #number of systems to include in the context
 
         #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
-        sys_inds = np.random.randint(0, num_tasks, sys_in_trace).tolist()
+        sys_inds = np.random.randint(0, num_tasks, sys_in_trace, replace=False).tolist()
 
         #create a tuple that matches the system names to the system indices
         sys_dict = {}
@@ -175,7 +175,10 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
         seg_start += tok_seg_len #update the starting index for the next segment
 
-    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens
+    if not single_system:
+        sys_inds.append(sys_ind) #add the last system index back to the list of system indices
+
+    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
 
 class FilterDataset(Dataset):
@@ -212,7 +215,7 @@ class FilterDataset(Dataset):
 
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
-            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
+            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
             entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 1:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
         else:
             # generate random entries

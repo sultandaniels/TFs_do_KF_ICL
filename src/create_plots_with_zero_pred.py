@@ -343,33 +343,52 @@ def compute_OLS_ir(config, ys, sim_objs, max_ir_length, err_lss):
     torch.set_default_dtype(torch.float32)
     return err_lss
 
-def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_per_config, sys_choices_per_config, sim_obs_per_config, config, multi_sys_ys, max_ir_length, err_lss):
+def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_per_config, sys_choices_per_config, sys_inds_per_config, sim_obs_per_config, config, ys, max_ir_length, err_lss):
+    #ys are the observations from the original validation dataset before interleaving
+
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
 
     for ir_length in range(1, max_ir_length + 1):
         # Initialize the err_lss ols and ols analytical values to infinity shaped like the multi_sys_ys
-        err_lss[f"OLS_ir_{ir_length}"] = np.full(multi_sys_ys.shape[:-1], np.inf)
-        err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full(multi_sys_ys.shape[:-1], np.inf)
+        err_lss[f"OLS_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+        err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
 
         # if ir_length == 2:
         #     err_lss[f"OLS_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
         #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"] = np.full(multi_sys_ys.shape[:-1], np.inf)
 
+    
+
     for trace_conf in range(num_trace_configs):
         print(f"\n\nTrace config: {trace_conf}")
-        print(seg_lens_per_config[trace_conf])
-        seg_count = 0
-        for next_start in next_start_per_config[trace_conf]:
-            sys = sys_choices_per_config[trace_conf][seg_count]
-            seg_len = seg_lens_per_config[trace_conf][seg_count]
-            sim_objs = sim_obs_per_config[trace_conf][sys]
-            ys = np.expand_dims(multi_sys_ys[trace_conf, :, next_start + 1:next_start + 1 + seg_len,:], axis=0)
-            print(f"\tseg_len: {seg_len}")
-            print(f"\tseg_start: {next_start}")
-            print(f"ys context: {ys.shape[2]}")
-            err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, seg_len, config, ys, sim_objs, max_ir_length, err_lss)
-            seg_count += 1
+        print(f"sys_inds_per_config[trace_conf]: {sys_inds_per_config[trace_conf]}")
+        # print(seg_lens_per_config[trace_conf])
+        #create a new array named ys_sys that takes the ys from axis 0 that correspond to every index in sys_inds_per_config[trace_conf]
+        ys_sys = np.expand_dims(ys[sys_inds_per_config[trace_conf]], axis=0)
+        print(f"ys_sys shape: {ys_sys.shape}, len of sys_inds_per_config[trace_conf]: {len(sys_inds_per_config[trace_conf])}, ys shape: {ys.shape}")
+
+
+
+        # #create a dictionary to store the system choice and the OLS prediction errors
+        # sys_ols_errs = {}
+        # sys_ols_analytical_errs = {}
+        # for sys in sys_inds_per_config[trace_conf]:
+        #     #i must get the ys from the original validations dataset before the interleaving
+        #     preds_rls_sys, preds_rls_an_sys = compute_OLS_helper(config, )
+
+
+        # seg_count = 0
+        # for next_start in next_start_per_config[trace_conf]:
+        #     sys = sys_choices_per_config[trace_conf][seg_count]
+        #     seg_len = seg_lens_per_config[trace_conf][seg_count]
+        #     sim_objs = sim_obs_per_config[trace_conf][sys]
+        #     ys = np.expand_dims(multi_sys_ys[trace_conf, :, next_start + 1:next_start + 1 + seg_len,:], axis=0)
+        #     print(f"\tseg_len: {seg_len}")
+        #     print(f"\tseg_start: {next_start}")
+        #     print(f"ys context: {ys.shape[2]}")
+        #     err_lss = compute_OLS_ir_multi_sys_helper(trace_conf, next_start, seg_len, config, ys, sim_objs, max_ir_length, err_lss)
+        #     seg_count += 1
 
     return err_lss
 
@@ -450,7 +469,7 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge, multi_sys_trace=F
             if multi_sys_trace and ys.shape[-2] == 1:
                 preds_rls_wentinn = torch.zeros_like(torch_ys[..., :1, :])
                 preds_rls_wentinn_analytical = torch.norm(torch_ys[..., :1, :], dim=-1) ** 2
-                print(f"\t\tshape of rls: {preds_rls_wentinn_sys.shape}, shape of rls_an {preds_rls_wentinn_analytical.shape}")
+                print(f"\t\tshape of rls: {preds_rls_wentinn.shape}, shape of rls_an {preds_rls_wentinn_analytical.shape}")
                 return preds_rls_wentinn, preds_rls_wentinn_analytical
             else:
 
@@ -728,13 +747,13 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
                 [entry["obs"] for entry in samples], axis=0
             ).reshape((num_systems, num_trials, config.n_positions + 1, config.ny)).astype(np.float32)
 
-            prev_xs = np.concatenate([
-                np.zeros((num_systems, num_trials, 1, config.nx)),
-                np.stack(
-                    [entry["states"][:-1] for entry in samples], axis=0
-                ).reshape((num_systems, num_trials, config.n_positions, config.nx)).astype(np.float32)
-            ], axis=2)
-            noiseless_ys = prev_xs @ np.stack([sim_obj.C @ sim_obj.A for sim_obj in sim_objs], axis=0)[:, None].transpose(0, 1, 3, 2)
+            # prev_xs = np.concatenate([
+            #     np.zeros((num_systems, num_trials, 1, config.nx)),
+            #     np.stack(
+            #         [entry["states"][:-1] for entry in samples], axis=0
+            #     ).reshape((num_systems, num_trials, config.n_positions, config.nx)).astype(np.float32)
+            # ], axis=2)
+            # noiseless_ys = prev_xs @ np.stack([sim_obj.C @ sim_obj.A for sim_obj in sim_objs], axis=0)[:, None].transpose(0, 1, 3, 2)
 
             gc.collect()  # Start the garbage collector
 
@@ -1068,14 +1087,14 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, single_system=False):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
     ys_trial = entries[:, trial] #get the observations for the first trial
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system)
+       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system)
     else:
         if sys_dict:
             context_len = n_positions + 1 #the length of the context
@@ -1124,7 +1143,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
             else:
                 raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
   
-    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens
+    return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
 
 def compute_errors_multi_sys(config, tf):
@@ -1196,6 +1215,7 @@ def compute_errors_multi_sys(config, tf):
     tok_seg_lens_per_config = []
     seg_starts_per_config = []
     real_seg_lens_per_config = []
+    sys_inds_per_config = []
     for trace_config in range(num_test_traces_configs):
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
         tok_seg_lens = None
@@ -1203,8 +1223,9 @@ def compute_errors_multi_sys(config, tf):
         sys_choices = None
         seg_starts= None
         real_seg_lens=None
+        sys_inds = None
         for trial in range(num_trials):
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, config.single_system) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1212,6 +1233,7 @@ def compute_errors_multi_sys(config, tf):
         tok_seg_lens_per_config.append(tok_seg_lens)
         seg_starts_per_config.append(seg_starts)
         real_seg_lens_per_config.append(real_seg_lens)
+        sys_inds_per_config.append(sys_inds)
 
     print("\nstart tf pred")
     start = time.time()  # start the timer for transformer predictions
@@ -1382,24 +1404,25 @@ def compute_errors_multi_sys(config, tf):
 
 
     # Think about having a sys_choices to prediction error dictionary to implement the remembering
-    # if True:
-    # # if not ("OLS" in err_lss.keys()):
-    #     # Original OLS
-    #     # Clear the PyTorch cache
-    #     start = time.time()  # start the timer for OLS predictions
-    #     print("start OLS pred")
+    if True:
+    # if not ("OLS" in err_lss.keys()):
+        # Original OLS
+        # Clear the PyTorch cache
+        start = time.time()  # start the timer for OLS predictions
+        print("start OLS pred")
 
-    #     err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, real_seg_lens_per_config, sys_choices_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
+        print(f"sys_inds_per_config: {sys_inds_per_config}")
+        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, real_seg_lens_per_config, sys_choices_per_config, sys_inds_per_config, sim_objs_per_config, config, ys, max_ir_length=3, err_lss=err_lss)
 
 
-    #     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-    #     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-    #             pickle.dump(err_lss, f)
+        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                pickle.dump(err_lss, f)
 
-    #     end = time.time()  # end the timer for OLS predictions
-    #     print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
-    # else:
-    #     print("OLS pred already in err_lss")
+        end = time.time()  # end the timer for OLS predictions
+        print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
+    else:
+        print("OLS pred already in err_lss")
 
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 

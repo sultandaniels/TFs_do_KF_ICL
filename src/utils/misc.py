@@ -143,7 +143,7 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_choices_per_config, sys_dict_pe
 
     next_start_inds = next_start_inds_per_config[trace_conf]
     sys_choices = sys_choices_per_config[trace_conf]
-    names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman"]#, "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
+    names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3", "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]
     print("\n\n\nTrace Config", trace_conf)
     if ax is None:
         fig = plt.figure(figsize=(15, 30))
