@@ -64,7 +64,7 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False):
+def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False, single_system=False):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -75,24 +75,35 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
     #randomly shuffle the system names
     np.random.shuffle(sys_names)
     
-    sys_in_trace = generate_zipf_integer(max_sys_trace, 1.5) #number of systems to include in the context
+    if single_system: #if single sys multi segment test
+        sys_in_trace = 1
+        sys_inds = [0]
+        sys_dict = {0: sys_names[0]}
 
-    #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
-    sys_inds = np.random.randint(0, num_tasks, sys_in_trace).tolist()
+        seg_lens = [] #initialize the list of segment lengths
+        while sum(seg_lens) < n_positions:
 
-    #create a tuple that matches the system names to the system indices
-    sys_dict = {}
-    for i in range(len(sys_inds)):
-        sys_dict[sys_inds[i]] = sys_names[i]
+            seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(3*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 3 segments of each system will fit in the trace)
+
+    else:
+        sys_in_trace = generate_zipf_integer(max_sys_trace, 1.5) #number of systems to include in the context
+
+        #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
+        sys_inds = np.random.randint(0, num_tasks, sys_in_trace).tolist()
+
+        #create a tuple that matches the system names to the system indices
+        sys_dict = {}
+        for i in range(len(sys_inds)):
+            sys_dict[sys_inds[i]] = sys_names[i]
         
 
-    seg_lens = [] #initialize the list of segment lengths
-    while sum(seg_lens) < n_positions:
+        seg_lens = [] #initialize the list of segment lengths
+        while sum(seg_lens) < n_positions:
 
-        if sys_in_trace == 1:
-            seg_lens = [n_positions] #one full trace
-        else:
-            seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(1.5*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
+            if sys_in_trace == 1:
+                seg_lens = [n_positions] #one full trace
+            else:
+                seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(1.5*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
 
     context_len = n_positions + 1
     segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
@@ -106,17 +117,22 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
         seg_starts.append(seg_start)
 
-        if seg_start > 1:
-            old_sys_ind = sys_ind
+        if single_system: #if single sys multi segment test
+            sys_ind = 0
+            sys_choices.append(sys_ind) #add the system index to the list of system choices
+        else:
 
-        #pick a random system index
-        sys_ind = np.random.choice(sys_inds)
-        sys_choices.append(sys_ind) #add the system index to the list of system choices
+            if seg_start > 1:
+                old_sys_ind = sys_ind
 
-        sys_inds.remove(sys_ind)
+            #pick a random system index
+            sys_ind = np.random.choice(sys_inds)
+            sys_choices.append(sys_ind) #add the system index to the list of system choices
 
-        if seg_start > 1:
-            sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)
+            sys_inds.remove(sys_ind)
+
+            if seg_start > 1:
+                sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)
 
         #get obs from the system trace corresponding to sys_trace_ind
         if test:

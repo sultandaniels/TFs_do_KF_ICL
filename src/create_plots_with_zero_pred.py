@@ -1068,14 +1068,14 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None):
+def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, single_system=False):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
     ys_trial = entries[:, trial] #get the observations for the first trial
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True)
+       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system)
     else:
         if sys_dict:
             context_len = n_positions + 1 #the length of the context
@@ -1204,7 +1204,7 @@ def compute_errors_multi_sys(config, tf):
         seg_starts= None
         real_seg_lens=None
         for trial in range(num_trials):
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, config.single_system) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1380,6 +1380,8 @@ def compute_errors_multi_sys(config, tf):
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
+
+    # Think about having a sys_choices to prediction error dictionary to implement the remembering
     # if True:
     # # if not ("OLS" in err_lss.keys()):
     #     # Original OLS
