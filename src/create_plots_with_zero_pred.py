@@ -1380,24 +1380,24 @@ def compute_errors_multi_sys(config, tf):
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
-    if True:
-    # if not ("OLS" in err_lss.keys()):
-        # Original OLS
-        # Clear the PyTorch cache
-        start = time.time()  # start the timer for OLS predictions
-        print("start OLS pred")
+    # if True:
+    # # if not ("OLS" in err_lss.keys()):
+    #     # Original OLS
+    #     # Clear the PyTorch cache
+    #     start = time.time()  # start the timer for OLS predictions
+    #     print("start OLS pred")
 
-        err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, real_seg_lens_per_config, sys_choices_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
+    #     err_lss = compute_OLS_ir_multi_sys(num_test_traces_configs, seg_starts_per_config, real_seg_lens_per_config, sys_choices_per_config, sim_objs_per_config, config, multi_sys_ys_true, max_ir_length=3, err_lss=err_lss)
 
 
-        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-                pickle.dump(err_lss, f)
+    #     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+    #     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+    #             pickle.dump(err_lss, f)
 
-        end = time.time()  # end the timer for OLS predictions
-        print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
-    else:
-        print("OLS pred already in err_lss")
+    #     end = time.time()  # end the timer for OLS predictions
+    #     print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
+    # else:
+    #     print("OLS pred already in err_lss")
 
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
@@ -1420,15 +1420,15 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     if train_conv:
         err_lss, irreducible_error = compute_errors_conv(config)
     elif config.multi_sys_trace:
-        err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config = compute_errors_multi_sys(config, tf)
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
         
         #save the system indices, starting indices, and token segment lengths to pickle file
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens_next_start_inds.pkl", 'wb') as f:
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
             pickle.dump({
-                'sys_inds_per_config': sys_inds_per_config,
-                'start_inds_per_config': start_inds_per_config,
+                'sys_choices_per_config': sys_choices_per_config,
+                'sys_dict_per_config': sys_dict_per_config,
                 'tok_seg_lens_per_config': tok_seg_lens_per_config,
-                'next_start_inds_per_config': next_start_inds_per_config
+                'seg_starts_per_config': seg_starts_per_config
             }, f)
         return None
     else:
@@ -1610,12 +1610,12 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         print("ckpt_steps:", ckpt_steps)
 
         #load the system indices, starting indices, and token segment lengths from the pickle file
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_inds_start_inds_tok_seg_lens_next_start_inds.pkl", 'rb') as f:
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'rb') as f:
             data = pickle.load(f)
-            sys_inds_per_config = data['sys_inds_per_config']
-            start_inds_per_config = data['start_inds_per_config']
+            sys_choices_per_config = data['sys_choices_per_config']
+            sys_dict_per_config = data['sys_dict_per_config']
             tok_seg_lens_per_config = data['tok_seg_lens_per_config']
-            next_start_inds_per_config = data['next_start_inds_per_config']
+            seg_starts_per_config = data['seg_starts_per_config']
 
         #load the err_lss dict from the pkl file
         with open(
@@ -1623,11 +1623,11 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
                 "rb") as f:
             err_lss_load = pickle.load(f)
 
-        for trace_conf in range(len(sys_inds_per_config)):
+        for trace_conf in range(len(seg_starts_per_config)):
             fig = plt.figure(figsize=(40, 15)) # create a figure with a size of 15x15
             ax = fig.add_subplot(111)
 
-            handles = plot_errs_multi_sys(trace_conf, err_lss_load, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config, ax=ax)
+            handles = plot_errs_multi_sys(trace_conf, err_lss_load, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, ax=ax)
 
             ax.legend(fontsize=16, loc="upper right", ncol=max(1, math.floor(len(handles) / 2)))
             ax.set_xlabel("Context", fontsize=30)

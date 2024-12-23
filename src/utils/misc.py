@@ -139,9 +139,10 @@ def plot_errs(colors, sys, err_lss, err_irreducible, legend_loc="upper right", a
     return handles, err_rat
 
 
-def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per_config, tok_seg_lens_per_config, next_start_inds_per_config, legend_loc="upper right", ax=None, shade=True, normalized=False):
+def plot_errs_multi_sys(trace_conf, err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, next_start_inds_per_config, legend_loc="upper right", ax=None, shade=True, normalized=False):
 
     next_start_inds = next_start_inds_per_config[trace_conf]
+    sys_choices = sys_choices_per_config[trace_conf]
     names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman"]#, "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
     print("\n\n\nTrace Config", trace_conf)
     if ax is None:
@@ -232,8 +233,11 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_inds_per_config, start_inds_per
                     else: #plot the analytical kalman filter
                         handles.extend(ax.plot(err_ls[trace_conf], label=name, linewidth=2, color='#000000'))
 
+    start_count = 0
     for next_start in next_start_inds:
-        ax.axvline(x=next_start, color='r', linestyle='--', linewidth=2)
+        ax.axvline(x=next_start, color='r', linestyle='--', linewidth=2) #plot vertical line at the start of the next system
+        ax.text(next_start, 1e-2, sys_choices[start_count], rotation=45, fontsize=18) #label the vertical line with the system name
+        start_count += 1
 
     return handles
 
