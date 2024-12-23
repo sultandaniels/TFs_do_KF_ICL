@@ -89,7 +89,8 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         sys_in_trace = generate_zipf_integer(max_sys_trace, 1.5) #number of systems to include in the context
 
         #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
-        sys_inds = np.random.randint(0, num_tasks, sys_in_trace, replace=False).tolist()
+        rng = np.random.default_rng()
+        sys_inds = rng.choice(num_tasks, sys_in_trace, replace=False).tolist()
 
         #create a tuple that matches the system names to the system indices
         sys_dict = {}
