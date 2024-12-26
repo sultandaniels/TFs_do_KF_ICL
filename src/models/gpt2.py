@@ -78,13 +78,16 @@ class GPT2(BaseModel):
         preds = intermediate_dict["preds"]
         res_sq = (preds - ys) ** 2 #residuals squared
 
-        # Create a mask to identify rows of ys that are all zeros
-        mask = torch.all(ys == 0, dim=-1, keepdim=True)
-        
-        # Apply the mask to res_sq to disregard the residuals for rows of ys that are all zeros
-        res_sq = res_sq.masked_fill(mask, 0)
+        if config.multi_sys_trace:
+            # Create a mask to identify rows of ys that are all zeros
+            mask = torch.all(ys == 0, dim=-1, keepdim=True)
+            
+            # Apply the mask to res_sq to disregard the residuals for rows of ys that are all zeros
+            res_sq = res_sq.masked_fill(mask, 0)
 
-        output_dict = {"loss_mse": torch.sum(res_sq) / (~mask).sum()} #mean squared error loss
+            output_dict = {"loss_mse": torch.sum(res_sq) / (~mask).sum()} #mean squared error loss
+        else:
+            output_dict = {"loss_mse": torch.mean(res_sq)}
         for i in range(ys.shape[1]):
             for j in range(ys.shape[2]):
                 output_dict[f"metric_mse_ts{i}_dim_{j}"] = torch.mean(res_sq[:, i, j])

@@ -17,8 +17,8 @@ class Config(object, metaclass=Singleton):
     fully_reproducible = False
 
     # Dataset settings
-    num_tasks = 40000 #number of training systems
-    num_val_tasks = 25 #number of test systems
+    num_tasks = 1 #number of training systems
+    num_val_tasks = 1 #number of test systems
     dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
     distinct_cond_nums = 10
@@ -31,19 +31,19 @@ class Config(object, metaclass=Singleton):
     changing = False #used only for plotting
 
     #experiment settings
-    multi_sys_trace = True #have multiple systems in a single trace
+    multi_sys_trace = False #have multiple systems in a single trace
     num_test_traces_configs = 3 #number of test traces configurations to generate
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
 
     # Training settings
-    devices=[1,2] #which GPU
-    train_steps = 84000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
-    num_epochs = 1000 #minimum number of epochs to train for
-    train_int = 3000 #number of steps between logging (train interval)
+    devices=1 #[1,2] #which GPU
+    train_steps = 1#84000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
+    num_epochs = 1 #1000 #minimum number of epochs to train for
+    train_int = 1 #3000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
-    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
+    batch_size = 1 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+    train_data_workers = 1 #128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
@@ -53,7 +53,7 @@ class Config(object, metaclass=Singleton):
     n_embd = 128
     n_layer = 12
     n_head = 8
-    n_dims_in = int(ny + (2*max_sys_trace) + 1) #input dimension is the observation dimension + special token parentheses + special start token
+    n_dims_in = int(ny + (2*max_sys_trace) + 1) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
     #transfoXL specific
