@@ -1058,8 +1058,8 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
         if sys_dict:
             context_len = n_positions + 1 #the length of the context
 
-            segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
-            segments[0, 2*max_sys_trace] = 1 #set the start token for the first segment
+            segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
+            segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
             #initialize a dictionary to hold the next starting index for each system trace
             next_start = {sys_ind: 0 for sys_ind in sys_dict.keys()}
@@ -1073,6 +1073,9 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
                 
                 segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
+                #concatenate 1 column of ones to the segment
+                ones = np.ones((segment.shape[0], 1))
+                segment = np.concatenate((ones, segment), axis=1)
                 #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
                 zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
                 segment = np.concatenate((zeros, segment), axis=1)
@@ -1205,7 +1208,7 @@ def compute_errors_multi_sys(config, tf):
     # Transformer Predictions
     # if not ("MOP" in err_lss.keys()):
 
-    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 1)).astype(np.float32) #set up the array to hold the test traces
+    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
 
     sys_choices_per_config = []
     sys_dict_per_config = []
