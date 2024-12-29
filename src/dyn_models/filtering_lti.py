@@ -241,17 +241,19 @@ class FilterSim:
                 self.S_state_inf = np.eye(nx) # Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
                 #think about the ortho case
             else:
-                self.S_state_inf = ct.dlyap(self.A, np.eye(nx) * self.sigma_w ** 2)
+                self.S_state_inf = ct.dlyap(self.A, np.eye(nx) * self.sigma_w ** 2) #solve the riccati equation for the steady state solution
 
             eval, evec = lin.eig(self.S_state_inf)
 
             if is_symmetric(self.S_state_inf, tol=1e-5) and np.all(np.greater(eval, 0)):
                 valid_system = True
 
-                S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2)
-                self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2
 
                 if not (tri == "ident" or tri == "ortho"):
+
+                    S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2) #solve the riccati equation for the steady-state state error covariance
+                    self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2 #steady state observation error covariance
+
                     # rescale C and V
                     V = np.eye(ny) * self.sigma_v ** 2
                     obs_tr = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
@@ -269,17 +271,16 @@ class FilterSim:
 
                     self.C = alpha*self.C
                     self.sigma_v = alpha*self.sigma_v
-                    V = np.eye(ny) * self.sigma_v ** 2
+                    V = np.eye(ny) * self.sigma_v ** 2#think about the identity case for this
+
+                    S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2)
+                    self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2
                 else:
+
+                    self.S_observation_inf = np.zeros((ny, ny))
                     self.sigma_v = 0.0
                     self.sigma_w = 0.0
 
-                # obs_tr_new = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
-                # print("new obs tr", obs_tr_new)
-
-                #think about the identity case for this
-                S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2)
-                self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2
             else:
                 print("steady-state covariance symmetric?:", is_symmetric(self.S_state_inf))
                 print("steady-state covariance positive definite?:", np.all(np.greater(eval, 0)))
@@ -315,7 +316,7 @@ class FilterSim:
         x0 = np.stack([
             np.random.multivariate_normal(np.zeros(nx), self.S_state_inf)
             for _ in range(batch_size)
-        ])
+        ]) 
 
         ws = np.random.randn(batch_size, n_noise + traj_len, nx) * self.sigma_w    # state noise of dimension nx
         vs = np.random.randn(batch_size, n_noise + traj_len, ny) * self.sigma_v    # output noise of dimension ny
