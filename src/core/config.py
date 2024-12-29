@@ -17,8 +17,8 @@ class Config(object, metaclass=Singleton):
     fully_reproducible = False
 
     # Dataset settings
-    num_tasks = 1 #number of training systems
-    num_val_tasks = 1 #number of test systems
+    num_tasks = 25 #number of training systems
+    num_val_tasks = 25 #number of test systems
     dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss"
     max_cond_num = 100
     distinct_cond_nums = 10
@@ -31,10 +31,10 @@ class Config(object, metaclass=Singleton):
     changing = False #used only for plotting
 
     #experiment settings
-    multi_sys_trace = False #have multiple systems in a single trace
+    multi_sys_trace = True #have multiple systems in a single trace
     num_test_traces_configs = 3 #number of test traces configurations to generate
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
-    single_system = False #only use a single system in the test trace
+    single_system = True #only use a single system in the test trace
 
     # Training settings
     devices=1 #[1,2] #which GPU

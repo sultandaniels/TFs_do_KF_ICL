@@ -387,9 +387,17 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_
             seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
 
             for ir_length in range(1, max_ir_length + 1):
-                err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = ols_err_lss[f"OLS_ir_{ir_length}"][sys_ind, :, sys_start[sys] + 1:sys_start[sys] + 1 + seg_len]
-                err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = ols_err_lss[f"OLS_analytical_ir_{ir_length}"][sys_ind, :, sys_start[sys] + 1:sys_start[sys] + 1 + seg_len]
-                sys_start[sys] += seg_len
+                print(f"ir_length: {ir_length}")
+                print(f"sys_start[sys]: {sys_start[sys]}")
+                print(f"sys_start[sys] + seg_len: {sys_start[sys] + seg_len}")
+                print(f"next_start + 1: {next_start + 1}")
+                print(f"next_start + 1 + seg_len: {next_start + 1 + seg_len}")
+                print(f"ols_err_lss[f'OLS_ir_{ir_length}'][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len].shape: {ols_err_lss[f'OLS_ir_{ir_length}'][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len].shape}")
+                print(f"err_lss[f'OLS_ir_{ir_length}'][trace_conf, :, next_start + 1:next_start + 1 + seg_len].shape: {err_lss[f'OLS_ir_{ir_length}'][trace_conf, :, next_start + 1:next_start + 1 + seg_len].shape}")
+                err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = ols_err_lss[f"OLS_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = ols_err_lss[f"OLS_analytical_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                
+            sys_start[sys] += seg_len
             seg_count += 1
 
     return err_lss
@@ -1106,6 +1114,7 @@ def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trac
 
 def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices_per_config, next_start_per_config, sys_inds_per_config, sim_obs_per_config, err_lss):
     
+    print(f"ys shape: {ys.shape}")
     err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
 
     print("computing kf multi sys with remembering")
@@ -1137,7 +1146,7 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
                 sys_ind = sys_inds_per_config[trace_conf].index(sys)
 
                 seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
-                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_kf[sys_ind, :, sys_start[sys] + 1:sys_start[sys] + 1 + seg_len]
+                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_kf[sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
                 sys_start[sys] += seg_len
 
                 seg_count += 1
@@ -1401,7 +1410,7 @@ def compute_errors_multi_sys(config, tf):
 
     print("kf multi sys with remembering")
     start = time.time()  # start the timer for kalman filter predictions
-    err_lss = compute_kf_multi_sys(num_test_traces_configs, multi_sys_ys_true, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
+    err_lss = compute_kf_multi_sys(num_test_traces_configs, ys, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
     end = time.time()  # end the timer for kalman filter predictions
     print("time elapsed for KF Pred with remembering:", (end - start) / 60, "min")  # print the time elapsed for kalman filter predictions with remembering
 
