@@ -101,7 +101,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             if sys_in_trace == 1:
                 seg_lens = [n_positions] #one full trace
             else:
-                seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(1.5*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
+                seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(10*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
 
     context_len = n_positions + 1
     segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
