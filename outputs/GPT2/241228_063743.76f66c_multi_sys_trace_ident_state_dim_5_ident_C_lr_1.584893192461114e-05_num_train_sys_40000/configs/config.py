@@ -34,7 +34,7 @@ class Config(object, metaclass=Singleton):
     multi_sys_trace = True #have multiple systems in a single trace
     num_test_traces_configs = 3 #number of test traces configurations to generate
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
-    single_system = True #only use a single system in the test trace
+    single_system = False #only use a single system in the test trace
 
     # Training settings
     devices=[0,3] #which GPU

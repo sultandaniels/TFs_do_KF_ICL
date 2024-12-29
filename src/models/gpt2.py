@@ -88,6 +88,9 @@ class GPT2(BaseModel):
             output_dict = {"loss_mse": torch.sum(res_sq) / (~mask).sum()} #mean squared error loss
         else:
             output_dict = {"loss_mse": torch.mean(res_sq)}
+            
+
+        # Calculate metrics
         for i in range(ys.shape[1]):
             for j in range(ys.shape[2]):
                 output_dict[f"metric_mse_ts{i}_dim_{j}"] = torch.mean(res_sq[:, i, j])

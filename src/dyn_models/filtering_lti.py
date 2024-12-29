@@ -214,6 +214,14 @@ class FilterSim:
                 A = generate_random_mat_cond_number(nx, cond_num) #generate a random matrix with a condition number of cond_number
                 self.A = A
 
+            elif tri == "ident":
+                self.A = np.eye(nx)
+
+            elif tri == "ortho":
+                random_matrix = np.random.randn(nx, nx) #generate a random square matrix
+                Q, R = np.linalg.qr(random_matrix) #get the QR decomposition
+                self.A = Q #set A to be the orthogonal matrix
+
             else:
                 if new_eig:
                     self.A = gen_A(0.97, 0.99, nx)
@@ -229,8 +237,11 @@ class FilterSim:
             self.C = self.construct_C(self.A, ny, C_dist)
 
             
-
-            self.S_state_inf = ct.dlyap(self.A, np.eye(nx) * self.sigma_w ** 2)
+            if tri == "ident":
+                self.S_state_inf = np.eye(nx) # Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
+                #think about the ortho case
+            else:
+                self.S_state_inf = ct.dlyap(self.A, np.eye(nx) * self.sigma_w ** 2)
 
             eval, evec = lin.eig(self.S_state_inf)
 
@@ -240,31 +251,33 @@ class FilterSim:
                 S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2)
                 self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2
 
+                if not (tri == "ident" or tri == "ortho"):
+                    # rescale C and V
+                    V = np.eye(ny) * self.sigma_v ** 2
+                    obs_tr = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
 
-                # rescale C and V
-                V = np.eye(ny) * self.sigma_v ** 2
-                obs_tr = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
+                    if obs_tr < 0:
+                        print("obs_tr negative:", obs_tr)
+                        print("evals of Pi", eval)
+                        print("evals greater than 0?", np.greater(eval, 0))
+                        print("all positive", np.all(np.greater(eval, 0)))
+                        print("eval of CPiCT:", lin.eig(self.C @ self.S_state_inf @ self.C.T))
+                        raise ValueError("Didn't catch negative evals")
+                    
 
-                if obs_tr < 0:
-                    print("obs_tr negative:", obs_tr)
-                    print("evals of Pi", eval)
-                    print("evals greater than 0?", np.greater(eval, 0))
-                    print("all positive", np.all(np.greater(eval, 0)))
-                    print("eval of CPiCT:", lin.eig(self.C @ self.S_state_inf @ self.C.T))
-                    raise ValueError("Didn't catch negative evals")
-                
+                    alpha = np.sqrt(E / obs_tr)
 
-
-                alpha = np.sqrt(E / obs_tr)
-
-                self.C = alpha*self.C
-                self.sigma_v = alpha*self.sigma_v
-                V = np.eye(ny) * self.sigma_v ** 2
+                    self.C = alpha*self.C
+                    self.sigma_v = alpha*self.sigma_v
+                    V = np.eye(ny) * self.sigma_v ** 2
+                else:
+                    self.sigma_v = 0.0
+                    self.sigma_w = 0.0
 
                 # obs_tr_new = np.trace(self.C @ self.S_state_inf @ self.C.T + V)
                 # print("new obs tr", obs_tr_new)
 
-
+                #think about the identity case for this
                 S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2)
                 self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2
             else:
@@ -348,6 +361,8 @@ class FilterSim:
             elif C_type == "_zero_C":
                 C = np.zeros((ny,nx))
                 break
+            elif C_type == "_ident_C":
+                C = np.eye(ny)
             elif C_type == "_single_system":
                 arr = np.array([
                         [ 1.58306722,  0.08254489,  0.63563991, -0.75589141,  0.45347395,  1.52444272,

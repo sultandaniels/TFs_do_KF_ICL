@@ -24,7 +24,7 @@ class Config(object, metaclass=Singleton):
     distinct_cond_nums = 10
     val_dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
     C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
-    nx = 5
+    nx = 10
     ny = 5
     n_noise = 1
     num_traces = {"train": 1, "val": 1}
@@ -34,7 +34,7 @@ class Config(object, metaclass=Singleton):
     multi_sys_trace = True #have multiple systems in a single trace
     num_test_traces_configs = 3 #number of test traces configurations to generate
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
-    single_system = True #only use a single system in the test trace
+    single_system = False #only use a single system in the test trace
 
     # Training settings
     devices=[0,3] #which GPU

@@ -2,29 +2,26 @@ from torch.utils.data import Dataset
 from dyn_models.filtering_lti import *
 from core import Config
 import torch
+import scipy.stats as stats
 import pickle
 from linalg_helpers import print_matrix
 
 
 config = Config()
 
-def generate_zipf_integer(n, a):
+def generate_zipfian_integer(n, a):
     """
     Generate integer number between 1 and n (inclusive) from a Zipf's power law distribution.
 
     Parameters:
     n (int): The upper limit (inclusive) for the range of integers.
-    a (float): The parameter of the Zipf distribution (a > 1).
+    a (float): The parameter of the Zipfian distribution (a >= 0).
 
     Returns:
-    np.ndarray: An array of integers between 0 and n.
+    int: An integer between 0 and n.
     """
-    # Generate samples from a Zipf distribution
-    rng = np.random.default_rng()
-    sample = rng.zipf(a, 1)
-
-    # Clip the samples to the desired range (1 to n)
-    sample = np.clip(sample, 0, n)
+    # Generate samples from a Zipfian distribution
+    sample = stats.zipfian.rvs(a,n, size=1)
 
     return sample[0]
 
@@ -54,11 +51,11 @@ def special_tokens(segment, sys_name, style):
         start_token = (sys_name/(sys_name + 1)) * np.ones((1, segment.shape[1]))
         end_token = (-sys_name/(sys_name + 1)) * np.ones((1, segment.shape[1]))
     elif style == "zeros":
-        # create an array of zeros with the same number of columns as the segment, but with a 1 in the column corresponding to the 2*system name
+        # create an array of zeros with the same number of columns as the segment, but with a sqrt2 in the column corresponding to the 2*system name
         start_token = np.zeros((1, segment.shape[1]))
-        start_token[0, 2*sys_name] = 1
+        start_token[0, 2*sys_name] = np.sqrt(2)
         end_token = np.zeros((1, segment.shape[1]))
-        end_token[0, 2*sys_name + 1] = 1
+        end_token[0, 2*sys_name + 1] = np.sqrt(2)
     else:
         raise ValueError(f"Special token style {style} has not been implemented.")
     
@@ -86,7 +83,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(3*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 3 segments of each system will fit in the trace)
 
     else:
-        sys_in_trace = generate_zipf_integer(max_sys_trace, 1.5) #number of systems to include in the context
+        sys_in_trace = generate_zipfian_integer(max_sys_trace, 1.5) #number of systems to include in the context
 
         #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
         rng = np.random.default_rng()
@@ -107,8 +104,8 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
                 seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(1.5*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
 
     context_len = n_positions + 1
-    segments = np.zeros((context_len, ny + 2*max_sys_trace + 1)) #initialize the segments array
-    segments[0, 2*max_sys_trace] = 1 #set the start token for the first segment
+    segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
+    segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
     #initialize a dictionary to hold the next starting index for each system trace
     next_start = {sys_ind: 0 for sys_ind in sys_inds} 
@@ -150,7 +147,11 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         else:
             segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
-        #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+        # concatenate 1 columns of ones to the segment
+        ones = np.ones((segment.shape[0], 1))
+        segment = np.concatenate((ones, segment), axis=1)
+    
+        # concatenate 2*max_sys_trace + 1 columns of zeros to the segment
         zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
         segment = np.concatenate((zeros, segment), axis=1)
 
@@ -178,7 +179,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
     if not single_system:
         sys_inds.append(sys_ind) #add the last system index back to the list of system indices
-
+        
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
 
@@ -224,7 +225,7 @@ class FilterDataset(Dataset):
 
             obs = entry.pop("obs")
             L = obs.shape[-2]
-            if config.dataset_typ in ["unifA", "noniid", "upperTriA", "upperTriA_gauss", "rotDiagA", "rotDiagA_unif", "rotDiagA_gauss", "gaussA", "gaussA_noscale", "single_system", "cond_num"]:
+            if config.dataset_typ in ["unifA", "noniid", "upperTriA", "upperTriA_gauss", "rotDiagA", "rotDiagA_unif", "rotDiagA_gauss", "gaussA", "gaussA_noscale", "single_system", "cond_num", "ident", "ortho"]:
                 entry["current"] = np.take(obs, np.arange(L - 1), axis=-2) #current observation
                 entry["target"] = np.take(obs, np.arange(1, L), axis=-2) #true value of target observation at the next instance
             else:
