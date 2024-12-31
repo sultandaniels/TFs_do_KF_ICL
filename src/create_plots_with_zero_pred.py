@@ -1275,16 +1275,13 @@ def compute_errors_multi_sys(config, tf):
 
     errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
     for trace_config in range(num_test_traces_configs):
-        print(f"trace config: {trace_config}")
         #set the errors for the start token to be infinite
         errs_tf[trace_config, :, 0] = np.inf
         errs_tf[trace_config, :, 1] = np.inf
         seg_count = 0
         for seg_start in seg_starts_per_config[trace_config]: #loop over the starting indices of the segments
-            print(f"seg_start + tok_seg_lens_per_config[trace_config][seg_count]: {seg_start + tok_seg_lens_per_config[trace_config][seg_count]}")
             #set the errors of the end of the segment to be infinite
             if real_seg_lens_per_config[trace_config][seg_count] < tok_seg_lens_per_config[trace_config][seg_count] - 1:
-                print("here")
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
             if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count]] = np.inf
@@ -1709,6 +1706,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             # Set major and minor gridlines
 
             ax.set_xlim(left=0, right=251)
+            # ax.set_ylim(bottom=0, top=5.5)  # set the y axis limits
 
 
             # Optionally, customize major and minor ticks
