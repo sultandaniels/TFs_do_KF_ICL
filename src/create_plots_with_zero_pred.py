@@ -1274,6 +1274,23 @@ def compute_errors_multi_sys(config, tf):
     multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
 
     errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
+    for trace_config in range(num_test_traces_configs):
+        print(f"trace config: {trace_config}")
+        #set the errors for the start token to be infinite
+        errs_tf[trace_config, :, 0] = np.inf
+        errs_tf[trace_config, :, 1] = np.inf
+        seg_count = 0
+        for seg_start in seg_starts_per_config[trace_config]: #loop over the starting indices of the segments
+            print(f"seg_start + tok_seg_lens_per_config[trace_config][seg_count]: {seg_start + tok_seg_lens_per_config[trace_config][seg_count]}")
+            #set the errors of the end of the segment to be infinite
+            if real_seg_lens_per_config[trace_config][seg_count] < tok_seg_lens_per_config[trace_config][seg_count] - 1:
+                print("here")
+                errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
+            if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
+                errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count]] = np.inf
+            seg_count += 1
+
+
     err_lss["MOP"] = errs_tf
 
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
@@ -1358,12 +1375,12 @@ def compute_errors_multi_sys(config, tf):
 
 
                     # la.print_matrix(ys_seg, "ys_seg")
+                    if not config.val_dataset_typ == "ident":
+                        # Apply the Kalman filter and append the result to the inner list
+                        result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
-                    # Apply the Kalman filter and append the result to the inner list
-                    result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
-
-                    #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
-                    inner_result[trial_count, seg_start + 1:seg_start + 1 + real_seg_lens_conf[seg_count], :] = result[:-1,:] #if last index was not an end_paren the infinity will be overwritten here
+                        #remove the last kf pred because the true y was a special token, and insert the kf pred after the last kf preds
+                        inner_result[trial_count, seg_start + 1:seg_start + 1 + real_seg_lens_conf[seg_count], :] = result[:-1,:] #if last index was not an end_paren the infinity will be overwritten here
 
                     #analytical kalman filter errors
                     #get the analytical kalman filter error for the segment
@@ -1380,28 +1397,29 @@ def compute_errors_multi_sys(config, tf):
             preds_kf[conf_count] = inner_result
             conf_count += 1
 
-        # Convert the preds_kf list to a numpy array
-        preds_kf = np.array(preds_kf)
-        errs_kf = np.linalg.norm((multi_sys_ys_true - preds_kf), axis=-1) ** 2
-        err_lss["Kalman"] = errs_kf
+        if not config.val_dataset_typ == "ident":
+            # Convert the preds_kf list to a numpy array
+            preds_kf = np.array(preds_kf)
+            errs_kf = np.linalg.norm((multi_sys_ys_true - preds_kf), axis=-1) ** 2
+            err_lss["Kalman"] = errs_kf
 
-        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-                pickle.dump(err_lss, f)
+            os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+            with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                    pickle.dump(err_lss, f)
 
-        end = time.time()  # end the timer for kalman filter predictions
-        print("time elapsed for KF Pred:", (end - start) / 60,
-            "min")  # print the time elapsed for kalman filter predictions
+            end = time.time()  # end the timer for kalman filter predictions
+            print("time elapsed for KF Pred:", (end - start) / 60,
+                "min")  # print the time elapsed for kalman filter predictions
 
 
-        del preds_kf
-        del errs_kf
+            del preds_kf
+            del errs_kf
 
-        torch.cuda.empty_cache()
-        gc.collect()
+            torch.cuda.empty_cache()
+            gc.collect()
 
     else:
-        print("Kalman pred already in err_lss")
+        print("Kalman pred for ident is trivial")
 
     
     err_lss["Analytical_Kalman"] = an_kf_errs #set the analytical kalman filter errors in the err_lss dictionary
@@ -1411,19 +1429,20 @@ def compute_errors_multi_sys(config, tf):
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
-    print("kf multi sys with remembering")
-    start = time.time()  # start the timer for kalman filter predictions
-    err_lss = compute_kf_multi_sys(num_test_traces_configs, ys, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
-    end = time.time()  # end the timer for kalman filter predictions
-    print("time elapsed for KF Pred with remembering:", (end - start) / 60, "min")  # print the time elapsed for kalman filter predictions with remembering
+    if not config.val_dataset_typ == "ident":
+        print("kf multi sys with remembering")
+        start = time.time()  # start the timer for kalman filter predictions
+        err_lss = compute_kf_multi_sys(num_test_traces_configs, ys, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
+        end = time.time()  # end the timer for kalman filter predictions
+        print("time elapsed for KF Pred with remembering:", (end - start) / 60, "min")  # print the time elapsed for kalman filter predictions with remembering
 
-    os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
-    with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
-            pickle.dump(err_lss, f)
+        os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
+        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
+                pickle.dump(err_lss, f)
 
 
     # Think about having a sys_choices to prediction error dictionary to implement the remembering
-    if True:
+    if not config.val_dataset_typ == "ident":
     # if not ("OLS" in err_lss.keys()):
         # Original OLS
         # Clear the PyTorch cache
@@ -1440,7 +1459,7 @@ def compute_errors_multi_sys(config, tf):
         end = time.time()  # end the timer for OLS predictions
         print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
     else:
-        print("OLS pred already in err_lss")
+        print("OLS pred for ident is trivial")
 
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
@@ -1682,7 +1701,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             ax.grid(which="both")
             if logscale:
                 ax.set_yscale('log')
-                ax.set_xscale('log')
+                # ax.set_xscale('log')
 
             ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
 
@@ -1717,7 +1736,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             #add a caption to the bottom of the figure
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
             fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
+                parent_parent_dir + f"/figures/multi_sys_trace/" + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
                     "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
         return None
 

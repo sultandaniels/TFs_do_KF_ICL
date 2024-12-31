@@ -415,10 +415,13 @@ def apply_kf(fsim, ys, sigma_w=None, sigma_v=None, return_obj=False):
     f.H = fsim.C
 
     ls = [fsim.C @ f.x]
+    count = 0
     for y in ys:
+        print(f"count: {count}")
         f.update(y)
         f.predict()
         ls.append(fsim.C @ f.x)
+        count += 1
     ls = np.array(ls)
     return (f, ls) if return_obj else ls
 
