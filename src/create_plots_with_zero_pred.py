@@ -1372,7 +1372,7 @@ def compute_errors_multi_sys(config, tf):
 
 
                     # la.print_matrix(ys_seg, "ys_seg")
-                    if not config.val_dataset_typ == "ident":
+                    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
                         # Apply the Kalman filter and append the result to the inner list
                         result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
@@ -1394,7 +1394,7 @@ def compute_errors_multi_sys(config, tf):
             preds_kf[conf_count] = inner_result
             conf_count += 1
 
-        if not config.val_dataset_typ == "ident":
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
             # Convert the preds_kf list to a numpy array
             preds_kf = np.array(preds_kf)
             errs_kf = np.linalg.norm((multi_sys_ys_true - preds_kf), axis=-1) ** 2
@@ -1426,7 +1426,7 @@ def compute_errors_multi_sys(config, tf):
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
             pickle.dump(err_lss, f)
 
-    if not config.val_dataset_typ == "ident":
+    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
         print("kf multi sys with remembering")
         start = time.time()  # start the timer for kalman filter predictions
         err_lss = compute_kf_multi_sys(num_test_traces_configs, ys, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
@@ -1439,7 +1439,7 @@ def compute_errors_multi_sys(config, tf):
 
 
     # Think about having a sys_choices to prediction error dictionary to implement the remembering
-    if not config.val_dataset_typ == "ident":
+    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
     # if not ("OLS" in err_lss.keys()):
         # Original OLS
         # Clear the PyTorch cache

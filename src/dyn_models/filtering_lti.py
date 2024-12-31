@@ -218,7 +218,7 @@ class FilterSim:
                 self.A = np.eye(nx)
 
             elif tri == "ortho":
-                random_matrix = np.random.randn(nx, nx) #generate a random square matrix
+                random_matrix = np.random.randn(nx, nx) #generate a Gaussian random square matrix
                 Q, R = np.linalg.qr(random_matrix) #get the QR decomposition
                 self.A = Q #set A to be the orthogonal matrix
 
@@ -237,9 +237,10 @@ class FilterSim:
             self.C = self.construct_C(self.A, ny, C_dist)
 
             
-            if tri == "ident":
-                self.S_state_inf = np.eye(nx) # Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
-                #think about the ortho case
+            if tri == "ident" or tri == "ortho":
+                self.S_state_inf = (1/np.sqrt(nx))*np.eye(nx) # for ident: Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
+                #for ortho case there is no steady state covariance unless A is Identity.
+                #we have Pi = U Lambda U^T = A U Lambda U^T A^T so U = AU.
             else:
                 self.S_state_inf = ct.dlyap(self.A, np.eye(nx) * self.sigma_w ** 2) #solve the riccati equation for the steady state solution
 
