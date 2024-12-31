@@ -361,17 +361,17 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_
     
 
     for trace_conf in range(num_trace_configs):
-        print(f"\n\nTrace config: {trace_conf}")
+        # print(f"\n\nTrace config: {trace_conf}")
         # print(f"sys_inds_per_config[trace_conf]: {sys_inds_per_config[trace_conf]}")
         # print(f"sim_obs_per_config[trace_conf]: {sim_obs_per_config[trace_conf]}")
         # print(f"sim_obs_per_config[trace_conf].values(): {sim_obs_per_config[trace_conf].values()}")
-        print(f"type of sim_obs_per_config[trace_conf].values(): {type(list(sim_obs_per_config[trace_conf].values()))}")
+        # print(f"type of sim_obs_per_config[trace_conf].values(): {type(list(sim_obs_per_config[trace_conf].values()))}")
 
         sim_objs_list = list(sim_obs_per_config[trace_conf].values())
         # print(seg_lens_per_config[trace_conf])
         #create a new array named ys_sys that takes the ys from axis 0 that correspond to every index in sys_inds_per_config[trace_conf]
         ys_sys = ys[sys_inds_per_config[trace_conf]]
-        print(f"ys_sys shape: {ys_sys.shape}, len of sys_inds_per_config[trace_conf]: {len(sys_inds_per_config[trace_conf])}, ys shape: {ys.shape}")
+        # print(f"ys_sys shape: {ys_sys.shape}, len of sys_inds_per_config[trace_conf]: {len(sys_inds_per_config[trace_conf])}, ys shape: {ys.shape}")
 
         ols_err_lss = {}
         ols_err_lss = compute_OLS_ir(config, ys_sys, sim_objs_list, max_ir_length, ols_err_lss)
@@ -387,13 +387,13 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_
             seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
 
             for ir_length in range(1, max_ir_length + 1):
-                print(f"ir_length: {ir_length}")
-                print(f"sys_start[sys]: {sys_start[sys]}")
-                print(f"sys_start[sys] + seg_len: {sys_start[sys] + seg_len}")
-                print(f"next_start + 1: {next_start + 1}")
-                print(f"next_start + 1 + seg_len: {next_start + 1 + seg_len}")
-                print(f"ols_err_lss[f'OLS_ir_{ir_length}'][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len].shape: {ols_err_lss[f'OLS_ir_{ir_length}'][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len].shape}")
-                print(f"err_lss[f'OLS_ir_{ir_length}'][trace_conf, :, next_start + 1:next_start + 1 + seg_len].shape: {err_lss[f'OLS_ir_{ir_length}'][trace_conf, :, next_start + 1:next_start + 1 + seg_len].shape}")
+                # print(f"ir_length: {ir_length}")
+                # print(f"sys_start[sys]: {sys_start[sys]}")
+                # print(f"sys_start[sys] + seg_len: {sys_start[sys] + seg_len}")
+                # print(f"next_start + 1: {next_start + 1}")
+                # print(f"next_start + 1 + seg_len: {next_start + 1 + seg_len}")
+                # print(f"ols_err_lss[f'OLS_ir_{ir_length}'][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len].shape: {ols_err_lss[f'OLS_ir_{ir_length}'][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len].shape}")
+                # print(f"err_lss[f'OLS_ir_{ir_length}'][trace_conf, :, next_start + 1:next_start + 1 + seg_len].shape: {err_lss[f'OLS_ir_{ir_length}'][trace_conf, :, next_start + 1:next_start + 1 + seg_len].shape}")
                 err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = ols_err_lss[f"OLS_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
                 err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = ols_err_lss[f"OLS_analytical_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
                 

@@ -143,7 +143,7 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_choices_per_config, sys_dict_pe
 
     next_start_inds = next_start_inds_per_config[trace_conf]
     sys_choices = sys_choices_per_config[trace_conf]
-    names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero"]#, "Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"] #, "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]
+    names = ["MOP", "Analytical_Kalman", "Analytical_Simulation", "Zero", "Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"] #, "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]
     print("\n\n\nTrace Config", trace_conf)
     if ax is None:
         fig = plt.figure(figsize=(15, 30))
@@ -219,21 +219,30 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_choices_per_config, sys_dict_pe
                 if name in names:
                     if name != "Analytical_Kalman":
                         avg, std = err_ls[trace_conf,:,:].mean(axis=(0)), (3/np.sqrt(err_ls.shape[1]))*err_ls[trace_conf,:,:].std(axis=0)
-                        # handles.extend(ax.plot(avg, 
-                        #                     label=name, 
-                        #                     linewidth=2, 
-                        #                     marker='x' if name == "MOP" or name == "Kalman" else ".", 
-                        #                     color=colors[color_count], 
-                        #                     markersize=5 if name == "MOP" or name == "Kalman" or name == "Zero" else 1))
                         scatter = ax.scatter(range(len(avg)), avg, 
                                             label=name, 
                                             marker='x' if name == "MOP" or name == "Kalman" else ".", 
                                             color=colors[color_count], 
                                             s=250 if name == "MOP" or name == "Kalman" or name == "Zero" else 250)
-                        handles.append(scatter)
                         if shade:
                             # ax.fill_between(np.arange(err_ls.shape[-1]), avg - std, avg + std, facecolor=handles[-1].get_facecolor(), alpha=0.2)
                             ax.errorbar(range(len(avg)), avg, yerr=std, fmt='none', ecolor=colors[color_count], alpha=0.5, capsize=2)
+                        
+
+                        # med, q1, q3 = np.quantile(err_ls[trace_conf], [0.5, 0.45, 0.55], axis=-2)
+                        # scatter = ax.scatter(range(len(med)), med, 
+                        #                     label=name, 
+                        #                     marker='x' if name == "MOP" or name == "Kalman" else ".", 
+                        #                     color=colors[color_count], 
+                        #                     s=250 if name == "MOP" or name == "Kalman" or name == "Zero" else 250)
+                        # if shade:
+                        #     # ax.fill_between(np.arange(err_ls.shape[-1]), avg - std, avg + std, facecolor=handles[-1].get_facecolor(), alpha=0.2)
+                        #     ax.errorbar(range(len(med)), med, yerr=[q1, q3], fmt='none', ecolor=colors[color_count], alpha=0.5, capsize=2)
+
+
+                        handles.append(scatter)
+
+                        
 
                         color_count += 1
 
