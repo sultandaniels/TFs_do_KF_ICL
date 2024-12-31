@@ -417,7 +417,6 @@ def apply_kf(fsim, ys, sigma_w=None, sigma_v=None, return_obj=False):
     ls = [fsim.C @ f.x]
     count = 0
     for y in ys:
-        print(f"count: {count}")
         f.update(y)
         f.predict()
         ls.append(fsim.C @ f.x)
