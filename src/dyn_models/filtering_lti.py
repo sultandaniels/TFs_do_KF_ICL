@@ -238,7 +238,7 @@ class FilterSim:
 
             
             if tri == "ident" or tri == "ortho":
-                self.S_state_inf = (1/np.sqrt(nx))*np.eye(nx) # for ident: Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
+                self.S_state_inf = (1/nx)*np.eye(nx) # for ident: Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
                 #for ortho case there is no steady state covariance unless A is Identity.
                 #we have Pi = U Lambda U^T = A U Lambda U^T A^T so U = AU.
             else:
