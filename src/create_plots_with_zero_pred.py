@@ -1054,64 +1054,80 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces(trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False):
+def populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, real_seg_lens=None):
+    if sys_dict:
+        context_len = n_positions + 1 #the length of the context
+
+        segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
+        segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
+
+        #initialize a dictionary to hold the next starting index for each system trace
+        next_start = {sys_ind: 0 for sys_ind in sys_dict.keys()}
+        seg_start = 1
+        count = 0
+        for sys in sys_choices:
+            #get obs from the system trace corresponding to sys_trace_ind
+            sys_trace_obs = ys_trial[sys]
+            tok_seg_len = tok_seg_lens[count]
+            seg_len = real_seg_lens[count]
+            
+            segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
+
+            #concatenate 1 column of ones to the segment
+            ones = np.ones((segment.shape[0], 1))
+            segment = np.concatenate((ones, segment), axis=1)
+            #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+            zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+            segment = np.concatenate((zeros, segment), axis=1)
+
+            # Create the special tokens
+            start_paren, end_paren = special_tokens(segment, sys_dict[sys], style="zeros")
+            
+            segment = np.concatenate([start_paren, segment, end_paren], axis=0)
+
+            if seg_start + seg_len + 2 > context_len:
+                #truncate the segment if it is too long so that it fits in the context
+                segment = segment[:context_len - seg_start, :]
+
+            segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+            
+            next_start[sys] += seg_len #update the next starting index for the trace from this system index
+
+            if seg_start + tok_seg_len == context_len:
+                break
+
+            seg_start += tok_seg_len #update the starting index for the next segment
+
+            count += 1
+    else:
+        if trial == 0:
+            raise ValueError(f"first conditional malfunction since trial = {trial}")
+        else:
+            raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
+    return segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens
+
+def cycle_list(lst, shift):
+    shift = shift % len(lst)
+    # a function to cycle a list to the right by shift amount
+    return lst[-shift:] + lst[:-shift]
+
+def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False, needle_in_haystack=False, datasource=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
     ys_trial = entries[:, trial] #get the observations for the first trial
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-       segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system)
-    else:
-        if sys_dict:
-            context_len = n_positions + 1 #the length of the context
+        if trace_conf > 0 and needle_in_haystack:
+            haystack = sys_choices[:-1] #get the haystack from the previous trial
+            new_haystack = cycle_list(haystack, 1) #cycle the haystack to the left by 1
+            sys_choices = new_haystack + [sys_choices[-1]] #set the new system choices
+            segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
 
-            segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
-            segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
-
-            #initialize a dictionary to hold the next starting index for each system trace
-            next_start = {sys_ind: 0 for sys_ind in sys_dict.keys()}
-            seg_start = 1
-            count = 0
-            for sys in sys_choices:
-                #get obs from the system trace corresponding to sys_trace_ind
-                sys_trace_obs = ys_trial[sys]
-                tok_seg_len = tok_seg_lens[count]
-                seg_len = real_seg_lens[count]
-                
-                segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
-
-                #concatenate 1 column of ones to the segment
-                ones = np.ones((segment.shape[0], 1))
-                segment = np.concatenate((ones, segment), axis=1)
-                #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
-                zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
-                segment = np.concatenate((zeros, segment), axis=1)
-
-                # Create the special tokens
-                start_paren, end_paren = special_tokens(segment, sys_dict[sys], style="zeros")
-                
-                segment = np.concatenate([start_paren, segment, end_paren], axis=0)
-
-                if seg_start + seg_len + 2 > context_len:
-                    #truncate the segment if it is too long so that it fits in the context
-                    segment = segment[:context_len - seg_start, :]
-
-                segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
-                
-                next_start[sys] += seg_len #update the next starting index for the trace from this system index
-
-                if seg_start + tok_seg_len == context_len:
-                    break
-
-                seg_start += tok_seg_len #update the starting index for the next segment
-
-                count += 1
         else:
-            if trial == 0:
-                raise ValueError(f"first conditional malfunction since trial = {trial}")
-            else:
-                raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system, needle_in_haystack=needle_in_haystack, datasource=datasource)
+    else:
+        segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
   
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
@@ -1160,14 +1176,12 @@ def compute_errors_multi_sys(config, tf):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     logger = logging.getLogger(__name__)  # get the logger
 
-    print("val_dataset_typ:", config.val_dataset_typ)
     num_systems = config.num_val_tasks  # number of validation tasks
-    print("Number of validation systems:", num_systems)
+    
     num_trials = config.num_traces["val"]  # number of traces
-    print("Number of trials:", num_trials)
-
+    
     num_test_traces_configs = config.num_test_traces_configs
-    print("Number of test trace configurations:", num_test_traces_configs)
+    
 
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
@@ -1182,7 +1196,6 @@ def compute_errors_multi_sys(config, tf):
     # get the parent directory of the parent directory
     parent_parent_dir = os.path.dirname(parent_dir)
 
-    print("getting the validation data")
     # open fsim file
     with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
         sim_objs = pickle.load(f)
@@ -1197,19 +1210,15 @@ def compute_errors_multi_sys(config, tf):
         gc.collect()  # Start the garbage collector
 
     ckpt_steps = get_step_number(config.ckpt_path)
-    print("ckpt_steps:", ckpt_steps)
+    
 
     # if parent_parent_dir + f"/prediction_errors{config.C_dist}_step={str(ckpt_step)}.ckpt exists, load the prediction errors
     if os.path.exists(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"):
-        print("\nerr_lss already exists\n")
+
         with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'rb') as f:
             err_lss = pickle.load(f)
 
-        for key in err_lss.keys():
-            print(key, err_lss[key].shape)
-            print("\n\n")
     else:
-        print("\n err_lss does not exist yet")
         err_lss = collections.OrderedDict()
 
 
@@ -1227,14 +1236,15 @@ def compute_errors_multi_sys(config, tf):
     sys_inds_per_config = []
     for trace_config in range(num_test_traces_configs):
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
-        tok_seg_lens = None
-        sys_dict = None
-        sys_choices = None
-        seg_starts= None
-        real_seg_lens=None
-        sys_inds = None
+        if (not config.needle_in_haystack) or (trace_config == 0):
+            tok_seg_lens = None
+            sys_dict = None
+            sys_choices = None
+            seg_starts= None
+            real_seg_lens=None
+            sys_inds = None
         for trial in range(num_trials):
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack, datasource=config.datasource) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1308,10 +1318,11 @@ def compute_errors_multi_sys(config, tf):
     errs_zero = np.linalg.norm(multi_sys_ys_true, axis=-1) ** 2  # get the errors of zero predictions
     err_lss["Zero"] = errs_zero
 
-    for i in range(len(sys_choices_per_config)):
-        print(f"trace config: {i}")
-        print(f"len of sys_choices: {len(sys_choices_per_config[i])}")
-        print("sum of zero err:", np.sum(errs_zero[i]))
+    if config.num_haystack_examples == 1:
+        for i in range(len(sys_choices_per_config)):
+            print(f"trace config: {i}")
+            print(f"len of sys_choices: {len(sys_choices_per_config[i])}")
+            print("sum of zero err:", np.sum(errs_zero[i]))
 
     os.makedirs(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt", exist_ok=True)
     with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'wb') as f:
@@ -1479,17 +1490,47 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     if train_conv:
         err_lss, irreducible_error = compute_errors_conv(config)
     elif config.multi_sys_trace:
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
-        
-        #save the system indices, starting indices, and token segment lengths to pickle file
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
-            pickle.dump({
-                'sys_choices_per_config': sys_choices_per_config,
-                'sys_dict_per_config': sys_dict_per_config,
-                'tok_seg_lens_per_config': tok_seg_lens_per_config,
-                'seg_starts_per_config': seg_starts_per_config
-            }, f)
-        return None
+        if not config.needle_in_haystack:
+            err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
+            
+            #save the system indices, starting indices, and token segment lengths to pickle file
+            with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+                pickle.dump({
+                    'sys_choices_per_config': sys_choices_per_config,
+                    'sys_dict_per_config': sys_dict_per_config,
+                    'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                    'seg_starts_per_config': seg_starts_per_config
+                }, f)
+            return None
+        else:
+            err_lss_examples = {}
+            for ex in range(config.num_haystack_examples):
+                err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
+                for key in err_lss.keys():
+                    if ex == 0:
+                        err_lss_examples[key] = [] #initialize the list for the prediction errors
+                    err_lss_examples[key].append(err_lss[key])
+            
+                #save the system indices, starting indices, and token segment lengths to pickle file
+                with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
+                    pickle.dump({
+                        'sys_choices_per_config': sys_choices_per_config,
+                        'sys_dict_per_config': sys_dict_per_config,
+                        'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                        'seg_starts_per_config': seg_starts_per_config
+                    }, f)
+
+            for key in err_lss_examples.keys():
+                print(f"err_lss_examples[{key}] len: {len(err_lss_examples[key])}")
+                err_lss_examples[key] = np.array(err_lss_examples[key])
+                print(f"err_lss_examples[{key}] shape: {err_lss_examples[key].shape}")
+
+            with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss_examples.pkl", 'wb') as f:
+                pickle.dump(err_lss_examples, f)
+
+            return None
+
+
     else:
         err_lss, irreducible_error = compute_errors(config, config.C_dist, run_deg_kf_test,
                                                 wentinn_data=False, tf=tf)
@@ -1733,8 +1774,9 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
             #add a caption to the bottom of the figure
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
+            os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/" + ("needle_in_haystack/" if config.needle_in_haystack else ""), exist_ok=True)
             fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/" + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
+                parent_parent_dir + f"/figures/multi_sys_trace/"+ ("needle_in_haystack/" if config.needle_in_haystack else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
                     "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
         return None
 
