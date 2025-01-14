@@ -17,7 +17,7 @@ class Config(object, metaclass=Singleton):
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
-    num_val_tasks = 1 #number of test systems
+    num_val_tasks = 25 #number of test systems
     dataset_typ = "ortho" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
     max_cond_num = 100
     distinct_cond_nums = 10
@@ -26,19 +26,19 @@ class Config(object, metaclass=Singleton):
     nx = 5
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 1}
+    num_traces = {"train": 1, "val": 2000}
     changing = False #used only for plotting
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
-    single_system = False #only use a single system in the test trace
+    single_system = True #only use a single system in the test trace
     needle_in_haystack = False #run needle in haystack tests
     datasource="val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #number of systems in the haystack
     len_seg_haystack = 10 #length of a haystack segment
     num_haystack_examples=1000 #number of haystack examples to generate
-    num_test_traces_configs = num_sys_haystack if needle_in_haystack else 10 #number of test traces configurations to generate
+    num_test_traces_configs = num_sys_haystack if needle_in_haystack else 3 #number of test traces configurations to generate
 
     # Training settings
     devices=[2,3] #which GPU

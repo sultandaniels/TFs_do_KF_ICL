@@ -105,10 +105,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         sys_inds = [0]
         sys_dict = {0: sys_names[0]}
 
-        seg_lens = [] #initialize the list of segment lengths
-        while sum(seg_lens) < n_positions:
-
-            seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(10*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 3 segments of each system will fit in the trace)
+        seg_lens = generate_seg_lens(n_positions, sys_in_trace)
 
     else:
         if needle_in_haystack:
