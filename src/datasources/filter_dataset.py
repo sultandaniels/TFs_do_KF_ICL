@@ -25,7 +25,35 @@ def generate_zipfian_integer(n, a):
 
     return sample[0]
 
+def generate_seg_lens(n_positions, sys_in_trace):
+    """
+    Generate segment lengths for a trace.
 
+    Parameters:
+    n_positions (int): The number of positions in the trace.
+    sys_in_trace (int): The number of systems in the trace.
+
+    # create a random generator
+    """
+    rng = np.random.default_rng()
+
+    # generate a sample from a poisson dist and name it num_cut
+    lam = 2*sys_in_trace
+
+    num_cut = rng.poisson(lam) # number of cuts in the trace
+
+    positions = rng.integers(0, n_positions, size=num_cut) #positions are the index of the closed paren (and start token)
+    if not 0 in positions:
+        positions = np.append(positions, 0)
+    positions = np.append(positions, n_positions)
+    positions.sort() # sort the positions in ascending order
+
+    # calculate the differenc between successive positions
+    diffs = np.diff(positions)
+
+    # calculate the real segment lengths
+    seg_lens = diffs - 2
+    return seg_lens
 
 def print_matrix(matrix, name):
     """
@@ -36,10 +64,10 @@ def print_matrix(matrix, name):
     name (str): The name of the matrix.
     """
     print(f"Matrix {name}:")
-    rows, cols = matrix.shape
+    rows, cols = matrix.shape #get the number of rows and columns in the matrix
     for i in range(rows):
         for j in range(cols):
-            print(f"{matrix[i, j]:>10.4f}", end=" ")
+            print(f"{matrix[i, j]:>10.4f}", end=" ") #print the element in the matrix
         print()
 
 def special_tokens(segment, sys_name, style):
@@ -102,13 +130,14 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             #make seg_lens be a list where the first 19 elements are 10 and the last element is n_positions - 190
             seg_lens = [10]*19 + [n_positions - 190]
         else:
-            seg_lens = [] #initialize the list of segment lengths
-            while sum(seg_lens) < n_positions:
+            # seg_lens = [] #initialize the list of segment lengths
+            # while sum(seg_lens) < n_positions:
 
-                if sys_in_trace == 1:
-                    seg_lens = [n_positions] #one full trace
-                else:
-                    seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(10*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
+            #     if sys_in_trace == 1:
+            #         seg_lens = [n_positions] #one full trace
+            #     else:
+            #         seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(10*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
+            seg_lens = generate_seg_lens(n_positions, sys_in_trace)
 
     context_len = n_positions + 1
     segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
@@ -161,45 +190,81 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         else:
             sys_trace_obs = entries[sys_ind]["obs"]
 
-        if next_start[sys_ind] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
-            if next_start[sys_ind] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
-                continue
-            else:
-                segment = sys_trace_obs[next_start[sys_ind]:, :] #get the segment from the next starting index to the end of the trace
-                seg_len = segment.shape[0] #update the segment length to the length of the segment
+        if seg_len == -2: #two closed parens on top of each other
+            tok_seg_lens.append(0)
+            real_seg_lens.append(0)
+            seg_count += 1
+            continue
+        elif seg_len == -1: # #two closed parens one after the other
+            start_paren, end_paren = special_tokens(segments, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
+            tok_seg_len = 1 
+            tok_seg_lens.append(tok_seg_len)
+            real_seg_lens.append(0) 
+
+            segments[seg_start:seg_start + tok_seg_len, :] = end_paren #closed paren
+
+            if seg_start + tok_seg_len == context_len:
+                break
+
+            seg_start += tok_seg_len #update the starting index for the next segment
+            seg_count += 1
+            continue
+        elif seg_len == 0: #closed paren, open paren, closed paren
+            start_paren, end_paren = special_tokens(segments, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
+            tok_seg_len = 2
+            tok_seg_lens.append(tok_seg_len)
+            real_seg_lens.append(0)
+
+            segments[seg_start:seg_start + tok_seg_len, :] = np.concatenate([start_paren, end_paren], axis=0) #open paren, closed paren
+
+            if seg_start + tok_seg_len == context_len:
+                break
+
+            seg_start += tok_seg_len #update the starting index for the next segment
+            seg_count += 1
+            continue
         else:
-            segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
-        # concatenate 1 columns of ones to the segment
-        ones = np.ones((segment.shape[0], 1))
-        segment = np.concatenate((ones, segment), axis=1)
-    
-        # concatenate 2*max_sys_trace + 1 columns of zeros to the segment
-        zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
-        segment = np.concatenate((zeros, segment), axis=1)
+            if next_start[sys_ind] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
+                if next_start[sys_ind] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
+                    continue
+                else:
+                    segment = sys_trace_obs[next_start[sys_ind]:, :] #get the segment from the next starting index to the end of the trace
+                    seg_len = segment.shape[0] #update the segment length to the length of the segment
+            else:
+                segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
-        start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
+            # concatenate 1 columns of ones to the segment
+            ones = np.ones((segment.shape[0], 1))
+            segment = np.concatenate((ones, segment), axis=1)
+        
+            # concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+            zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+            segment = np.concatenate((zeros, segment), axis=1)
 
-        segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
+            start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 
-        if seg_start + seg_len + 2 > context_len:
-            #truncate the segment if it is too long so that it fits in the context
-            segment = segment[:context_len - seg_start, :]
-            seg_len = segment.shape[0] - 1
+            segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
 
-        tok_seg_len = segment.shape[0]
-        tok_seg_lens.append(tok_seg_len)
-        real_seg_lens.append(seg_len)
+            if seg_start + seg_len + 2 > context_len:
+                #truncate the segment if it is too long so that it fits in the context
+                segment = segment[:context_len - seg_start, :]
+                seg_len = segment.shape[0] - 1
 
-        segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+            tok_seg_len = segment.shape[0]
+            tok_seg_lens.append(tok_seg_len)
+            real_seg_lens.append(seg_len)
 
-        next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
+            segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
 
-        if seg_start + tok_seg_len == context_len:
-            break
+            next_start[sys_ind] += seg_len #update the next starting index for the trace from this system index 
 
-        seg_start += tok_seg_len #update the starting index for the next segment
-        seg_count += 1
+            if seg_start + tok_seg_len == context_len:
+                break
+
+            seg_start += tok_seg_len #update the starting index for the next segment
+            seg_count += 1
+
 
     #uncomment if code that makes sure the same system isn't picked twice in a row is uncommented
     # if not single_system:

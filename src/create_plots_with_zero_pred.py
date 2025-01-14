@@ -1070,28 +1070,38 @@ def populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, 
             sys_trace_obs = ys_trial[sys]
             tok_seg_len = tok_seg_lens[count]
             seg_len = real_seg_lens[count]
-            
-            segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
-
-            #concatenate 1 column of ones to the segment
-            ones = np.ones((segment.shape[0], 1))
-            segment = np.concatenate((ones, segment), axis=1)
-            #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
-            zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
-            segment = np.concatenate((zeros, segment), axis=1)
 
             # Create the special tokens
-            start_paren, end_paren = special_tokens(segment, sys_dict[sys], style="zeros")
-            
-            segment = np.concatenate([start_paren, segment, end_paren], axis=0)
+            start_paren, end_paren = special_tokens(segments, sys_dict[sys], style="zeros")
 
-            if seg_start + seg_len + 2 > context_len:
-                #truncate the segment if it is too long so that it fits in the context
-                segment = segment[:context_len - seg_start, :]
+            if tok_seg_len == 0: #nothing
+                break
+            elif tok_seg_len == 1: #close parenthesis
 
-            segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+                segments[seg_start:seg_start + tok_seg_len, :] = end_paren #add the segment to the segments array
+            elif tok_seg_len == 2: #open close parenthesis
+
+                segments[seg_start:seg_start + tok_seg_len, :] = np.concatenate([start_paren, end_paren], axis=0) #add the segment to the segments array
+            else:
             
-            next_start[sys] += seg_len #update the next starting index for the trace from this system index
+                segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
+
+                #concatenate 1 column of ones to the segment
+                ones = np.ones((segment.shape[0], 1))
+                segment = np.concatenate((ones, segment), axis=1)
+                #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
+                zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+                segment = np.concatenate((zeros, segment), axis=1)
+                
+                segment = np.concatenate([start_paren, segment, end_paren], axis=0)
+
+                if seg_start + seg_len + 2 > context_len:
+                    #truncate the segment if it is too long so that it fits in the context
+                    segment = segment[:context_len - seg_start, :]
+
+                segments[seg_start:seg_start + tok_seg_len, :] = segment #add the segment to the segments array
+                
+                next_start[sys] += seg_len #update the next starting index for the trace from this system index
 
             if seg_start + tok_seg_len == context_len:
                 break

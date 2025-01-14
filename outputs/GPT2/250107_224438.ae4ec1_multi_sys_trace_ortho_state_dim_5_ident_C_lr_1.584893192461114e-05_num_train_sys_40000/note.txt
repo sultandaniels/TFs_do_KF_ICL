@@ -1,0 +1,2 @@
+trained on 3 GPUs until ckpt 99,000.
+trained on 2 GPUs for rest.

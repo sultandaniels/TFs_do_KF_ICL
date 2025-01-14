@@ -251,6 +251,12 @@ def plot_errs_multi_sys(trace_conf, err_lss, sys_choices_per_config, sys_dict_pe
 
     start_count = 0
     for next_start in next_start_inds:
+        if start_count + 1 < len(next_start_inds):
+            if next_start_inds[start_count+1] == next_start + 1:
+                ax.text(next_start, 1e-2, sys_choices[start_count], rotation=45, fontsize=18) #label the vertical line with the system name
+                start_count += 1
+                continue
+        
         ax.axvline(x=next_start, color='r', linestyle='--', linewidth=2) #plot vertical line at the start of the next system
         ax.text(next_start, 1e-2, sys_choices[start_count], rotation=45, fontsize=18) #label the vertical line with the system name
         start_count += 1
