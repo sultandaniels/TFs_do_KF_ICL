@@ -10,7 +10,7 @@ self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transp
 self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transpose(0, 1) # [O_D x R x O_D]
 
 
-scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2/241231_175136.793356_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt sultand@sahai-desktop.eecs.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2/241231_175136.793356_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt 
+scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=39000.ckpt sultand@sahai-desktop.eecs.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=39000.ckpt 
 
 
 scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2 sultandaniels@hpc.brc.berkeley.edu:/global/scratch/users/sultandaniels/
