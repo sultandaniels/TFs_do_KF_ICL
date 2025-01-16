@@ -1122,7 +1122,7 @@ def cycle_list(lst, shift):
     # a function to cycle a list to the right by shift amount
     return lst[-shift:] + lst[:-shift]
 
-def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False, needle_in_haystack=False, datasource=None):
+def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False, needle_in_haystack=False):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
@@ -1136,7 +1136,7 @@ def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, 
             segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
 
         else:
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system, needle_in_haystack=needle_in_haystack, datasource=datasource)
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system, needle_in_haystack=needle_in_haystack)
     else:
         segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
   
@@ -1189,7 +1189,12 @@ def compute_errors_multi_sys(config, tf):
 
     num_systems = config.num_val_tasks  # number of validation tasks
     
-    num_trials = config.num_traces["val"]  # number of traces
+    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+        num_trials = config.num_traces["val"]
+    elif config.datasource == "train":
+        num_trials = config.num_traces["train"]
+    else:
+        raise ValueError(f"datasource {config.datasource} not recognized")
     
     num_test_traces_configs = config.num_test_traces_configs
     
@@ -1237,7 +1242,9 @@ def compute_errors_multi_sys(config, tf):
     # Transformer Predictions
     # if not ("MOP" in err_lss.keys()):
 
+
     multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+            
 
     sys_choices_per_config = []
     sys_dict_per_config = []
@@ -1255,8 +1262,31 @@ def compute_errors_multi_sys(config, tf):
             real_seg_lens=None
             sys_inds = None
         for trial in range(num_trials):
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack, datasource=config.datasource) # get the first trace  which will set the testing structure
-            multi_sys_ys[trace_config, trial] = segments
+            if ((not config.needle_in_haystack) or config.datasource == "val"):
+
+                #generate interleaved segments
+                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
+                multi_sys_ys[trace_config, trial] = segments
+
+            elif config.datasource == "train":
+                with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                    #get train traces
+                    samples = pickle.load(f)
+                    train_ys = np.stack(
+                        [entry["obs"] for entry in samples], axis=0
+                    ).reshape((num_systems, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+                    print(f"train_ys shape: {train_ys.shape}")
+
+                #generate interleaved segments
+                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, train_ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
+                multi_sys_ys[trace_config, trial] = segments
+
+                raise NotImplementedError("Needle in haystack not implemented for train")
+            
+            elif config.datasource == "train_systems":
+                raise NotImplementedError("Needle in haystack not implemented for train_systems")
+            else:
+                raise ValueError(f"datasource {config.datasource} not recognized")
         
         sys_choices_per_config.append(sys_choices)
         sys_dict_per_config.append(sys_dict)

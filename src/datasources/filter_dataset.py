@@ -89,7 +89,7 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False, single_system=False, needle_in_haystack=False, datasource=None):
+def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False, single_system=False, needle_in_haystack=False):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -178,12 +178,8 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
         #get obs from the system trace corresponding to sys_trace_ind
         if test:
-            if ((not needle_in_haystack) or datasource == "val"):
-                sys_trace_obs = entries[sys_ind]
-            elif datasource == "train":
-                raise NotImplementedError("Needle in haystack not implemented for train")
-            elif datasource == "train_systems":
-                raise NotImplementedError("Needle in haystack not implemented for train_systems")
+            sys_trace_obs = entries[sys_ind]
+
         else:
             sys_trace_obs = entries[sys_ind]["obs"]
 
