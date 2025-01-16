@@ -188,11 +188,14 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             sys_trace_obs = entries[sys_ind]["obs"]
 
         if seg_len == -2: #two closed parens on top of each other
+            
             tok_seg_lens.append(0)
             real_seg_lens.append(0)
             seg_count += 1
             continue
+
         elif seg_len == -1: # #two closed parens one after the other
+
             start_paren, end_paren = special_tokens(segments, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
             tok_seg_len = 1 
             tok_seg_lens.append(tok_seg_len)
@@ -207,6 +210,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             seg_count += 1
             continue
         elif seg_len == 0: #closed paren, open paren, closed paren
+
             start_paren, end_paren = special_tokens(segments, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
             tok_seg_len = 2
             tok_seg_lens.append(tok_seg_len)

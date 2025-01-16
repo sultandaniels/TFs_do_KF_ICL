@@ -2,6 +2,7 @@
 import dyn_models
 import pickle
 import numpy
+import linalg_helpers as la
 
 import torch
 
@@ -20,28 +21,11 @@ def convert_to_tensor_dicts(sim_objs):
 
 
 #check systems that were trained and validated
-with open("../outputs/GPT2/241117_204332.cee615_upperTriA_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/data/val_gaussA_gauss_C_state_dim_10_sim_objs.pkl", "rb") as f:
-        sim_objs = pickle.load(f)
+with open("../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/data/val_gaussA_gauss_C_state_dim_10.pkl", "rb") as f:
+        samples = pickle.load(f)
 
-print("len of sim_objs", len(sim_objs))
-sys_ind = 500
-print(f"type(sim_objs[{str(sys_ind)}]])", type(sim_objs[sys_ind]))
-#print the first system
-print(f"sim_objs[{str(sys_ind)}].A", sim_objs[sys_ind].A)
-#check if the first system is upper triangular and print
-print("is upper triangular", numpy.allclose(sim_objs[sys_ind].A, numpy.triu(sim_objs[sys_ind].A)))
-#print just the diagonal elements of the first system
-print("diagonal elements", numpy.diagonal(sim_objs[sys_ind].A))
-print("\n\n\n")
-
-
-# #convert the systems to tensors
-# tensor_dicts = convert_to_tensor_dicts(sim_objs)
-
-# print("tensor_dicts", tensor_dicts)
-
-# #save the tensors to a file in the same directory
-# with open("../outputs/GPT2/240619_070456.1e49ad_upperTriA_gauss_C/data/val_upperTriA_gauss_C_sim_objs.pkl", "wb") as f:
-#         pickle.dump(tensor_dicts, f)
+print(f"Number of samples: {len(samples)}")
+print(f"Num of traces per sample: {len(samples)/25}")
+la.print_matrix(samples[2000*18+1000]['obs'], "trace")
 
 

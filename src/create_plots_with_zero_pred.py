@@ -1075,7 +1075,8 @@ def populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, 
             start_paren, end_paren = special_tokens(segments, sys_dict[sys], style="zeros")
 
             if tok_seg_len == 0: #nothing
-                break
+                count += 1
+                continue
             elif tok_seg_len == 1: #close parenthesis
 
                 segments[seg_start:seg_start + tok_seg_len, :] = end_paren #add the segment to the segments array
@@ -1344,8 +1345,7 @@ def compute_errors_multi_sys(config, tf):
     gc.collect()
 
 
-    if True:
-    # if not ("Kalman" in err_lss.keys()):
+    if not ("Kalman" in err_lss.keys()):
         start = time.time()  # start the timer for kalman filter predictions
         
         #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
