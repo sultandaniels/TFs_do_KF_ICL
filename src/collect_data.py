@@ -21,19 +21,17 @@ def mix_ind(i, total_number, labels, counts, max_ind=2):
     return index, counts
 
 #modify collect data so that it can tolerate multiple traces for one system
-def collect_data(model, config, output_dir, only="", train_mix_dist=False, train_mix_state_dim=False, train_mix_C=False):
+def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_state_dim=False, train_mix_C=False, specific_sim_objs=None):
 
-    logger = logging.getLogger(__name__)
-    # config = Config()
+    
+    if specific_sim_objs:
+        only = "val"
+        config.override("num_val_tasks", len(specific_sim_objs))
+        config.override("val_dataset_typ", "specA")
+        config.override("C_dist", "_spec_C")
 
 
-    # instantiate gpt2 model (FOR THE SAKE OF TESTING, REMOVE LATER)
-    # model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
-    #              n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
 
-    zero_count = 0
-    one_count = 0
-    two_count = 0
     for name, num_tasks in zip(["train", "val"], [config.num_tasks, config.num_val_tasks]):
         if only and name != only: #if only is specified, skip the other dataset
             continue
@@ -70,7 +68,7 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
             print("cond_num:", cond_nums)
             #setup counters for each distinct cond_num
             cond_counts = np.zeros(config.distinct_cond_nums)
-      
+        
         for i in tqdm(range(num_tasks)):
             if name == "train": 
                 if train_mix_dist:
@@ -97,7 +95,7 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
                     config.override("C_dist", C_dists[C_index]) #override the dataset_typ
 
                 
-            fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None)
+            fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None, specific_sim_obj=specific_sim_objs[i] if specific_sim_objs else None)
 
             if (name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num"):
                 cond_counts[int(np.floor(config.distinct_cond_nums*i/num_tasks))] += 1
@@ -115,14 +113,16 @@ def collect_data(model, config, output_dir, only="", train_mix_dist=False, train
             sim_objs.append(fsim)
         print("Saving", len(samples), "samples for", name)
 
-        with open(output_dir + f"/data/{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")+ ".pkl", "wb") as f:
+        loc = output_dir + f"/data/" + ("train_systems_" if specific_sim_objs else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")
+
+        with open(loc + ".pkl", "wb") as f:
             pickle.dump(samples, f)
 
-        print("location:", output_dir + f"/data/{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "") + ".pkl")
+        print("location:", loc + ".pkl")
 
         print("output_dir:", output_dir)
         #save fsim to pickle file
-        with open(output_dir + f"/data/{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "") + "_sim_objs.pkl", "wb") as f:
+        with open(loc + "_sim_objs.pkl", "wb") as f:
             pickle.dump(sim_objs, f)
 
         if (config.dataset_typ == "cond_num" and name == "train") or (config.val_dataset_typ == "cond_num" and name == "val"):
@@ -194,4 +194,4 @@ if __name__ == "__main__":
     model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                  n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
     
-    collect_data(model, config, "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000", only, train_mix_dist)
+    collect_data(config, "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000", only, train_mix_dist)

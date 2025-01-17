@@ -141,7 +141,7 @@ class FilterSim:
 
     # ####################################################################################################
     # #code that I added
-    def __init__(self, nx, ny, sigma_w, sigma_v, tri, C_dist, n_noise, new_eig, cond_num=10, E = 1):
+    def __init__(self, nx, ny, sigma_w, sigma_v, tri, C_dist, n_noise, new_eig, cond_num=10, E = 1, specific_sim_obj=None):
 
         valid_system = False
         while not valid_system:
@@ -151,7 +151,14 @@ class FilterSim:
 
             self.n_noise = n_noise
 
-            if tri == "upperTriA":
+            if specific_sim_obj:
+                self.A = specific_sim_obj["A"]
+                self.C = specific_sim_obj["C"]
+                self.S_state_inf = specific_sim_obj["S_state_inf"]
+                self.S_observation_inf = specific_sim_obj["S_observation_inf"]
+                valid_system = True
+                continue
+            elif tri == "upperTriA":
 
                 A = np.diag(np.random.uniform(-1, 1, nx)) * 0.95
                 A[np.triu_indices(nx, 1)] = np.random.uniform(-1, 1, (nx ** 2 + nx) // 2 - nx)
@@ -181,6 +188,7 @@ class FilterSim:
                             
                 self.A = Q @ A @ Q.T 
             elif tri == "gaussA":
+                print("generating random matrix with Gaussian distribution")
                 A = np.sqrt(0.33)*np.random.randn(nx, nx) #same second moment as uniform(-1,1)
                 A /= np.max(np.abs(np.linalg.eigvals(A)))
                 self.A = A * 0.95 #scale the matrix
@@ -430,15 +438,15 @@ def apply_kf(fsim, ys, sigma_w=None, sigma_v=None, return_obj=False):
 # code that I added
 
 
-def _generate_lti_sample(C_dist, dataset_typ, batch_size, n_positions, nx, ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=1, cond_num=None):
-    fsim = FilterSim(nx, ny, sigma_w, sigma_v, tri=dataset_typ, C_dist=C_dist, n_noise=n_noise, new_eig = False, cond_num=cond_num)
+def _generate_lti_sample(C_dist, dataset_typ, batch_size, n_positions, nx, ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=1, cond_num=None, specific_sim_obj=None):
+    fsim = FilterSim(nx, ny, sigma_w, sigma_v, tri=dataset_typ, C_dist=C_dist, n_noise=n_noise, new_eig = False, cond_num=cond_num, specific_sim_obj=specific_sim_obj)
     states, obs = fsim.simulate_steady(batch_size, n_positions)
     # return fsim, {"states": states, "obs": obs, "A": fsim.A, "C": fsim.C}
     return fsim, {"obs": obs}
 
-def generate_lti_sample(C_dist, dataset_typ, batch_size, n_positions, nx, ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=1, cond_num=None):
+def generate_lti_sample(C_dist, dataset_typ, batch_size, n_positions, nx, ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=1, cond_num=None, specific_sim_obj=None):
     while True:
-        fsim, entry = _generate_lti_sample(C_dist, dataset_typ, batch_size, n_positions, nx, ny, sigma_w, sigma_v, n_noise=n_noise, cond_num=cond_num)
+        fsim, entry = _generate_lti_sample(C_dist, dataset_typ, batch_size, n_positions, nx, ny, sigma_w, sigma_v, n_noise=n_noise, cond_num=cond_num, specific_sim_obj=specific_sim_obj)
         if check_validity(entry):
             return fsim, entry
 

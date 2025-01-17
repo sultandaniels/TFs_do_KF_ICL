@@ -113,6 +113,7 @@ def compute_ratio(ind, err, kalman_err):
     percentiles = torch.tensor([0.25, 0.5, 0.75], device=device)
 
     #take the median of the ratios along axis 1
+    print(f"ratios shape: {ratios.shape}")
     ratios, _ = torch.median(ratios, axis=1)
 
     if ind == None:

@@ -700,7 +700,7 @@ if __name__ == '__main__':
             gc.collect()
                
         else:
-            collect_data(model, config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
+            collect_data(config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
 
         # replace ckpt_path with the path to the checkpoint file
         config.override("ckpt_path", output_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")

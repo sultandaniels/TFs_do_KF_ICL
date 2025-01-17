@@ -23,6 +23,7 @@ from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
 from datasources import filter_dataset
 from datasources.filter_dataset import populate_traces, special_tokens
+from collect_data import collect_data
 import linalg_helpers as la
 
 plt.rcParams['axes.titlesize'] = 20
@@ -1274,17 +1275,31 @@ def compute_errors_multi_sys(config, tf):
                     samples = pickle.load(f)
                     train_ys = np.stack(
                         [entry["obs"] for entry in samples], axis=0
-                    ).reshape((num_systems, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+                    ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
                     print(f"train_ys shape: {train_ys.shape}")
 
                 #generate interleaved segments
                 segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, train_ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = segments
-
-                raise NotImplementedError("Needle in haystack not implemented for train")
             
             elif config.datasource == "train_systems":
-                raise NotImplementedError("Needle in haystack not implemented for train_systems")
+                with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                    train_sim_objs = pickle.load(f)
+
+                collect_data(config, parent_parent_dir, "val", False, False, False, train_sim_objs)
+
+                with open(parent_parent_dir + f"/data/train_systems_val_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                    #get train system traces
+                    samples = pickle.load(f)
+                    train_sys_ys = np.stack(
+                        [entry["obs"] for entry in samples], axis=0
+                    ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+                    print(f"train_ys shape: {train_sys_ys.shape}")
+
+                #generate interleaved segments
+                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, train_ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
+                multi_sys_ys[trace_config, trial] = segments
+                
             else:
                 raise ValueError(f"datasource {config.datasource} not recognized")
         
@@ -1375,7 +1390,7 @@ def compute_errors_multi_sys(config, tf):
     gc.collect()
 
 
-    if not ("Kalman" in err_lss.keys()):
+    if True:
         start = time.time()  # start the timer for kalman filter predictions
         
         #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
