@@ -1232,7 +1232,14 @@ def compute_errors_multi_sys(config, tf):
 
 
     multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
-            
+
+    if config.needle_in_haystack and config.datasource == "train_systems":      
+        #get the sim_objs for the training data
+        with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            sim_objs = pickle.load(f)
+
+        #generate traces from the training systems
+        collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs)        
 
     sys_choices_per_config = []
     sys_dict_per_config = []
@@ -1283,20 +1290,12 @@ def compute_errors_multi_sys(config, tf):
                     ys = np.stack(
                         [entry["obs"] for entry in samples], axis=0
                     ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
-                    print(f"train_ys shape: {ys.shape}")
 
                 #generate interleaved segments
                 segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = segments
             
             elif config.datasource == "train_systems":
-                
-                #get the sim_objs for the training data
-                with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                    sim_objs = pickle.load(f)
-
-                #generate traces from the training systems
-                collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs)
 
                 #set ys to be the traces generated from the training systems
                 with open(parent_parent_dir + f"/data/train_systems_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
@@ -1305,7 +1304,6 @@ def compute_errors_multi_sys(config, tf):
                     ys = np.stack(
                         [entry["obs"] for entry in samples], axis=0
                     ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-                    print(f"train_ys shape: {ys.shape}")
 
                 #generate interleaved segments
                 segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
