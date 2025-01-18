@@ -1259,6 +1259,8 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
         for trial in range(num_trials):
             if ((not config.needle_in_haystack) or config.datasource == "val"):
 
+                print(f"getting test data from datasource {config.datasource}")
+
                 # get the sim objs for the validation data
                 with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
                     sim_objs = pickle.load(f)
@@ -1279,6 +1281,8 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
 
             elif config.datasource == "train":
 
+                print(f"getting test data from datasource {config.datasource}")
+
                 #get the sim_objs for the training data
                 with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
                     sim_objs = pickle.load(f)
@@ -1296,6 +1300,8 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
                 multi_sys_ys[trace_config, trial] = segments
             
             elif config.datasource == "train_systems":
+
+                print(f"getting test data from datasource {config.datasource}")
 
                 #set ys to be the traces generated from the training systems
                 with open(parent_parent_dir + f"/data/train_systems_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
