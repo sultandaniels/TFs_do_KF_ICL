@@ -1757,6 +1757,10 @@ def setup_deg_kf_axs_arrs(num_systems):
 
 def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf):
     C_dist = config.C_dist
+
+    if config.needle_in_haystack:
+        return
+    
     if excess:
         fig = plt.figure(figsize=(30, 15))
         ax = fig.add_subplot(111)
