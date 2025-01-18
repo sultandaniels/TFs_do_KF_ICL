@@ -541,6 +541,7 @@ def initialize_err_list(ts):
 
 
 def predict_all_checkpoints(config, output_dir, logscale):
+        config.override("num_test_traces_configs", 1)
         filecount = 0
         for filename in os.listdir(output_dir + "/checkpoints/"):
             filecount += 1
@@ -649,7 +650,7 @@ if __name__ == '__main__':
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
     elif train_conv:
-        output_dir = "../outputs/GPT2/241210_180753.5991f3_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
         #241117_204226.922f5f_rotDiagA_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000" #241117_204332.cee615_upperTriA_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
         if make_preds:
             predict_all_checkpoints(config, output_dir, logscale)

@@ -1183,7 +1183,7 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
                 seg_count += 1
     return err_lss
 
-def compute_errors_multi_sys(config, tf):
+def compute_errors_multi_sys(config, tf, run_OLS=True):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     logger = logging.getLogger(__name__)  # get the logger
@@ -1517,7 +1517,7 @@ def compute_errors_multi_sys(config, tf):
 
 
     # Think about having a sys_choices to prediction error dictionary to implement the remembering
-    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_OLS:
     # if not ("OLS" in err_lss.keys()):
         # Original OLS
         # Clear the PyTorch cache
@@ -1557,9 +1557,24 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
 
     os.makedirs(errs_dir, exist_ok=True)
 
-    if train_conv:
+    if train_conv and not config.multi_sys_trace:
         err_lss, irreducible_error = compute_errors_conv(config)
-    elif config.multi_sys_trace:
+    elif train_conv and config.multi_sys_trace:
+
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False)
+
+        #save the system indices, starting indices, and token segment lengths to pickle file
+        with open(errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+            pickle.dump({
+                'sys_choices_per_config': sys_choices_per_config,
+                'sys_dict_per_config': sys_dict_per_config,
+                'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                'seg_starts_per_config': seg_starts_per_config
+            }, f)
+        return None
+
+
+    elif not train_conv and config.multi_sys_trace:
         if not config.needle_in_haystack:
             err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
             
