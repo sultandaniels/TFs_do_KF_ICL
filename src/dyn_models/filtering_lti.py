@@ -152,10 +152,10 @@ class FilterSim:
             self.n_noise = n_noise
 
             if specific_sim_obj:
-                self.A = specific_sim_obj["A"]
-                self.C = specific_sim_obj["C"]
-                self.S_state_inf = specific_sim_obj["S_state_inf"]
-                self.S_observation_inf = specific_sim_obj["S_observation_inf"]
+                self.A = specific_sim_obj.A
+                self.C = specific_sim_obj.C
+                self.S_state_inf = specific_sim_obj.S_state_inf
+                self.S_observation_inf = specific_sim_obj.S_observation_inf
                 valid_system = True
                 continue
             elif tri == "upperTriA":
