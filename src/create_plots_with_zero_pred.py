@@ -1755,9 +1755,6 @@ def setup_deg_kf_axs_arrs(num_systems):
 
 def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf):
     C_dist = config.C_dist
-
-    if config.needle_in_haystack:
-        return
     
     if excess:
         fig = plt.figure(figsize=(30, 15))
@@ -1767,7 +1764,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         print("config path:", config.ckpt_path)
         save_preds(run_deg_kf_test, config, train_conv, tf)  # save the predictions to a file
 
-        if train_conv:
+        if train_conv or config.needle_in_haystack:
             return None
 
     # load the prediction errors from the file
