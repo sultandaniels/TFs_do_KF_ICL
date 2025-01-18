@@ -1213,19 +1213,6 @@ def compute_errors_multi_sys(config, tf):
     # get the parent directory of the parent directory
     parent_parent_dir = os.path.dirname(parent_dir)
 
-    # open fsim file
-    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-        sim_objs = pickle.load(f)
-
-    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-        samples = pickle.load(f)
-        # for every 2000 entries in samples, get the observation values and append them to the ys list
-        ys = np.stack(
-            [entry["obs"] for entry in samples], axis=0
-        ).reshape((num_systems, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-
-        gc.collect()  # Start the garbage collector
-
     ckpt_steps = get_step_number(config.ckpt_path)
     
 
@@ -1265,39 +1252,63 @@ def compute_errors_multi_sys(config, tf):
         for trial in range(num_trials):
             if ((not config.needle_in_haystack) or config.datasource == "val"):
 
+                # get the sim objs for the validation data
+                with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                    sim_objs = pickle.load(f)
+
+                #set ys to be the validation data
+                with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                    samples = pickle.load(f)
+                    # for every 2000 entries in samples, get the observation values and append them to the ys list
+                    ys = np.stack(
+                        [entry["obs"] for entry in samples], axis=0
+                    ).reshape((num_systems, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+                    gc.collect()  # Start the garbage collector
+
                 #generate interleaved segments
                 segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = segments
 
             elif config.datasource == "train":
+
+                #get the sim_objs for the training data
+                with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                    sim_objs = pickle.load(f)
+
+                #set ys to be the training data
                 with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
                     #get train traces
                     samples = pickle.load(f)
-                    train_ys = np.stack(
+                    ys = np.stack(
                         [entry["obs"] for entry in samples], axis=0
                     ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
-                    print(f"train_ys shape: {train_ys.shape}")
+                    print(f"train_ys shape: {ys.shape}")
 
                 #generate interleaved segments
-                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, train_ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
+                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = segments
             
             elif config.datasource == "train_systems":
+                
+                #get the sim_objs for the training data
                 with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                    train_sim_objs = pickle.load(f)
+                    sim_objs = pickle.load(f)
 
-                collect_data(config, parent_parent_dir, "val", False, False, False, train_sim_objs)
+                #generate traces from the training systems
+                collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs)
 
-                with open(parent_parent_dir + f"/data/train_systems_val_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                #set ys to be the traces generated from the training systems
+                with open(parent_parent_dir + f"/data/train_systems_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
                     #get train system traces
                     samples = pickle.load(f)
-                    train_sys_ys = np.stack(
+                    ys = np.stack(
                         [entry["obs"] for entry in samples], axis=0
                     ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-                    print(f"train_ys shape: {train_sys_ys.shape}")
+                    print(f"train_ys shape: {ys.shape}")
 
                 #generate interleaved segments
-                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, train_ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
+                segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
                 multi_sys_ys[trace_config, trial] = segments
                 
             else:
@@ -1544,7 +1555,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     print("ckpt_steps:", ckpt_steps)
 
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
     os.makedirs(errs_dir, exist_ok=True)
 
@@ -1555,7 +1566,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
             err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
             
             #save the system indices, starting indices, and token segment lengths to pickle file
-            with open(errs_dir + f"/" + (f"needle_{config.datasource}" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+            with open(errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
                 pickle.dump({
                     'sys_choices_per_config': sys_choices_per_config,
                     'sys_dict_per_config': sys_dict_per_config,
@@ -1573,7 +1584,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
                     err_lss_examples[key].append(err_lss[key])
             
                 #save the system indices, starting indices, and token segment lengths to pickle file
-                with open(errs_dir + f"/" + (f"needle_{config.datasource}" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
+                with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
                     pickle.dump({
                         'sys_choices_per_config': sys_choices_per_config,
                         'sys_dict_per_config': sys_dict_per_config,
@@ -1586,7 +1597,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
                 err_lss_examples[key] = np.array(err_lss_examples[key])
                 print(f"err_lss_examples[{key}] shape: {err_lss_examples[key].shape}")
 
-            with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss_examples.pkl", 'wb') as f:
+            with open(errs_loc + "err_lss_examples.pkl", 'wb') as f:
                 pickle.dump(err_lss_examples, f)
 
             return None
@@ -1770,8 +1781,11 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         ckpt_steps = get_step_number(config.ckpt_path)
         print("ckpt_steps:", ckpt_steps)
 
+        errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
+        errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+
         #load the system indices, starting indices, and token segment lengths from the pickle file
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'rb') as f:
+        with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'rb') as f:
             data = pickle.load(f)
             sys_choices_per_config = data['sys_choices_per_config']
             sys_dict_per_config = data['sys_dict_per_config']
@@ -1780,7 +1794,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
         #load the err_lss dict from the pkl file
         with open(
-                parent_parent_dir + "/prediction_errors" + config.C_dist + "_"+ f"step={ckpt_steps}.ckpt" + f"/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl",
+                errs_loc + "_err_lss.pkl",
                 "rb") as f:
             err_lss_load = pickle.load(f)
 
@@ -1835,7 +1849,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
             #add a caption to the bottom of the figure
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
-            os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/" + ("needle_in_haystack/" if config.needle_in_haystack else ""), exist_ok=True)
+            os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack/{config.datasource}/" if config.needle_in_haystack else ""), exist_ok=True)
             fig.savefig(
                 parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack/{config.datasource}/" if config.needle_in_haystack else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
                     "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
