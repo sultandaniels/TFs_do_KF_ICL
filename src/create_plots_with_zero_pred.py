@@ -1285,7 +1285,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
             samples = pickle.load(f)
             ys = np.stack(
                 [entry["obs"] for entry in samples], axis=0
-            ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+            ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
             gc.collect()  # Start the garbage collector
 
     else:
@@ -1368,7 +1368,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
 
     #create a directory to save the prediction errors
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     os.makedirs(errs_dir, exist_ok=True)
     with open(errs_loc, 'wb') as f:
@@ -1561,6 +1561,10 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     if train_conv and not config.multi_sys_trace:
         err_lss, irreducible_error = compute_errors_conv(config)
     elif train_conv and config.multi_sys_trace:
+
+        print(f"in train conv and multi sys trace")
+        print(f"config.single_system: {config.single_system}")
+        print(f"config.needle_in_haystack: {config.needle_in_haystack}")
 
         err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False)
 
