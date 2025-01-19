@@ -1605,7 +1605,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
                     err_lss_examples[key].append(err_lss[key])
             
                 #save the system indices, starting indices, and token segment lengths to pickle file
-                with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
+                with open(errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
                     pickle.dump({
                         'sys_choices_per_config': sys_choices_per_config,
                         'sys_dict_per_config': sys_dict_per_config,
@@ -1787,7 +1787,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         print("config path:", config.ckpt_path)
         save_preds(run_deg_kf_test, config, train_conv, tf)  # save the predictions to a file
 
-        if train_conv or config.needle_in_haystack:
+        if train_conv:
             return None
 
     # load the prediction errors from the file
