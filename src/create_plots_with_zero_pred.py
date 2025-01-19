@@ -1216,10 +1216,13 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
     ckpt_steps = get_step_number(config.ckpt_path)
     
 
-    # if parent_parent_dir + f"/prediction_errors{config.C_dist}_step={str(ckpt_step)}.ckpt exists, load the prediction errors
-    if os.path.exists(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"):
+    #create a directory to save the prediction errors
+    errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
-        with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'rb') as f:
+    if os.path.exists(errs_dir):
+
+        with open(errs_loc, 'rb') as f:
             err_lss = pickle.load(f)
 
         print(f"\n err_lss already exists for step {ckpt_steps}")
@@ -1369,9 +1372,6 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
 
     err_lss["MOP"] = errs_tf
 
-    #create a directory to save the prediction errors
-    errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     os.makedirs(errs_dir, exist_ok=True)
     with open(errs_loc, 'wb') as f:

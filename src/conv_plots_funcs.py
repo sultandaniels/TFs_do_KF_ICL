@@ -47,7 +47,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             if not needle_in_haystack:
                 kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx, single_system=single_system)
             for ckpt_step in ckpt_steps:
-                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, needle_in_haystack=needle_in_haystack)
+                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, single_system=single_system)
                 if pred_ckpt:
                 
                     if needle_in_haystack:
