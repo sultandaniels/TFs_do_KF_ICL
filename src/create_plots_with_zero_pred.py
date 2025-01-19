@@ -1809,7 +1809,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
         #load the err_lss dict from the pkl file
         with open(
-                errs_loc + "_err_lss.pkl",
+                errs_loc + "err_lss.pkl",
                 "rb") as f:
             err_lss_load = pickle.load(f)
 
