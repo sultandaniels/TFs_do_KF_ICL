@@ -542,6 +542,8 @@ def initialize_err_list(ts):
 
 def predict_all_checkpoints(config, output_dir, logscale):
         config.override("num_test_traces_configs", 1)
+        config.override("needle_in_haystack", False)
+        config.override("single_system", True)
         filecount = 0
         for filename in os.listdir(output_dir + "/checkpoints/"):
             filecount += 1
