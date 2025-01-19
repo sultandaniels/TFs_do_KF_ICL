@@ -89,11 +89,13 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False, single_system=False, needle_in_haystack=False):
+def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False, single_system=False, needle_in_haystack=False, num_sys_haystack=19, len_seg_haystack=10):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
     real_seg_lens = []
+
+    context_len = n_positions + 1 #the length of the context is the number of positions plus 1 for the start token
 
 
     sys_names = np.arange(max_sys_trace) #system names
@@ -109,7 +111,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
     else:
         if needle_in_haystack:
-            sys_in_trace = 19 #number of systems to include in the context
+            sys_in_trace = num_sys_haystack #number of systems to include in the context
         else:
             sys_in_trace = generate_zipfian_integer(max_sys_trace, 1.5) #number of systems to include in the context
 
@@ -124,19 +126,10 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
         
 
         if needle_in_haystack:
-            #make seg_lens be a list where the first 19 elements are 10 and the last element is n_positions - 190
-            seg_lens = [10]*19 + [n_positions - 190]
+            seg_lens = [len_seg_haystack]*num_sys_haystack + [context_len - (1 + num_sys_haystack*(len_seg_haystack + 2) + 2)]
         else:
-            # seg_lens = [] #initialize the list of segment lengths
-            # while sum(seg_lens) < n_positions:
-
-            #     if sys_in_trace == 1:
-            #         seg_lens = [n_positions] #one full trace
-            #     else:
-            #         seg_lens = 1 + np.random.binomial(n_positions - 1, 1/(10*sys_in_trace), size=10*sys_in_trace) #randomly sample segment lengths for the trace segments (p = 1/(1.5*sys_in_trace), so that about on average 1.5 segments of each system will fit in the trace)
             seg_lens = generate_seg_lens(n_positions, sys_in_trace)
 
-    context_len = n_positions + 1
     segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
     segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 

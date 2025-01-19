@@ -1123,7 +1123,7 @@ def cycle_list(lst, shift):
     # a function to cycle a list to the right by shift amount
     return lst[-shift:] + lst[:-shift]
 
-def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False, needle_in_haystack=False):
+def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False, needle_in_haystack=False, num_sys_haystack=19, len_seg_haystack=10):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
@@ -1137,7 +1137,7 @@ def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, 
             segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
 
         else:
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system, needle_in_haystack=needle_in_haystack)
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system, needle_in_haystack=needle_in_haystack, num_sys_haystack=num_sys_haystack, len_seg_haystack=len_seg_haystack)
     else:
         segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
   
@@ -1313,7 +1313,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
         for trial in range(num_trials):
 
             #generate interleaved segments
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack, config.num_sys_haystack, config.len_seg_haystack) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1807,7 +1807,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
         #load the system indices, starting indices, and token segment lengths from the pickle file
-        with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'rb') as f:
+        with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if config.needle_in_haystack else "") + ".pkl", 'rb') as f:
             data = pickle.load(f)
             sys_choices_per_config = data['sys_choices_per_config']
             sys_dict_per_config = data['sys_dict_per_config']
@@ -1871,9 +1871,9 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
             #add a caption to the bottom of the figure
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
-            os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack/{config.datasource}/" if config.needle_in_haystack else ""), exist_ok=True)
+            os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else ""), exist_ok=True)
             fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack/{config.datasource}/" if config.needle_in_haystack else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
+                parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
                     "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
         return None
 
