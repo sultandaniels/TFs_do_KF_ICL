@@ -21,7 +21,7 @@ from check_ecdf import get_empirical_cdf
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False):
+def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False):
     num_preds = 3 #len(experiments) #number of predictors to plot
     colors = plt.cm.tab10(np.linspace(0, 1, num_preds))
 
@@ -45,13 +45,13 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             quantiles = []
             print("\n\ni", i)
             if not needle_in_haystack:
-                kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx)
+                kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx, single_system=single_system)
             for ckpt_step in ckpt_steps:
-                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx)
+                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, needle_in_haystack=needle_in_haystack)
                 if pred_ckpt:
                 
                     if needle_in_haystack:
-                        kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx)
+                        kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system)
                     pred_ckpts.append(pred_ckpt)
                     quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err)
                     print(f"quantile shape: {quantile.shape}")
