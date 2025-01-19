@@ -32,13 +32,13 @@ class Config(object, metaclass=Singleton):
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
-    single_system = False #only use a single system in the test trace
-    needle_in_haystack = True #run needle in haystack tests
+    single_system = True #only use a single system in the test trace
+    needle_in_haystack = False #run needle in haystack tests
     datasource="val" #"val #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #number of systems in the haystack
     len_seg_haystack = 10 #length of a haystack segment
     num_haystack_examples = 1 #number of haystack examples to generate
-    num_test_traces_configs = num_sys_haystack if needle_in_haystack else 10 #number of test traces configurations to generate
+    num_test_traces_configs = num_sys_haystack if needle_in_haystack else 1 #number of test traces configurations to generate
 
     # Training settings
     devices=[2,3] #which GPU

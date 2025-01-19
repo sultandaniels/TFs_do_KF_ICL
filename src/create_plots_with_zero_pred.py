@@ -1368,7 +1368,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
 
     #create a directory to save the prediction errors
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     os.makedirs(errs_dir, exist_ok=True)
     with open(errs_loc, 'wb') as f:
@@ -1554,7 +1554,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     print("ckpt_steps:", ckpt_steps)
 
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
     os.makedirs(errs_dir, exist_ok=True)
 
@@ -1569,7 +1569,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
         err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False)
 
         #save the system indices, starting indices, and token segment lengths to pickle file
-        with open(errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+        with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
             pickle.dump({
                 'sys_choices_per_config': sys_choices_per_config,
                 'sys_dict_per_config': sys_dict_per_config,
@@ -1584,7 +1584,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
             err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
             
             #save the system indices, starting indices, and token segment lengths to pickle file
-            with open(errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+            with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
                 pickle.dump({
                     'sys_choices_per_config': sys_choices_per_config,
                     'sys_dict_per_config': sys_dict_per_config,
@@ -1801,7 +1801,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         print("ckpt_steps:", ckpt_steps)
 
         errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-        errs_loc = errs_dir + f"/" + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
         #load the system indices, starting indices, and token segment lengths from the pickle file
         with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'rb') as f:
