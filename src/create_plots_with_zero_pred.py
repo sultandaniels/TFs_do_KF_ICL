@@ -1222,8 +1222,11 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
         with open(parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt/{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl", 'rb') as f:
             err_lss = pickle.load(f)
 
+        print(f"\n err_lss already exists for step {ckpt_steps}")
+
     else:
         err_lss = collections.OrderedDict()
+        print(f"\n err_lss does not exist yet for step {ckpt_steps}")
 
 
     # print("no tf pred")
