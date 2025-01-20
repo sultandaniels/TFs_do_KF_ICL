@@ -37,7 +37,7 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
             continue
         samples = [] #make sure that train and val samples are different
         sim_objs = [] #make sure that train and val sim_objs are different
-        print("Generating", num_tasks, "samples for", name)
+        print("Generating", num_tasks*config.num_traces[name], "samples for", name)
 
         if name == "train":
             

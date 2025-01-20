@@ -97,7 +97,7 @@ def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False)
         print(f"path does not exist: {path}")
     return mop_err, pred_ckpt
 
-def compute_ratio(ind, err, kalman_err):
+def compute_ratio(ind, err, kalman_err, single_system=False):
     
     if err.shape != kalman_err.shape:
         #take the reciprocal of every element in kalman_err
@@ -114,11 +114,20 @@ def compute_ratio(ind, err, kalman_err):
 
     #take the median of the ratios along axis 1
     print(f"ratios shape: {ratios.shape}")
-    ratios, _ = torch.median(ratios, axis=1)
+
+    if not single_system:
+        ratios, _ = torch.median(ratios, axis=1)
+    else:
+        ratios = ratios[0]
+
+    print(f"ratios shape after median: {ratios.shape}")
 
     if ind == None:
-        ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
-        # ratios_med = torch.median(ratios, axis=0)
+        if not single_system:
+            ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
+        else:
+            ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
+
     else:
         ratios_percentiles = torch.quantile(ratios[:,ind], percentiles)
         # ratios_med = torch.median(ratios[:, ind])

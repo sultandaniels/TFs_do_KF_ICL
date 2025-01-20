@@ -1217,11 +1217,10 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
     
 
     #create a directory to save the prediction errors
-    errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
+    errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
     errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
-    if os.path.exists(errs_dir):
-
+    if os.path.exists(errs_loc):
         with open(errs_loc, 'rb') as f:
             err_lss = pickle.load(f)
 
@@ -1802,6 +1801,8 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         # get the step size from the ckpt_path
         ckpt_steps = get_step_number(config.ckpt_path)
         print("ckpt_steps:", ckpt_steps)
+
+        print(f"\n\n config.val_dataset_typ: {config.val_dataset_typ} in create_plots")
 
         errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
         errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"

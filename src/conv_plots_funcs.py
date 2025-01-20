@@ -21,6 +21,22 @@ from check_ecdf import get_empirical_cdf
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
+def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False):
+    # load the sys choices etc
+    errs_dir = "../outputs/GPT2/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
+    errs_loc = errs_dir + f"/single_system_{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl"
+
+    if not os.path.exists(errs_loc):
+        return None
+    else:
+        with open(errs_loc, "rb") as f:
+            data = pickle.load(f)
+            seg_starts_per_config = data['seg_starts_per_config']
+            if print_seg_starts:
+                print(f"seg_starts_per_config: {seg_starts_per_config}")
+                
+        return seg_starts_per_config
+
 def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False):
     num_preds = 3 #len(experiments) #number of predictors to plot
     colors = plt.cm.tab10(np.linspace(0, 1, num_preds))
@@ -52,8 +68,24 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 
                     if needle_in_haystack:
                         kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system)
-                    pred_ckpts.append(pred_ckpt)
                     quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err)
+                    if single_system:
+
+                        print(f"quantile shape before seg start choice: {quantile.shape}")
+                        seg_starts_per_config = get_seg_starts_per_config(experiment, valA, C_dist, nx, ckpt_step, print_seg_starts=True)
+                        seg_starts = seg_starts_per_config[0]
+
+                        if len(seg_starts) > 1:
+                            quantile = quantile[:, seg_starts[1] + 1] #take the quantile at the start of the second segment
+                            print(f"seg_starts[1] + 1: {seg_starts[1] + 1}")
+                            print(f"quantile shape after seg start choice: {quantile.shape}")
+                        else:
+                            print("only one segment start so disregard ckpt")
+                            continue
+                        
+
+                    
+                    pred_ckpts.append(pred_ckpt)
                     print(f"quantile shape: {quantile.shape}")
                     if isinstance(quantile, torch.Tensor):
                         quantile = quantile.cpu().numpy()
@@ -76,7 +108,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             pred_ckpts = data["pred_ckpts"]
             quantiles = data["quantiles"]
 
-        quantiles -= 1
+        # quantiles -= 1
         print("quantiles shape", quantiles.shape)    
         ##plotting stuff
         ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=trainAs[i] + " Median")# label= f"Experiment: {experiments[i]} Median")
@@ -92,8 +124,8 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
         ax.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
         ax.legend()
-        ax.set_yscale("log")
-        ax.set_xscale("log")
+        # ax.set_yscale("log")
+        # ax.set_xscale("log")
 
         fig.text(0.5, 0.01, f'Generated at {plot_time}', ha='center')
 
