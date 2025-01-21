@@ -302,7 +302,7 @@ def compute_OLS_ir(config, ys, sim_objs, max_ir_length, err_lss):
 
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
-    print("max_ir_length + 1:", max_ir_length + 1)
+    # print("max_ir_length + 1:", max_ir_length + 1)
     for ir_length in range(1, max_ir_length + 1):
         start = time.time()
         print(f"\tIR length: {ir_length}")
@@ -1597,7 +1597,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
         else:
             err_lss_examples = {}
             for ex in range(config.num_haystack_examples):
-                err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
+                err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False)
                 for key in err_lss.keys():
                     if ex == 0:
                         err_lss_examples[key] = [] #initialize the list for the prediction errors

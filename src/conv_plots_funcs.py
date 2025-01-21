@@ -68,7 +68,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 
                     if needle_in_haystack:
                         kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system)
-                    quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err)
+                    quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err, single_system=single_system)
                     if single_system:
 
                         print(f"quantile shape before seg start choice: {quantile.shape}")

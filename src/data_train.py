@@ -665,6 +665,9 @@ if __name__ == '__main__':
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                     n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
         
+        print("\nmodel:", model)
+        raise ValueError("stop here")
+        
         model.to(device)
         
         output_dir = setup_train(model, train_mix_dist, train_mix_state_dim)
