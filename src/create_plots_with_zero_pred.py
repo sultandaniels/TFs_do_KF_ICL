@@ -1158,6 +1158,7 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
             ys_sys = ys[sys_inds_per_config[trace_conf]]
             print(f"ys_sys shape: {ys_sys.shape}, len of sys_inds_per_config[trace_conf]: {len(sys_inds_per_config[trace_conf])}, ys shape: {ys.shape}")
 
+            #think about how to take this out of the trace_conf loop
             preds_kf = np.array([[
                 apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w,
                         sigma_v=sim_obj.sigma_v)
