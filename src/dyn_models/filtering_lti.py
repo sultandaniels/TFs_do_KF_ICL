@@ -188,7 +188,6 @@ class FilterSim:
                             
                 self.A = Q @ A @ Q.T 
             elif tri == "gaussA":
-                print("generating random matrix with Gaussian distribution")
                 A = np.sqrt(0.33)*np.random.randn(nx, nx) #same second moment as uniform(-1,1)
                 A /= np.max(np.abs(np.linalg.eigvals(A)))
                 self.A = A * 0.95 #scale the matrix
