@@ -664,12 +664,15 @@ def compute_kf(config, ys, sim_objs):
 def compute_analytical_kf_simulation(config, ys, sim_objs):
     # Analytical Kalman Predictions
     analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-    analytical_kf = analytical_kf.reshape((num_systems, 1)) @ np.ones((1, config.n_positions))
+    analytical_kf = analytical_kf.reshape((len(sim_objs), 1)) @ np.ones((1, config.n_positions))
+    print("analytical_kf.shape:", analytical_kf.shape)
     
 
     #Analytical simulation predictions
     #generate config.n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
     an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (config.num_traces["val"], config.n_positions+1)) for sim_obj in sim_objs])
+
+    print("an_sims.shape:", an_sims.shape)
 
     return analytical_kf, an_sims
 
@@ -1061,12 +1064,12 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, real_seg_lens=None):
+def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_dict=None, tok_seg_lens=None, real_seg_lens=None):
     if sys_dict:
-        context_len = n_positions + 1 #the length of the context
+        context_len = config.n_positions + 1 #the length of the context
 
-        segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
-        segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
+        segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
+        segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
         #initialize a dictionary to hold the next starting index for each system trace
         next_start = {sys_ind: 0 for sys_ind in sys_dict.keys()}
@@ -1098,7 +1101,7 @@ def populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, 
                 ones = np.ones((segment.shape[0], 1))
                 segment = np.concatenate((ones, segment), axis=1)
                 #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
-                zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+                zeros = np.zeros((segment.shape[0], 2*config.max_sys_trace + 1))
                 segment = np.concatenate((zeros, segment), axis=1)
                 
                 segment = np.concatenate([start_paren, segment, end_paren], axis=0)
@@ -1129,23 +1132,23 @@ def cycle_list(lst, shift):
     # a function to cycle a list to the right by shift amount
     return lst[-shift:] + lst[:-shift]
 
-def populate_val_traces(trace_conf, trial, n_positions, ny, num_tasks, entries, max_sys_trace, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, single_system=False, needle_in_haystack=False, num_sys_haystack=19, len_seg_haystack=10):
+def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, train_conv=False):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
     ys_trial = entries[:, trial] #get the observations for the first trial
 
     if trial == 0: #if this is the leader trace that sets the system indices, starting indices, and token segment lengths
-        if trace_conf > 0 and needle_in_haystack:
+        if trace_conf > 0 and config.needle_in_haystack:
             haystack = sys_choices[:-1] #get the haystack from the previous trial
             new_haystack = cycle_list(haystack, 1) #cycle the haystack to the left by 1
             sys_choices = new_haystack + [sys_choices[-1]] #set the new system choices
-            segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
+            segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
 
         else:
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(n_positions, ny, num_tasks, ys_trial, max_sys_trace, test=True, single_system=single_system, needle_in_haystack=needle_in_haystack, num_sys_haystack=num_sys_haystack, len_seg_haystack=len_seg_haystack)
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv)
     else:
-        segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(trial, n_positions, ny, ys_trial, max_sys_trace, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
+        segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
   
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
@@ -1219,7 +1222,7 @@ def compute_kf_needle(num_trace_configs, ys, errs_all, seg_lens_per_config, sys_
 
     return err_lss
 
-def compute_errors_multi_sys(config, tf, run_OLS=True):
+def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     logger = logging.getLogger(__name__)  # get the logger
@@ -1351,7 +1354,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
         for trial in range(num_trials):
 
             #generate interleaved segments
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack, config.num_sys_haystack, config.len_seg_haystack) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, train_conv) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1644,7 +1647,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
         for trial in range(num_trials):
 
             #generate interleaved segments
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack, config.num_sys_haystack, config.len_seg_haystack) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1769,7 +1772,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
         print(f"config.single_system: {config.single_system}")
         print(f"config.needle_in_haystack: {config.needle_in_haystack}")
 
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False)
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False, train_conv=train_conv)
 
         #save the system indices, starting indices, and token segment lengths to pickle file
         with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
@@ -1863,9 +1866,16 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
 
             err_lss_all = {}
 
+            start = time.time()  # start the timer for kf predictions
             errs_kf = compute_kf(config, ys, sim_objs)
+            end = time.time()  # end the timer for kf predictions
+            print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
             err_lss_all["Kalman"] = errs_kf
-            err_lss_all = compute_OLS_ir(config, sim_objs, max_ir_length=3, err_lss=err_lss_all)
+
+            start = time.time()  # start the timer for ols predictions
+            err_lss_all = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss_all)
+            end = time.time()
+            print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
 
             analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs)
             err_lss_all["Analytical_Kalman"] = analytical_kf

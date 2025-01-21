@@ -30,7 +30,7 @@ def generate_seg_lens(n_positions, sys_in_trace):
     Generate segment lengths for a trace.
 
     Parameters:
-    n_positions (int): The number of positions in the trace.
+    config.n_positions (int): The number of positions in the trace.
     sys_in_trace (int): The number of systems in the trace.
 
     # create a random generator
@@ -89,31 +89,34 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=False, single_system=False, needle_in_haystack=False, num_sys_haystack=19, len_seg_haystack=10):
+def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
     real_seg_lens = []
 
-    context_len = n_positions + 1 #the length of the context is the number of positions plus 1 for the start token
+    context_len = config.n_positions + 1 #the length of the context is the number of positions plus 1 for the start token
 
 
-    sys_names = np.arange(max_sys_trace) #system names
+    sys_names = np.arange(config.max_sys_trace) #system names
     #randomly shuffle the system names
     np.random.shuffle(sys_names)
     
-    if single_system: #if single sys multi segment test
+    if config.single_system: #if single sys multi segment test
         sys_in_trace = 1
         sys_inds = [0]
         sys_dict = {0: sys_names[0]}
 
-        seg_lens = generate_seg_lens(n_positions, sys_in_trace)
+        if train_conv:
+            seg_lens = (config.n_positions/2 - 2)*[1,1]
+        else:
+            seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
 
     else:
-        if needle_in_haystack:
-            sys_in_trace = num_sys_haystack #number of systems to include in the context
+        if config.needle_in_haystack:
+            sys_in_trace = config.num_sys_haystack #number of systems to include in the context
         else:
-            sys_in_trace = generate_zipfian_integer(max_sys_trace, 1.5) #number of systems to include in the context
+            sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
 
         #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
         rng = np.random.default_rng()
@@ -125,13 +128,13 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             sys_dict[sys_inds[i]] = sys_names[i]
         
 
-        if needle_in_haystack:
-            seg_lens = [len_seg_haystack]*num_sys_haystack + [context_len - (1 + num_sys_haystack*(len_seg_haystack + 2) + 2)]
+        if config.needle_in_haystack:
+            seg_lens = [config.len_seg_haystack]*config.num_sys_haystack + [context_len - (1 + config.num_sys_haystack*(config.len_seg_haystack + 2) + 2)]
         else:
-            seg_lens = generate_seg_lens(n_positions, sys_in_trace)
+            seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
 
-    segments = np.zeros((context_len, ny + 2*max_sys_trace + 2)) #initialize the segments array
-    segments[0, 2*max_sys_trace] = np.sqrt(2) #set the start token for the first segment
+    segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
+    segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
     #initialize a dictionary to hold the next starting index for each system trace
     next_start = {sys_ind: 0 for sys_ind in sys_inds} 
@@ -143,7 +146,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
         seg_starts.append(seg_start)
 
-        if single_system: #if single sys multi segment test
+        if config.single_system: #if single sys multi segment test
             sys_ind = 0
             sys_choices.append(sys_ind) #add the system index to the list of system choices
 
@@ -152,7 +155,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             if seg_start > 1:
                 old_sys_ind = sys_ind
 
-            if needle_in_haystack:
+            if config.needle_in_haystack:
                 #pick the system index from the list of system indices
                 ind = seg_count % len(sys_inds) #use mod to cycle through the system indices
                 sys_ind = sys_inds[ind]
@@ -228,8 +231,8 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
             ones = np.ones((segment.shape[0], 1))
             segment = np.concatenate((ones, segment), axis=1)
         
-            # concatenate 2*max_sys_trace + 1 columns of zeros to the segment
-            zeros = np.zeros((segment.shape[0], 2*max_sys_trace + 1))
+            # concatenate 2*config.max_sys_trace + 1 columns of zeros to the segment
+            zeros = np.zeros((segment.shape[0], 2*config.max_sys_trace + 1))
             segment = np.concatenate((zeros, segment), axis=1)
 
             start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
@@ -257,7 +260,7 @@ def populate_traces(n_positions, ny, num_tasks, entries, max_sys_trace, test=Fal
 
 
     #uncomment if code that makes sure the same system isn't picked twice in a row is uncommented
-    # if not single_system:
+    # if not config.single_system:
     #     sys_inds.append(sys_ind) #add the last system index back to the list of system indices
         
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
@@ -297,15 +300,15 @@ class FilterDataset(Dataset):
 
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
-            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config.n_positions, config.ny, config.num_tasks, self.entries, config.max_sys_trace)
-            entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the ny columns
+            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
+            entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
         else:
             # generate random entries
             entry = self.entries[idx % len(self.entries)].copy()
 
             obs = entry.pop("obs")
             L = obs.shape[-2]
-            if config.dataset_typ in ["unifA", "noniid", "upperTriA", "upperTriA_gauss", "rotDiagA", "rotDiagA_unif", "rotDiagA_gauss", "gaussA", "gaussA_noscale", "single_system", "cond_num", "ident", "ortho"]:
+            if config.dataset_typ in ["unifA", "noniid", "upperTriA", "upperTriA_gauss", "rotDiagA", "rotDiagA_unif", "rotDiagA_gauss", "gaussA", "gaussA_noscale", "config.single_system", "cond_num", "ident", "ortho"]:
                 entry["current"] = np.take(obs, np.arange(L - 1), axis=-2) #current observation
                 entry["target"] = np.take(obs, np.arange(1, L), axis=-2) #true value of target observation at the next instance
             else:
