@@ -1214,7 +1214,7 @@ def compute_kf_needle(num_trace_configs, ys, errs_all, seg_lens_per_config, sys_
 
                 seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
                 err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Kalman"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Analytical_Kalman"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys_ind, sys_start[sys]:sys_start[sys] + seg_len]
                 err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
                 sys_start[sys] += seg_len
 
@@ -1760,7 +1760,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
     print("ckpt_steps:", ckpt_steps)
 
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
     os.makedirs(errs_dir, exist_ok=True)
 
@@ -1801,7 +1801,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
         else:
 
             save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-            save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+            save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
             if (config.datasource == "val"):
 

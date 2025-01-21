@@ -129,7 +129,11 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
         
 
         if config.needle_in_haystack:
-            seg_lens = [config.len_seg_haystack]*config.num_sys_haystack + [context_len - (1 + config.num_sys_haystack*(config.len_seg_haystack + 2) + 2)]
+            if config.needle_final_seg_extended:
+                seg_lens = [config.len_seg_haystack]*(config.num_sys_haystack - 1) + [context_len - ((config.num_sys_haystack - 1)*(config.len_seg_haystack + 2) + 2)]
+                print(f"final seg extended seg lens: {seg_lens}")
+            else:
+                seg_lens = [config.len_seg_haystack]*config.num_sys_haystack + [context_len - (1 + config.num_sys_haystack*(config.len_seg_haystack + 2) + 2)]
         else:
             seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
 
