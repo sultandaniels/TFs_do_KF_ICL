@@ -108,7 +108,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             pred_ckpts = data["pred_ckpts"]
             quantiles = data["quantiles"]
 
-        # quantiles -= 1
+        quantiles -= 1
         print("quantiles shape", quantiles.shape)    
         ##plotting stuff
         ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=trainAs[i] + " Median")# label= f"Experiment: {experiments[i]} Median")
@@ -116,16 +116,19 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         torch.cuda.empty_cache()
         gc.collect()
 
-        ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
+        if single_system:
+            ax.set_title(f"Error Ratio of Instance After Punctuation vs Training Iteration: Gaussian Test Distribution.")
+        else:
+            ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
         ax.grid(True)
-        ax.set_ylabel("Error of Median Test System / Emp Kal Error")
+        ax.set_ylabel("Error of Instance After Punctuation / Emp Kal Error")
         ax.set_xlabel("Training Iteration")
         ax.minorticks_on()
         ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
         ax.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
         ax.legend()
-        # ax.set_yscale("log")
-        # ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xscale("log")
 
         fig.text(0.5, 0.01, f'Generated at {plot_time}', ha='center')
 
