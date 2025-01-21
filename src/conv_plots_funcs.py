@@ -56,9 +56,11 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
     i = 0
     for experiment in experiments:
-        if not os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz") or compute_more_ckpts:
+        if not (os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz") or (single_system and os.path.exists(parent_path + experiment + "/train_conv/quantiles_5.npz"))) or compute_more_ckpts:
             pred_ckpts = []
             quantiles = []
+            if single_system:
+                quantiles_5 = []
             print("\n\ni", i)
             if not needle_in_haystack:
                 kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx, single_system=single_system)
@@ -76,6 +78,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                         seg_starts = seg_starts_per_config[0]
 
                         if len(seg_starts) > 1:
+                            quantile_5 = quantile[:, seg_starts[1] + 5] #take the quantile 5 steps after the start of the second segment
                             quantile = quantile[:, seg_starts[1] + 1] #take the quantile at the start of the second segment
                             print(f"seg_starts[1] + 1: {seg_starts[1] + 1}")
                             print(f"quantile shape after seg start choice: {quantile.shape}")
@@ -92,6 +95,11 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                     del mop_err
                     quantiles.append(quantile)
 
+                    if single_system:
+                        if isinstance(quantile_5, torch.Tensor):
+                            quantile_5 = quantile_5.cpu().numpy()
+                        quantiles_5.append(quantile_5)
+
                     torch.cuda.empty_cache()
                     gc.collect()
             del kal_err
@@ -99,20 +107,35 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             gc.collect()
 
             quantiles = np.array(quantiles)
+            if single_system:
+                quantiles_5 = np.array(quantiles_5)
             
             #save quantiles to file
             os.makedirs(parent_path + experiment + "/train_conv", exist_ok=True)
             np.savez_compressed(parent_path + experiment + "/train_conv/quantiles.npz", pred_ckpts=pred_ckpts, quantiles=quantiles)
+            if single_system:
+                np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_5.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_5)
         else:
             data = np.load(parent_path + experiment + "/train_conv/quantiles.npz", allow_pickle=False)
             pred_ckpts = data["pred_ckpts"]
             quantiles = data["quantiles"]
 
+            if single_system:
+                data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=False)
+                quantiles_5 = data["quantiles"]
+
         quantiles -= 1
+        if single_system:
+            quantiles_5 -= 1
+
         print("quantiles shape", quantiles.shape)    
         ##plotting stuff
-        ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=trainAs[i] + " Median")# label= f"Experiment: {experiments[i]} Median")
+        ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=trainAs[i] + " Median" + (" 1 step" if single_system else ""))
         plt.fill_between(pred_ckpts, quantiles[:,0], quantiles[:,2], color=colors[i], alpha=0.2) #, label='25th-75th Percentile Range')
+        if single_system:
+            ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[1], label=trainAs[i] + " Median" + (" 5 steps" if single_system else ""))
+            plt.fill_between(pred_ckpts, quantiles_5[:,0], quantiles_5[:,2], color=colors[1], alpha=0.2) #, label='25th-75th Percentile Range')
+
         torch.cuda.empty_cache()
         gc.collect()
 
