@@ -108,7 +108,7 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
         sys_dict = {0: sys_names[0]}
 
         if train_conv:
-            seg_lens = (config.n_positions/2 - 2)*[1,1]
+            seg_lens = [int(config.n_positions/2 - 2)]*2
         else:
             seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
 
