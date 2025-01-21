@@ -133,7 +133,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=trainAs[i] + " Median" + (" 1 step" if single_system else ""))
         plt.fill_between(pred_ckpts, quantiles[:,0], quantiles[:,2], color=colors[i], alpha=0.2) #, label='25th-75th Percentile Range')
         if single_system:
-            ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[1], label=trainAs[i] + " Median" + (" 5 steps" if single_system else ""))
+            ax.plot(pred_ckpts, quantiles_5[:,1], marker="*", linewidth=3, color= colors[1], label=trainAs[i] + " Median" + (" 5 steps" if single_system else ""))
             plt.fill_between(pred_ckpts, quantiles_5[:,0], quantiles_5[:,2], color=colors[1], alpha=0.2) #, label='25th-75th Percentile Range')
 
         torch.cuda.empty_cache()
