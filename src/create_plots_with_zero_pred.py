@@ -403,56 +403,39 @@ def compute_OLS_ir_multi_sys(num_trace_configs, next_start_per_config, seg_lens_
 
     return err_lss
 
-
-def compute_OLS_ir_multi_sys_helper(trace_conf, next_start, seg_len, config, ys, sim_objs, max_ir_length, err_lss):
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
-
+def compute_OLS_needle(num_trace_configs, next_start_per_config, seg_lens_per_config, sys_choices_per_config, sys_inds_per_config, sim_obs_per_config, config, ys, errs_all, max_ir_length, err_lss):
+    #ys are the observations from the original validation dataset before interleaving
 
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
+
     for ir_length in range(1, max_ir_length + 1):
-        start = time.time()
-        # print(f"\tIR length: {ir_length}")
+        # Initialize the err_lss ols and ols analytical values to infinity shaped like the multi_sys_ys
+        err_lss[f"OLS_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+        err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
 
-        # if ir_length == 2:
-        #     print("unreg")
-        #     preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 0.0, multi_sys_trace=config.multi_sys_trace)
+    for trace_conf in range(num_trace_configs):
 
-        #     print("finished unreg")
+        sys_start = {sys_ind: 0 for sys_ind in sys_inds_per_config[trace_conf]} #initialize the start of the segment for each system
+        seg_count = 0
+        for next_start in next_start_per_config[trace_conf]:
+            sys = sys_choices_per_config[trace_conf][seg_count]
 
-        #     err_lss[f"OLS_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + seg_len] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
-        #     err_lss[f"OLS_analytical_ir_{ir_length}_unreg"][trace_conf, :, next_start + 1:next_start + seg_len] = np.array(preds_rls_wentinn_analytical.cpu())[0]
+            #find the index of sys in sys_inds_per_config[trace_conf]
+            sys_ind = sys_inds_per_config[trace_conf].index(sys)
 
-        #     del preds_rls_wentinn
-        #     del preds_rls_wentinn_analytical
-        #     torch.cuda.empty_cache()
-        #     gc.collect()
+            seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
 
-        preds_rls_wentinn, preds_rls_wentinn_analytical = compute_OLS_helper(config, ys, sim_objs, ir_length, 1.0)
+            for ir_length in range(1, max_ir_length + 1):
+                err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_analytical_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                
+            sys_start[sys] += seg_len
+            seg_count += 1
 
-        err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = (np.linalg.norm(ys - np.array(preds_rls_wentinn.cpu()), axis=-1) ** 2)[0]
-        err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = np.array(preds_rls_wentinn_analytical.cpu())
-        end = time.time()
-        # print("\ttime elapsed:", (end - start) / 60, "min\n")
-
-        del preds_rls_wentinn
-        del preds_rls_wentinn_analytical   
-        torch.cuda.empty_cache()
-        gc.collect()
-
-        # # Check if CUDA is available
-        # if torch.cuda.is_available():
-
-        #     # Print memory usage
-        #     print(f"Memory Allocated: {torch.cuda.memory_allocated(device) / (1024 ** 2):.2f} MB")
-        #     print(f"Memory Reserved: {torch.cuda.memory_reserved(device) / (1024 ** 2):.2f} MB")
-        #     print(f"Max Memory Allocated: {torch.cuda.max_memory_allocated(device) / (1024 ** 2):.2f} MB")
-        #     print(f"Max Memory Reserved: {torch.cuda.max_memory_reserved(device) / (1024 ** 2):.2f} MB")
-        # else:
-        #     print("CUDA is not available.")
-    # set torch precision back to float32
-    torch.set_default_dtype(torch.float32)
     return err_lss
+
+
 
 def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
@@ -666,6 +649,29 @@ def batch_trace(x):
     if x.ndim < 2:
         raise ValueError("Input tensor x must have at least two dimensions")
     return x.diagonal(dim1=-2, dim2=-1).sum(dim=-1)
+
+def compute_kf(config, ys, sim_objs):
+        print("start kf pred")
+        preds_kf = np.array([[
+            apply_kf(sim_obj, __ys, sigma_w=sim_obj.sigma_w,
+                    sigma_v=sim_obj.sigma_v)
+            for __ys in _ys
+        ] for sim_obj, _ys in zip(sim_objs, np.take(ys, np.arange(ys.shape[-2] - 1), axis=-2))
+        ])  # get kalman filter predictions
+        errs_kf = np.linalg.norm((ys - preds_kf), axis=-1) ** 2
+        return errs_kf
+
+def compute_analytical_kf_simulation(config, ys, sim_objs):
+    # Analytical Kalman Predictions
+    analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
+    analytical_kf = analytical_kf.reshape((num_systems, 1)) @ np.ones((1, config.n_positions))
+    
+
+    #Analytical simulation predictions
+    #generate config.n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
+    an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (config.num_traces["val"], config.n_positions+1)) for sim_obj in sim_objs])
+
+    return analytical_kf, an_sims
 
 
 def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
@@ -1184,6 +1190,35 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
                 seg_count += 1
     return err_lss
 
+def compute_kf_needle(num_trace_configs, ys, errs_all, seg_lens_per_config, sys_choices_per_config, next_start_per_config, sys_inds_per_config, sim_obs_per_config, err_lss):
+
+    err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+    err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+
+    print("computing kf multi sys with remembering")
+    for trace_conf in range(num_trace_configs):
+            
+            print(f"\n\nTrace config: {trace_conf}")
+
+            sys_start = {sys: 0 for sys in sys_inds_per_config[trace_conf]} #initialize the starting index for each system trace
+            seg_count = 0
+            for next_start in next_start_per_config[trace_conf]:
+                sys = sys_choices_per_config[trace_conf][seg_count]
+
+                #find the index of sys in sys_inds_per_config[trace_conf]
+                sys_ind = sys_inds_per_config[trace_conf].index(sys)
+
+                seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
+                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Analytical_Kalman"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                sys_start[sys] += seg_len
+
+                seg_count += 1
+
+    return err_lss
+
 def compute_errors_multi_sys(config, tf, run_OLS=True):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
@@ -1543,6 +1578,171 @@ def compute_errors_multi_sys(config, tf, run_OLS=True):
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
 
+def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
+    # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
+    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+
+    num_systems = config.num_val_tasks  # number of validation tasks
+    
+    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+        num_trials = config.num_traces["val"]
+    elif config.datasource == "train":
+        num_trials = config.num_traces["train"]
+    else:
+        raise ValueError(f"datasource {config.datasource} not recognized")
+    
+    num_test_traces_configs = config.num_test_traces_configs
+    
+
+    model = GPT2.load_from_checkpoint(config.ckpt_path,
+                                      n_dims_in=config.n_dims_in, n_positions=config.n_positions,
+                                      n_dims_out=config.n_dims_out, n_embd=config.n_embd,
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+        device)  # load_from_checkpoint
+
+    
+    # get the parent directory of the ckpt_path
+    parent_dir = os.path.dirname(config.ckpt_path)
+
+    # get the parent directory of the parent directory
+    parent_parent_dir = os.path.dirname(parent_dir)
+
+    ckpt_steps = get_step_number(config.ckpt_path)
+    
+
+
+
+    if os.path.exists(errs_loc):
+        with open(errs_loc, 'rb') as f:
+            err_lss = pickle.load(f)
+
+        print(f"\n err_lss already exists for step {ckpt_steps}")
+
+    else:
+        err_lss = collections.OrderedDict()
+        print(f"\n err_lss does not exist yet for step {ckpt_steps}")
+
+
+    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+        
+
+    sys_choices_per_config = []
+    sys_dict_per_config = []
+    tok_seg_lens_per_config = []
+    seg_starts_per_config = []
+    real_seg_lens_per_config = []
+    sys_inds_per_config = []
+    for trace_config in range(num_test_traces_configs):
+        #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
+        if (not config.needle_in_haystack) or (trace_config == 0):
+            tok_seg_lens = None
+            sys_dict = None
+            sys_choices = None
+            seg_starts= None
+            real_seg_lens=None
+            sys_inds = None
+        for trial in range(num_trials):
+
+            #generate interleaved segments
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(trace_config, trial, config.n_positions, config.ny, config.num_val_tasks, ys, config.max_sys_trace, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, config.single_system, config.needle_in_haystack, config.num_sys_haystack, config.len_seg_haystack) # get the first trace  which will set the testing structure
+            multi_sys_ys[trace_config, trial] = segments
+        
+        sys_choices_per_config.append(sys_choices)
+        sys_dict_per_config.append(sys_dict)
+        tok_seg_lens_per_config.append(tok_seg_lens)
+        seg_starts_per_config.append(seg_starts)
+        real_seg_lens_per_config.append(real_seg_lens)
+        sys_inds_per_config.append(sys_inds)
+
+    print("\nstart tf pred")
+    start = time.time()  # start the timer for transformer predictions
+    with torch.no_grad():  # no gradients
+        I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+
+        # print("before model.predict_step()")
+        batch_shape = I.shape[:-2]
+        # print("batch_shape:", batch_shape)
+        flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
+        # print("flattened_I.shape:", flattened_I.shape)
+        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
+                                                        batch_size=config.test_batch_size)
+        preds_arr = []  # Store the predictions for all batches
+        for validation_batch in iter(validation_loader):
+            _, flattened_preds_tf = model.predict_step(
+                {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
+            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                            (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
+        # print("preds_tf.shape:", preds_tf.shape)
+        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
+                                axis=-2)  # concatenate the predictions
+        # print("preds_tf.shape:", preds_tf.shape)
+    end = time.time()  # end the timer for transformer predictions
+    print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
+
+    #take the last config.ny columns of axis=-1 as the true test observations
+    multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
+
+    errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
+    for trace_config in range(num_test_traces_configs):
+        #set the errors for the start token to be infinite
+        errs_tf[trace_config, :, 0] = np.inf
+        errs_tf[trace_config, :, 1] = np.inf
+        seg_count = 0
+        for seg_start in seg_starts_per_config[trace_config]: #loop over the starting indices of the segments
+            #set the errors of the end of the segment to be infinite
+            if real_seg_lens_per_config[trace_config][seg_count] < tok_seg_lens_per_config[trace_config][seg_count] - 1:
+                errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
+            if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
+                errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count]] = np.inf
+            seg_count += 1
+
+
+    err_lss["MOP"] = errs_tf
+
+
+    os.makedirs(errs_dir, exist_ok=True)
+    with open(errs_loc, 'wb') as f:
+            pickle.dump(err_lss, f)  
+    
+    del errs_tf
+    del preds_tf
+
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    print("start zero predictor")
+    # zero predictor predictions
+    errs_zero = np.linalg.norm(multi_sys_ys_true, axis=-1) ** 2  # get the errors of zero predictions
+    err_lss["Zero"] = errs_zero
+
+    if config.num_haystack_examples == 1:
+        for i in range(len(sys_choices_per_config)):
+            print(f"trace config: {i}")
+            print(f"len of sys_choices: {len(sys_choices_per_config[i])}")
+            print("sum of zero err:", np.sum(errs_zero[i]))
+
+    os.makedirs(errs_dir, exist_ok=True)
+    with open(errs_loc, 'wb') as f:
+            pickle.dump(err_lss, f)
+
+    del errs_zero
+
+    torch.cuda.empty_cache()
+    gc.collect() 
+
+    #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
+    sim_objs_per_config = []
+    for trace_config in range(num_test_traces_configs):
+        sim_obj_conf = {}
+        for sys_ind in sys_inds_per_config[trace_config]:
+            sim_obj_conf[sys_ind] = sim_objs[sys_ind] 
+
+        sim_objs_per_config.append(sim_obj_conf)  
+
+    return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
+
+
 
 
 def save_preds(run_deg_kf_test, config, train_conv, tf):
@@ -1596,10 +1796,95 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
                 }, f)
             return None
         else:
+
+            save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
+            save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+
+            if (config.datasource == "val"):
+
+                print(f"getting test data from datasource {config.datasource}")
+
+                # get the sim objs for the validation data
+                with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                    sim_objs = pickle.load(f)
+
+                #set ys to be the validation data
+                with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                    samples = pickle.load(f)
+                    # for every 2000 entries in samples, get the observation values and append them to the ys list
+                    ys = np.stack(
+                        [entry["obs"] for entry in samples], axis=0
+                    ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+                    gc.collect()  # Start the garbage collector
+
+
+                #now that I have err_lss_all, I just need to interleave everything instead of computing for each example and trace configuration
+
+            elif config.datasource == "train":
+
+                print(f"getting test data from datasource {config.datasource}")
+
+                #get the sim_objs for the training data
+                with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                    sim_objs = pickle.load(f)
+
+                #set ys to be the training data
+                with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                    #get train traces
+                    samples = pickle.load(f)
+                    ys = np.stack(
+                        [entry["obs"] for entry in samples], axis=0
+                    ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+                    gc.collect()  # Start the garbage collector
+
+            elif config.datasource == "train_systems":
+
+                print(f"getting test data from datasource {config.datasource}")
+
+                #get the sim_objs for the training data
+                with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                    sim_objs = pickle.load(f)
+
+                #generate traces from the training systems
+                collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs) 
+
+                with open(parent_parent_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+                    #get train traces
+                    samples = pickle.load(f)
+                    ys = np.stack(
+                        [entry["obs"] for entry in samples], axis=0
+                    ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+                    gc.collect()  # Start the garbage collector
+
+            else:
+                raise ValueError(f"datasource {config.datasource} not recognized")
+            
+
+            err_lss_all = {}
+
+            errs_kf = compute_kf(config, ys, sim_objs)
+            err_lss_all["Kalman"] = errs_kf
+            err_lss_all = compute_OLS_ir(config, sim_objs, max_ir_length=3, err_lss=err_lss_all)
+
+            analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs)
+            err_lss_all["Analytical_Kalman"] = analytical_kf
+            err_lss_all["Analytical_Simulation"] = an_sims
+
             err_lss_examples = {}
             for ex in range(config.num_haystack_examples):
-                err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False)
+                err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc)
+
+                err_lss = compute_kf_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config,sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
+
+                err_lss = compute_OLS_needle(config.num_test_traces_configs, seg_starts_per_config, real_seg_lens_per_config, sys_choices_per_config, sys_inds_per_config, sim_objs_per_config, config, ys, err_lss_all, max_ir_length=3, err_lss=err_lss)
+
+                os.makedirs(save_errs_dir, exist_ok=True)
+                with open(save_errs_loc, 'wb') as f:
+                        pickle.dump(err_lss, f)
+
                 for key in err_lss.keys():
+                    print(f"err_lss[{key}] len: {len(err_lss[key])}")
                     if ex == 0:
                         err_lss_examples[key] = [] #initialize the list for the prediction errors
                     err_lss_examples[key].append(err_lss[key])
