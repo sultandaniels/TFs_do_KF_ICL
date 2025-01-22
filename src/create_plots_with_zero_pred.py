@@ -1627,15 +1627,15 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
 
 
 
-    if os.path.exists(errs_loc):
-        with open(errs_loc, 'rb') as f:
-            err_lss = pickle.load(f)
+    # if os.path.exists(errs_loc):
+    #     with open(errs_loc, 'rb') as f:
+    #         err_lss = pickle.load(f)
 
-        print(f"\n err_lss already exists for step {ckpt_steps}")
+    #     print(f"\n err_lss already exists for step {ckpt_steps}")
 
-    else:
-        err_lss = collections.OrderedDict()
-        print(f"\n err_lss does not exist yet for step {ckpt_steps}")
+    # else:
+    err_lss = collections.OrderedDict()
+    # print(f"\n err_lss does not exist yet for step {ckpt_steps}")
 
 
     multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
