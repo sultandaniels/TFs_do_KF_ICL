@@ -9,9 +9,10 @@ config = Config()
 
 
 class GPT2(BaseModel):
-    def __init__(self, n_dims_in, n_positions, n_embd, n_layer=12, n_head=8, n_dims_out=5, learning_rate=config.learning_rate):
+    def __init__(self, n_dims_in, n_positions, n_embd, n_layer=12, n_head=8, n_dims_out=5, learning_rate=config.learning_rate, use_pos_emb=config.use_pos_emb):
         super(GPT2, self).__init__(learning_rate=learning_rate)
         gpt_configuration = GPT2Config(
+            use_pos_emb=use_pos_emb,
             n_positions=2048,  # set to sthg large advised
             n_embd=n_embd,
             n_layer=n_layer,

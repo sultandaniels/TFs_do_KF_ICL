@@ -663,10 +663,7 @@ if __name__ == '__main__':
         print("\ndevice:", device)
         # instantiate gpt2 model
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
-                    n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
-        
-        print("\nmodel:", model)
-        raise ValueError("stop here")
+                    n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb)
         
         model.to(device)
         

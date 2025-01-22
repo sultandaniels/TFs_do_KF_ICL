@@ -16,7 +16,7 @@ class Config(object, metaclass=Singleton):
     fully_reproducible = False
 
     # Dataset settings
-    num_tasks = 40000 #number of training systems
+    num_tasks = 100 #40000 #number of training systems
     num_val_tasks = 25 #number of test systems
     dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
     max_cond_num = 100
@@ -42,18 +42,19 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else 1) #number of test traces configurations to generate
 
     # Training settings
-    devices=[2,3] #which GPU
-    train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
+    devices=[0] #which GPU
+    train_steps = 5 #1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 3000 #number of steps between logging (train interval)
+    train_int = 5 #3000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 16 #512 #usually 512 (~35GB) tune this to fit into GPU memory
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
+    use_pos_emb = False #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
     n_embd = 128
     n_layer = 12

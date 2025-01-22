@@ -305,7 +305,7 @@ class FilterDataset(Dataset):
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
             segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
-            entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+            entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
         else:
             # generate random entries
             entry = self.entries[idx % len(self.entries)].copy()
