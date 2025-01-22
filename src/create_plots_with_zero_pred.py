@@ -1909,6 +1909,11 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
                     if ex == 0:
                         err_lss_examples[key] = [] #initialize the list for the prediction errors
                     err_lss_examples[key].append(err_lss[key])
+
+
+                del err_lss
+                torch.cuda.empty_cache()
+                gc.collect()
             
                 #save the system indices, starting indices, and token segment lengths to pickle file
                 with open(errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
