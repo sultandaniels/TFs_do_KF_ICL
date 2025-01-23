@@ -1198,7 +1198,7 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
 def interleave_kf_OLS_needle(num_trace_configs, ys, errs_all, seg_lens_per_config, sys_choices_per_config, next_start_per_config, sys_inds_per_config, max_ir_length, err_lss):
 
     err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
-    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, ys.shape[2]), np.inf)
     err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
 
     for ir_length in range(1, max_ir_length + 1):
@@ -1221,7 +1221,7 @@ def interleave_kf_OLS_needle(num_trace_configs, ys, errs_all, seg_lens_per_confi
 
                 seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
                 err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Kalman"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys_ind, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys_ind, sys_start[sys]:sys_start[sys] + seg_len]
                 err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
 
                 for ir_length in range(1, max_ir_length + 1):

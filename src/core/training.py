@@ -23,7 +23,7 @@ def setup_train(model, train_mix_dist=False, train_mix_state_dim=False):
         logger.info(f'Resuming from the checkpoint: {config.ckpt_path}')
     if output_dir is None:
         print("in output_dir is None")
-        identifier = (config.model_type + '/' +
+        identifier = (config.model_type + ("_NoPE" if not config.use_pos_emb else "") + '/' +
                       time.strftime('%y%m%d_%H%M%S') + '.' +
                       hashlib.md5(config.get_full_yaml().encode('utf-8')).hexdigest()[:6]
                       )

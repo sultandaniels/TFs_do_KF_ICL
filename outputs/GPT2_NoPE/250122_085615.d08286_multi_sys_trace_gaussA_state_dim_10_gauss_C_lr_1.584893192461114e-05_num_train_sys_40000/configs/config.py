@@ -33,7 +33,7 @@ class Config(object, metaclass=Singleton):
     multi_sys_trace = True #have multiple systems in a single trace
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
-    needle_in_haystack = True #run needle in haystack tests
+    needle_in_haystack = False #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #number of systems in the haystack
@@ -54,7 +54,7 @@ class Config(object, metaclass=Singleton):
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = True #use positional embeddings
+    use_pos_emb = False #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
     n_embd = 128
     n_layer = 12
