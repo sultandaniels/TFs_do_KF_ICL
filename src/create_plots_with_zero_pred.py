@@ -1899,8 +1899,6 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
 
                 err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
-                raise NotImplementedError("Need to implement the interleave function for needle predictions")
-
                 os.makedirs(save_errs_dir, exist_ok=True)
                 with open(save_errs_loc, 'wb') as f:
                         pickle.dump(err_lss, f)
@@ -2155,8 +2153,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
                 ax.set_yscale('log')
                 # ax.set_xscale('log')
 
-            ax.set_title(f"MSE vs Context. Trace Configuration: {trace_conf}")
-
+            ax.set_title(("NoPE " if not config.use_pos_emb else "") + ("Gaussian Systems " if config.val_dataset_typ == "gaussA" else ("Orthogonal Systems " if config.val_dataset_typ == "ortho" else ("Identity Systems " if config.val_dataset_typ == "ident" else "")))   + f"MSE vs Context. Trace Configuration: {trace_conf}")
             # ax.set_ylim([0,2])
             # Set major and minor gridlines
 
@@ -2190,7 +2187,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
             os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else ""), exist_ok=True)
             fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
+                parent_parent_dir + f"/figures/multi_sys_trace/" + (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else "") + ("NoPE_" if not config.use_pos_emb else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
                     "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
         return None
 
