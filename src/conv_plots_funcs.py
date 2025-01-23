@@ -37,8 +37,8 @@ def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg
                 
         return seg_starts_per_config
 
-def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False):
-    num_preds = 3 #len(experiments) #number of predictors to plot
+def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3):
+    num_preds = 3+(3*2) #len(experiments) #number of predictors to plot
     colors = plt.cm.tab10(np.linspace(0, 1, num_preds))
 
     plot_time = time.ctime()
@@ -47,7 +47,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     fig, ax = plt.subplots(1, 1, figsize=(10, 10), sharex=True)
     filename = f'training_dist_comparison_val_{valA}_state_dim_{nx}_val_sys_{num_val_systems}_{time.time()}.png'
 
-    parent_path = "../outputs/GPT2/"
+    parent_path = "../outputs/GPT2_NoPE/"
 
     filepath = os.path.abspath(f"../outputs/train_conv/{filename}")
     print(filepath)
@@ -57,19 +57,50 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     i = 0
     for experiment in experiments:
         if not (os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz") or (single_system and os.path.exists(parent_path + experiment + "/train_conv/quantiles_5.npz"))) or compute_more_ckpts:
+            kal_err = None #initialize kalman error
             pred_ckpts = []
             quantiles = []
             if single_system:
                 quantiles_5 = []
+                quantiles_20 = []
             print("\n\ni", i)
-            if not needle_in_haystack:
-                kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx, single_system=single_system)
+            if not needle_in_haystack and not (valA == "ortho" or valA == "ident"): 
+                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx, single_system=single_system)
+
+
+                    if single_system:
+                        seg_starts_per_config = get_seg_starts_per_config(experiment, valA, C_dist, nx, kal_ckpt[i], print_seg_starts=True)
+                        seg_starts = seg_starts_per_config[0]
+
+                        ols_quantile = {}
+                        ols_quantile_5 = {}
+                        ols_quantile_20 = {}
+                        for ir in range(1, max_ir_len+1):
+
+                            ols_errs = get_other_err(valA, C_dist, kal_ckpt[i], experiment, f"OLS_ir_{ir}", nx=nx, single_system=single_system)
+                            ols_err_rat = compute_ratio(ind=ind, err=ols_errs, kalman_err=kal_err, single_system=single_system)
+
+                            if len(seg_starts) > 1:
+                                ols_quantile[ir] = ols_err_rat[:, seg_starts[1] + 1] #take the quantile at the start of the second segment
+                                ols_quantile_5[ir] = ols_err_rat[:, seg_starts[1] + 5] #take the quantile 5 steps after the start of the second segment
+                                ols_quantile_20[ir] = ols_err_rat[:, seg_starts[1] + 20] #take the quantile 20 steps after the start of the second segment
+
+                            if isinstance(ols_quantile[ir], torch.Tensor):
+                                ols_quantile[ir] = ols_quantile[ir].cpu().numpy()
+                            if isinstance(ols_quantile_5[ir], torch.Tensor):
+                                ols_quantile_5[ir] = ols_quantile_5[ir].cpu().numpy()
+                            if isinstance(ols_quantile_20[ir], torch.Tensor):
+                                ols_quantile_20[ir] = ols_quantile_20[ir].cpu().numpy()
+
+
+                    
             for ckpt_step in ckpt_steps:
                 mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, single_system=single_system)
                 if pred_ckpt:
                 
-                    if needle_in_haystack:
+                    if needle_in_haystack and not (valA == "ortho" or valA == "ident"):
                         kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system)
+
                     quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err, single_system=single_system)
                     if single_system:
 
@@ -79,6 +110,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
                         if len(seg_starts) > 1:
                             quantile_5 = quantile[:, seg_starts[1] + 5] #take the quantile 5 steps after the start of the second segment
+                            quantile_20 = quantile[:, seg_starts[1] + 20] #take the quantile 20 steps after the start of the second segment
                             quantile = quantile[:, seg_starts[1] + 1] #take the quantile at the start of the second segment
                             print(f"seg_starts[1] + 1: {seg_starts[1] + 1}")
                             print(f"quantile shape after seg start choice: {quantile.shape}")
@@ -86,7 +118,6 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                             print("only one segment start so disregard ckpt")
                             continue
                         
-
                     
                     pred_ckpts.append(pred_ckpt)
                     print(f"quantile shape: {quantile.shape}")
@@ -99,6 +130,10 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                         if isinstance(quantile_5, torch.Tensor):
                             quantile_5 = quantile_5.cpu().numpy()
                         quantiles_5.append(quantile_5)
+                        if isinstance(quantile_20, torch.Tensor):
+                            quantile_20 = quantile_20.cpu().numpy()
+                        quantiles_20.append(quantile_20)
+
 
                     torch.cuda.empty_cache()
                     gc.collect()
@@ -109,12 +144,18 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             quantiles = np.array(quantiles)
             if single_system:
                 quantiles_5 = np.array(quantiles_5)
+                quantiles_20 = np.array(quantiles_20)
             
             #save quantiles to file
             os.makedirs(parent_path + experiment + "/train_conv", exist_ok=True)
             np.savez_compressed(parent_path + experiment + "/train_conv/quantiles.npz", pred_ckpts=pred_ckpts, quantiles=quantiles)
             if single_system:
                 np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_5.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_5)
+
+                np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_20.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_20)
+
+                if not (valA == "ortho" or valA == "ident"):
+                    np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols.npz", pred_ckpts=pred_ckpts, quantiles_ols=ols_quantile, quantiles_ols_5=ols_quantile_5, quantiles_ols_20=ols_quantile_20)
         else:
             data = np.load(parent_path + experiment + "/train_conv/quantiles.npz", allow_pickle=False)
             pred_ckpts = data["pred_ckpts"]
@@ -124,23 +165,65 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=False)
                 quantiles_5 = data["quantiles"]
 
-        quantiles -= 1
-        if single_system:
-            quantiles_5 -= 1
+                data = np.load(parent_path + experiment + "/train_conv/quantiles_20.npz", allow_pickle=False)
+                quantiles_20 = data["quantiles"]
+
+                if not (valA == "ortho" or valA == "ident"):
+                    data = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=False)
+                    ols_quantile = data["quantiles_ols"]
+                    ols_quantile_5 = data["quantiles_ols_5"]
+                    ols_quantile_20 = data["quantiles_ols_20"]
+
+
+        if not (valA == "ortho" or valA == "ident"):
+
+            quantiles -= 1
+            if single_system:
+                quantiles_5 -= 1
+                quantiles_20 -= 1
+                for ir in range(1, max_ir_len+1):
+                    ols_quantile[ir] -= 1
+                    ols_quantile_5[ir] -= 1
+                    ols_quantile_20[ir] -= 1
+
+        pred_ckpts = [2*ckpt for ckpt in pred_ckpts]
+        # # for the ortho regular training run since the first ckpt was trained on 3 GPUs
+        # count = 0
+        # for pred_ckpt in pred_ckpts:
+        #     if pred_ckpt == 3000:
+        #         pred_ckpts[count] = 3*pred_ckpt
+        #     else:
+        #         pred_ckpts[count] = 3*3000 + 2*(pred_ckpt - 3000)
+
+        #     count += 1
 
         print("quantiles shape", quantiles.shape)    
         ##plotting stuff
-        ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=trainAs[i] + " Median" + (" 1 step" if single_system else ""))
+        ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=(trainAs[i] if not single_system else "") + " MOP Median" + (" 1 step" if single_system else ""))
         plt.fill_between(pred_ckpts, quantiles[:,0], quantiles[:,2], color=colors[i], alpha=0.2) #, label='25th-75th Percentile Range')
         if single_system:
-            ax.plot(pred_ckpts, quantiles_5[:,1], marker="*", linewidth=3, color= colors[1], label=trainAs[i] + " Median" + (" 5 steps" if single_system else ""))
+            ax.plot(pred_ckpts, quantiles_5[:,1], marker="*", linewidth=3, color= colors[1], label=(trainAs[i] if not single_system else "") + " MOP Median" + (" 5 steps" if single_system else ""))
             plt.fill_between(pred_ckpts, quantiles_5[:,0], quantiles_5[:,2], color=colors[1], alpha=0.2) #, label='25th-75th Percentile Range')
+
+            ax.plot(pred_ckpts, quantiles_20[:,1], marker="*", linewidth=3, color= colors[2], label=(trainAs[i] if not single_system else "") + " MOP Median" + (" 20 steps" if single_system else ""))
+            plt.fill_between(pred_ckpts, quantiles_20[:,0], quantiles_20[:,2], color=colors[2], alpha=0.2) #, label='25th-75th Percentile Range')
+
+            if not (valA == "ortho" or valA == "ident"):
+                for ir in range(2, max_ir_len+1):
+                    ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker="*", linewidth=3, color= colors[3*(ir-1)], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir} Median" + (" 1 step" if single_system else ""))
+                    plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3*(ir-1)], alpha=0.05) #, label='25th-75th Percentile Range')
+
+                    ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker="*", linewidth=3, color= colors[3*(ir-1) + 1], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir} Median" + (" 5 steps" if single_system else ""))
+                    plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[3*(ir-1) + 1], alpha=0.05) #, label='25th-75th Percentile Range')
+
+                    ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker="*", linewidth=3, color= colors[3*(ir-1) + 2], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir} Median" + (" 20 steps" if single_system else ""))
+                    plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[3*(ir-1) + 2], alpha=0.05) #, label='25th-75th Percentile Range')
 
         torch.cuda.empty_cache()
         gc.collect()
 
         if single_system:
-            ax.set_title(f"Error Ratio of Instance After Punctuation vs Training Iteration: Gaussian Test Distribution.")
+            ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution. NoPE")
         else:
             ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
         ax.grid(True)
@@ -149,7 +232,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         ax.minorticks_on()
         ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
         ax.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
-        ax.legend()
+        ax.legend(loc="lower left" if single_system else "upper right")
         ax.set_yscale("log")
         ax.set_xscale("log")
 

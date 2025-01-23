@@ -73,7 +73,7 @@ def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False)
     pred_ckpt = None
     #print the absolute path of the experiment
 
-    path = f"../outputs/GPT2/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/" + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
+    path = f"../outputs/GPT2_NoPE/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/" + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
     if os.path.exists(path):
         print(os.path.abspath(path))
         #load prediction errors
@@ -99,7 +99,10 @@ def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False)
 
 def compute_ratio(ind, err, kalman_err, single_system=False):
     
-    if err.shape != kalman_err.shape:
+    if not kalman_err:
+        print(f"err shape: {err.shape}")
+        ratios = err
+    elif err.shape != kalman_err.shape:
         #take the reciprocal of every element in kalman_err
         rec_kalman = 1/kalman_err
         #multiply rec_kalman by analytical error
@@ -123,10 +126,7 @@ def compute_ratio(ind, err, kalman_err, single_system=False):
     print(f"ratios shape after median: {ratios.shape}")
 
     if ind == None:
-        if not single_system:
-            ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
-        else:
-            ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
+        ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
 
     else:
         ratios_percentiles = torch.quantile(ratios[:,ind], percentiles)
