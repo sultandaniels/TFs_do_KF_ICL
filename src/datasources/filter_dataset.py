@@ -104,8 +104,8 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
     
     if config.single_system: #if single sys multi segment test
         sys_in_trace = 1
-        sys_inds = [0]
-        sys_dict = {0: sys_names[0]}
+        sys_inds = [0] #list of system indices
+        sys_dict = {sys_inds[0]: sys_names[0]}
 
         if train_conv:
             seg_lens = [int(config.n_positions/2 - 2)]*2
@@ -151,7 +151,7 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
         seg_starts.append(seg_start)
 
         if config.single_system: #if single sys multi segment test
-            sys_ind = 0
+            sys_ind = sys_inds[0]
             sys_choices.append(sys_ind) #add the system index to the list of system choices
 
         else:

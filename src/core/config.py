@@ -38,7 +38,7 @@ class Config(object, metaclass=Singleton):
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #number of systems in the haystack
     len_seg_haystack = 10 #length of a haystack segment
-    num_haystack_examples = 200 #number of haystack examples to generate
+    num_haystack_examples = 3 #number of haystack examples to generate
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else 1) #number of test traces configurations to generate
 
     # Training settings

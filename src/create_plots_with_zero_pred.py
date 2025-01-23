@@ -666,15 +666,12 @@ def compute_analytical_kf_simulation(config, ys, sim_objs):
     # Analytical Kalman Predictions
     analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
     analytical_kf = analytical_kf.reshape((len(sim_objs), 1)) @ np.ones((1, config.n_positions))
-    print("analytical_kf.shape:", analytical_kf.shape)
     
 
     #Analytical simulation predictions
     #generate config.n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
     an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (config.num_traces["val"], config.n_positions+1)) for sim_obj in sim_objs])
     an_sims = np.linalg.norm(an_sims, axis=-1) ** 2
-
-    print("an_sims.shape:", an_sims.shape)
 
     return analytical_kf, an_sims
 
@@ -1216,17 +1213,14 @@ def interleave_kf_OLS_needle(num_trace_configs, ys, errs_all, seg_lens_per_confi
             for next_start in next_start_per_config[trace_conf]:
                 sys = sys_choices_per_config[trace_conf][seg_count]
 
-                #find the index of sys in sys_inds_per_config[trace_conf]
-                sys_ind = sys_inds_per_config[trace_conf].index(sys)
-
                 seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
-                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys_ind, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys, sys_start[sys]:sys_start[sys] + seg_len]
+                err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
 
                 for ir_length in range(1, max_ir_length + 1):
-                    err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
-                    err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_analytical_ir_{ir_length}"][sys_ind, :, sys_start[sys]:sys_start[sys] + seg_len]
+                    err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_ir_{ir_length}"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
+                    err_lss[f"OLS_analytical_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_analytical_ir_{ir_length}"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
 
                 sys_start[sys] += seg_len
 
@@ -1889,6 +1883,11 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
             end = time.time()
             print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
 
+            # #for quick debugging
+            # names = ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
+            # for name in names:
+            #     err_lss_all[name] = np.zeros((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1))
+
             analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs)
             err_lss_all["Analytical_Kalman"] = analytical_kf
             err_lss_all["Analytical_Simulation"] = an_sims
@@ -1899,6 +1898,8 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
                 err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc)
 
                 err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
+
+                raise NotImplementedError("Need to implement the interleave function for needle predictions")
 
                 os.makedirs(save_errs_dir, exist_ok=True)
                 with open(save_errs_loc, 'wb') as f:
