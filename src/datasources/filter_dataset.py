@@ -115,6 +115,8 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
     else:
         if config.needle_in_haystack:
             sys_in_trace = config.num_sys_haystack #number of systems to include in the context
+        elif config.zero_cut:
+            sys_in_trace = 1
         else:
             sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
 
@@ -135,7 +137,10 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
             else:
                 seg_lens = [config.len_seg_haystack]*config.num_sys_haystack + [context_len - (1 + config.num_sys_haystack*(config.len_seg_haystack + 2) + 2)]
         else:
-            seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
+            if config.zero_cut:
+                seg_lens = [config.n_positions - 2]
+            else:
+                seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
 
     segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
     segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment

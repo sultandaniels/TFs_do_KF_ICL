@@ -21,12 +21,13 @@ from check_ecdf import get_empirical_cdf
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False):
+def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False, nope=False):
     # load the sys choices etc
-    errs_dir = "../outputs/GPT2/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
+    errs_dir = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
     errs_loc = errs_dir + f"/single_system_{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl"
 
     if not os.path.exists(errs_loc):
+        print(f"errs_loc {errs_loc} does not exist")
         return None
     else:
         with open(errs_loc, "rb") as f:
@@ -37,17 +38,19 @@ def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg
                 
         return seg_starts_per_config
 
-def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3):
+def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3, nope=False):
     num_preds = 3+(3*2) #len(experiments) #number of predictors to plot
-    colors = plt.cm.tab10(np.linspace(0, 1, num_preds))
+
+    colors = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE"]
+
 
     plot_time = time.ctime()
 
     #create a figure with subplots for each of the m indexes for the cdfs
     fig, ax = plt.subplots(1, 1, figsize=(10, 10), sharex=True)
-    filename = f'training_dist_comparison_val_{valA}_state_dim_{nx}_val_sys_{num_val_systems}_{time.time()}.png'
+    filename = f'training_dist_comparison_val_{valA}_state_dim_{nx}_val_sys_{num_val_systems}_{time.time()}.pdf'
 
-    parent_path = "../outputs/GPT2_NoPE/"
+    parent_path = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/"
 
     filepath = os.path.abspath(f"../outputs/train_conv/{filename}")
     print(filepath)
@@ -69,7 +72,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
 
                     if single_system:
-                        seg_starts_per_config = get_seg_starts_per_config(experiment, valA, C_dist, nx, kal_ckpt[i], print_seg_starts=True)
+                        seg_starts_per_config = get_seg_starts_per_config(experiment, valA, C_dist, nx, kal_ckpt[i], print_seg_starts=True, nope=nope)
                         seg_starts = seg_starts_per_config[0]
 
                         ols_quantile = {}
@@ -105,7 +108,9 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                     if single_system:
 
                         print(f"quantile shape before seg start choice: {quantile.shape}")
-                        seg_starts_per_config = get_seg_starts_per_config(experiment, valA, C_dist, nx, ckpt_step, print_seg_starts=True)
+                        seg_starts_per_config = get_seg_starts_per_config(experiment, valA, C_dist, nx, ckpt_step, print_seg_starts=True, nope=nope)
+
+                        print(f"seg_starts_per_config: {seg_starts_per_config}")
                         seg_starts = seg_starts_per_config[0]
 
                         if len(seg_starts) > 1:
@@ -186,7 +191,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                     ols_quantile_5[ir] -= 1
                     ols_quantile_20[ir] -= 1
 
-        pred_ckpts = [2*ckpt for ckpt in pred_ckpts]
+        pred_ckpts = [2*ckpt for ckpt in pred_ckpts] #trained on 2 GPUs
         # # for the ortho regular training run since the first ckpt was trained on 3 GPUs
         # count = 0
         # for pred_ckpt in pred_ckpts:
@@ -199,35 +204,38 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
         print("quantiles shape", quantiles.shape)    
         ##plotting stuff
-        ax.plot(pred_ckpts, quantiles[:,1], marker="*", linewidth=3, color= colors[i], label=(trainAs[i] if not single_system else "") + " MOP Median" + (" 1 step" if single_system else ""))
-        plt.fill_between(pred_ckpts, quantiles[:,0], quantiles[:,2], color=colors[i], alpha=0.2) #, label='25th-75th Percentile Range')
+        ax.plot(pred_ckpts, quantiles[:,1], marker=".", linewidth=3, color= colors[0], label=(trainAs[i] if not single_system else "") + " TF" + (" 1 step" if single_system else ""), markersize=10)
+        plt.fill_between(pred_ckpts, quantiles[:,0], quantiles[:,2], color=colors[0], alpha=0.2) #, label='25th-75th Percentile Range')
         if single_system:
-            ax.plot(pred_ckpts, quantiles_5[:,1], marker="*", linewidth=3, color= colors[1], label=(trainAs[i] if not single_system else "") + " MOP Median" + (" 5 steps" if single_system else ""))
+            ax.plot(pred_ckpts, quantiles_5[:,1], marker=".", linewidth=3, color= colors[1], label=(trainAs[i] if not single_system else "") + " TF" + (" 5 steps" if single_system else ""), markersize=10)
             plt.fill_between(pred_ckpts, quantiles_5[:,0], quantiles_5[:,2], color=colors[1], alpha=0.2) #, label='25th-75th Percentile Range')
 
-            ax.plot(pred_ckpts, quantiles_20[:,1], marker="*", linewidth=3, color= colors[2], label=(trainAs[i] if not single_system else "") + " MOP Median" + (" 20 steps" if single_system else ""))
+            ax.plot(pred_ckpts, quantiles_20[:,1], marker=".", linewidth=3, color= colors[2], label=(trainAs[i] if not single_system else "") + " TF" + (" 20 steps" if single_system else ""), markersize=10)
             plt.fill_between(pred_ckpts, quantiles_20[:,0], quantiles_20[:,2], color=colors[2], alpha=0.2) #, label='25th-75th Percentile Range')
 
             if not (valA == "ortho" or valA == "ident"):
                 for ir in range(2, max_ir_len+1):
-                    ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker="*", linewidth=3, color= colors[3*(ir-1)], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir} Median" + (" 1 step" if single_system else ""))
-                    plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3*(ir-1)], alpha=0.05) #, label='25th-75th Percentile Range')
+                    ols_markers = ["x", "o"]
+                    ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[3], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 1 step" if single_system else ""), markersize=10)
+                    plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3], alpha=0.05) #, label='25th-75th Percentile Range')
 
-                    ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker="*", linewidth=3, color= colors[3*(ir-1) + 1], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir} Median" + (" 5 steps" if single_system else ""))
-                    plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[3*(ir-1) + 1], alpha=0.05) #, label='25th-75th Percentile Range')
+                    ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[4], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 5 steps" if single_system else ""), markersize=10)
+                    plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[4], alpha=0.05) #, label='25th-75th Percentile Range')
 
-                    ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker="*", linewidth=3, color= colors[3*(ir-1) + 2], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir} Median" + (" 20 steps" if single_system else ""))
-                    plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[3*(ir-1) + 2], alpha=0.05) #, label='25th-75th Percentile Range')
+                    ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[5], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 20 steps" if single_system else ""), markersize=10)
+                    plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[5], alpha=0.05) #, label='25th-75th Percentile Range')
 
         torch.cuda.empty_cache()
         gc.collect()
 
         if single_system:
-            ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution. NoPE")
+            # print(f"no title for single system")
+            ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution." + (" NoPE" if nope else ""))
         else:
             ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
         ax.grid(True)
-        ax.set_ylabel("Error of Instance After Punctuation / Emp Kal Error")
+
+        ax.set_ylabel("Error of Instance After Punctuation" + (" / Emp Kal Error" if not (valA == "ortho" or valA == "ident") else ""))
         ax.set_xlabel("Training Iteration")
         ax.minorticks_on()
         ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
@@ -240,7 +248,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         #save the figures
-        fig.savefig(filepath)
+        fig.savefig(filepath, format='pdf', bbox_inches='tight')
         if i ==0:
             lr_med = quantiles[1,:]
             lr_pred_ckpts = pred_ckpts

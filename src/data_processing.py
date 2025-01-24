@@ -68,12 +68,12 @@ def get_other_err(valA, C_dist, ckpt_step, exper, curve, nx, single_system=False
         raise ValueError(f"Preds do not exist for this checkpoint at:\n{path}")
     return curve_err
 
-def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False):
+def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False, nope=False):
     mop_err = None
     pred_ckpt = None
     #print the absolute path of the experiment
 
-    path = f"../outputs/GPT2_NoPE/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/" + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
+    path = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/" + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
     if os.path.exists(path):
         print(os.path.abspath(path))
         #load prediction errors

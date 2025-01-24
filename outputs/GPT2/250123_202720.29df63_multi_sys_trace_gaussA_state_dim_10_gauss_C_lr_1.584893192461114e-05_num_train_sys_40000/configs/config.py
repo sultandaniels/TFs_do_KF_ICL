@@ -17,25 +17,24 @@ class Config(object, metaclass=Singleton):
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
-    num_val_tasks = 1 #number of test systems
-    dataset_typ = "ortho" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+    num_val_tasks = 25 #number of test systems
+    dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
     max_cond_num = 100
     distinct_cond_nums = 10
-    val_dataset_typ = "ortho" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
-    C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
-    nx = 5
+    val_dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+    C_dist = "_gauss_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+    nx = 10
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 1}
+    num_traces = {"train": 1, "val": 2000}
     changing = False #used only for plotting
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
-    zero_cut = False #no cuts in the trace interleaving
-    needle_in_haystack = False #run needle in haystack tests
-    needle_final_seg_extended = False #extend the final segment of the needle in haystack test
+    needle_in_haystack = True #run needle in haystack tests
+    needle_final_seg_extended = True #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #number of systems in the haystack
     len_seg_haystack = 10 #length of a haystack segment
@@ -46,7 +45,7 @@ class Config(object, metaclass=Singleton):
     devices=[2,3] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 3000 #number of steps between logging (train interval)
+    train_int = 100 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
     batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
@@ -55,7 +54,7 @@ class Config(object, metaclass=Singleton):
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = False #use positional embeddings
+    use_pos_emb = True #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
     n_embd = 128
     n_layer = 12

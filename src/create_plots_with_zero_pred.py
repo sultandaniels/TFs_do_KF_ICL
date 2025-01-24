@@ -2119,7 +2119,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         print(f"\n\n config.val_dataset_typ: {config.val_dataset_typ} in create_plots")
 
         errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
         #load the system indices, starting indices, and token segment lengths from the pickle file
         with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if config.needle_in_haystack else "") + ".pkl", 'rb') as f:
@@ -2187,7 +2187,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
             os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else ""), exist_ok=True)
             fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/" + (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else "") + ("NoPE_" if not config.use_pos_emb else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
+                parent_parent_dir + f"/figures/multi_sys_trace/" + (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + ("NoPE_" if not config.use_pos_emb else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
                     "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
         return None
 
