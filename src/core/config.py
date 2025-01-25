@@ -17,7 +17,7 @@ class Config(object, metaclass=Singleton):
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
-    num_val_tasks = 1 #number of test systems
+    num_val_tasks = 25 #number of test systems
     dataset_typ = "ortho" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
     max_cond_num = 100
     distinct_cond_nums = 10
@@ -26,7 +26,7 @@ class Config(object, metaclass=Singleton):
     nx = 5
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 1}
+    num_traces = {"train": 1, "val": 2000}
     changing = False #used only for plotting
 
     #experiment settings
@@ -34,7 +34,7 @@ class Config(object, metaclass=Singleton):
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
     zero_cut = False #no cuts in the trace interleaving
-    needle_in_haystack = False #run needle in haystack tests
+    needle_in_haystack = True #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #number of systems in the haystack
@@ -55,7 +55,7 @@ class Config(object, metaclass=Singleton):
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = False #use positional embeddings
+    use_pos_emb = True #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
     n_embd = 128
     n_layer = 12

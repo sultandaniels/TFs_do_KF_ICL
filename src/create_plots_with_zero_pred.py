@@ -1872,32 +1872,35 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
 
             err_lss_all = {}
 
-            start = time.time()  # start the timer for kf predictions
-            errs_kf = compute_kf(config, ys, sim_objs)
-            end = time.time()  # end the timer for kf predictions
-            print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
-            err_lss_all["Kalman"] = errs_kf
+            if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+            
+                start = time.time()  # start the timer for kf predictions
+                errs_kf = compute_kf(config, ys, sim_objs)
+                end = time.time()  # end the timer for kf predictions
+                print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
+                err_lss_all["Kalman"] = errs_kf
 
-            start = time.time()  # start the timer for ols predictions
-            err_lss_all = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss_all)
-            end = time.time()
-            print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
+                start = time.time()  # start the timer for ols predictions
+                err_lss_all = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss_all)
+                end = time.time()
+                print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
 
-            # #for quick debugging
-            # names = ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
-            # for name in names:
-            #     err_lss_all[name] = np.zeros((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1))
+                # #for quick debugging
+                # names = ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
+                # for name in names:
+                #     err_lss_all[name] = np.zeros((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1))
 
-            analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs)
-            err_lss_all["Analytical_Kalman"] = analytical_kf
-            err_lss_all["Analytical_Simulation"] = an_sims
+                analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs)
+                err_lss_all["Analytical_Kalman"] = analytical_kf
+                err_lss_all["Analytical_Simulation"] = an_sims
 
             err_lss_examples = {}
             for ex in range(config.num_haystack_examples):
                 start = time.time()  # start the timer for needle predictions
                 err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc)
 
-                err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
+                if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+                    err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
                 os.makedirs(save_errs_dir, exist_ok=True)
                 with open(save_errs_loc, 'wb') as f:
