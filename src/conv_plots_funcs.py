@@ -47,7 +47,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     plot_time = time.ctime()
 
     #create a figure with subplots for each of the m indexes for the cdfs
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10), sharex=True)
+    fig, ax = plt.subplots(1, 1, figsize=(8, 8), sharex=True)
     filename = f'training_dist_comparison_val_{valA}_state_dim_{nx}_val_sys_{num_val_systems}_{time.time()}.pdf'
 
     parent_path = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/"
@@ -59,7 +59,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
     i = 0
     for experiment in experiments:
-        if not (os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz") or (single_system and os.path.exists(parent_path + experiment + "/train_conv/quantiles_5.npz"))) or compute_more_ckpts:
+        if not (os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz") or (single_system and not os.path.exists(parent_path + experiment + "/train_conv/quantiles_5.npz"))) or compute_more_ckpts:
             kal_err = None #initialize kalman error
             pred_ckpts = []
             quantiles = []
@@ -162,9 +162,13 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 if not (valA == "ortho" or valA == "ident"):
                     np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols.npz", pred_ckpts=pred_ckpts, quantiles_ols=ols_quantile, quantiles_ols_5=ols_quantile_5, quantiles_ols_20=ols_quantile_20)
         else:
+            print(f"quantiles already exist for {experiment}, and single_system={single_system}")
+
             data = np.load(parent_path + experiment + "/train_conv/quantiles.npz", allow_pickle=False)
+            print(f"keys in the file: {data.files}")
             pred_ckpts = data["pred_ckpts"]
             quantiles = data["quantiles"]
+            print(f"quantiles shape after load: {quantiles.shape}")
 
             if single_system:
                 data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=False)
@@ -235,14 +239,18 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
         ax.grid(True)
 
-        ax.set_ylabel("Error of Instance After Punctuation" + (" / Emp Kal Error" if not (valA == "ortho" or valA == "ident") else ""))
-        ax.set_xlabel("Training Iteration")
+        ax.set_ylabel("Error of Instance After Punctuation" + (" / Emp Kal Error" if not (valA == "ortho" or valA == "ident") else ""), fontsize=12)
+        ax.set_xlabel("Training Iteration", fontsize=12)
         ax.minorticks_on()
-        ax.grid(which='major', linestyle='-', linewidth='0.5', color='black')
+        ax.grid(which='major', linestyle='-', linewidth='1', color='black')
         ax.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
         ax.legend(loc="lower left" if single_system else "upper right")
         ax.set_yscale("log")
         ax.set_xscale("log")
+
+        # Set the font size of the tick labels
+        ax.tick_params(axis='both', which='major', labelsize=12)  
+        ax.tick_params(axis='both', which='minor', labelsize=12) 
 
         fig.text(0.5, 0.01, f'Generated at {plot_time}', ha='center')
 
