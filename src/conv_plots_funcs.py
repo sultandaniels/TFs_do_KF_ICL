@@ -234,7 +234,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
         if single_system:
             # print(f"no title for single system")
-            ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution." + (" NoPE" if nope else ""))
+            ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution." + (" NoPE" if nope else ""), fontsize=8)
         else:
             ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
         ax.grid(True)
@@ -252,7 +252,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         ax.tick_params(axis='both', which='major', labelsize=12)  
         ax.tick_params(axis='both', which='minor', labelsize=12) 
 
-        fig.text(0.5, 0.01, f'Generated at {plot_time}', ha='center')
+        # fig.text(0.5, 0.01, f'Generated at {plot_time}', ha='center')
 
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         #save the figures
