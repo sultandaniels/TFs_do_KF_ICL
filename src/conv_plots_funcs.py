@@ -47,7 +47,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     plot_time = time.ctime()
 
     #create a figure with subplots for each of the m indexes for the cdfs
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10), sharex=True)
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5), sharex=True)
     filename = f'training_dist_comparison_val_{valA}_state_dim_{nx}_val_sys_{num_val_systems}_{time.time()}.pdf'
 
     parent_path = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/"
