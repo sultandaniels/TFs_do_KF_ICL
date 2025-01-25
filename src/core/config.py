@@ -43,12 +43,12 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else 1) #number of test traces configurations to generate
 
     # Training settings
-    devices=[0,1,2,3,4,5,6,7] #which GPU
+    devices=[0] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 1000 #number of steps between logging (train interval)
+    train_int = 4000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 512 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
