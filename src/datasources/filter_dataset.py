@@ -89,7 +89,7 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
+def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -120,9 +120,12 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
         else:
             sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
 
-        #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
-        rng = np.random.default_rng()
-        sys_inds = rng.choice(num_tasks, sys_in_trace, replace=False).tolist()
+        if config.zero_cut:
+            sys_inds = [trace_conf] #set the system index to the trace_conf
+        else:
+            #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
+            rng = np.random.default_rng()
+            sys_inds = rng.choice(num_tasks, sys_in_trace, replace=False).tolist()
 
         #create a tuple that matches the system names to the system indices
         sys_dict = {}
@@ -171,6 +174,8 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False):
             else:
                 #pick a random system index
                 sys_ind = np.random.choice(sys_inds)
+                if config.zero_cut:
+                    print(f"sys_ind: {sys_ind}")
 
             sys_choices.append(sys_ind) #add the system index to the list of system choices
 

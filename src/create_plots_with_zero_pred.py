@@ -1145,7 +1145,7 @@ def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choic
             segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
 
         else:
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv)
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv, trace_conf=trace_conf)
     else:
         segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
   
@@ -1263,7 +1263,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False):
 
     #create a directory to save the prediction errors
     errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     if os.path.exists(errs_loc):
         with open(errs_loc, 'rb') as f:
@@ -1348,7 +1348,10 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False):
     seg_starts_per_config = []
     real_seg_lens_per_config = []
     sys_inds_per_config = []
+
+    print("\n\nstart populating test traces")
     for trace_config in range(num_test_traces_configs):
+        print(f"\nTrace config: {trace_config}\n")
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
         if (not config.needle_in_haystack) or (trace_config == 0):
             tok_seg_lens = None
@@ -2154,7 +2157,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
             ax.grid(which="both")
             if logscale:
                 ax.set_yscale('log')
-                # ax.set_xscale('log')
+                ax.set_xscale('log')
 
             ax.set_title(("NoPE " if not config.use_pos_emb else "") + ("Gaussian Systems " if config.val_dataset_typ == "gaussA" else ("Orthogonal Systems " if config.val_dataset_typ == "ortho" else ("Identity Systems " if config.val_dataset_typ == "ident" else "")))   + f"MSE vs Context. Trace Configuration: {trace_conf}")
             # ax.set_ylim([0,2])
