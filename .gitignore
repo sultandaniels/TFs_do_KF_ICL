@@ -15,7 +15,7 @@ wandb
 *.json
 *.xml
 *.yaml
-*.yml
 *.gz
 *.zip
 *.dat
+*.sh
