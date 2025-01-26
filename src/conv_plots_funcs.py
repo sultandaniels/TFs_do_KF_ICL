@@ -195,7 +195,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                     ols_quantile_5[ir] -= 1
                     ols_quantile_20[ir] -= 1
 
-        pred_ckpts = [(batch_size/512)*gpus*ckpt for ckpt in pred_ckpts] #trained on 2 GPUs
+        pred_ckpts = [batch_size*gpus*ckpt for ckpt in pred_ckpts] #trained on 2 GPUs
         # # for the ortho regular training run since the first ckpt was trained on 3 GPUs
         # count = 0
         # for pred_ckpt in pred_ckpts:
@@ -240,7 +240,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         ax.grid(True)
 
         ax.set_ylabel("Error of Instance After Punctuation" + (" / Emp Kal Error" if not (valA == "ortho" or valA == "ident") else ""), fontsize=12)
-        ax.set_xlabel("Training Iteration", fontsize=12)
+        ax.set_xlabel("# of Training Examples", fontsize=12)
         ax.minorticks_on()
         ax.grid(which='major', linestyle='-', linewidth='1', color='black')
         ax.grid(which='minor', linestyle=':', linewidth='0.5', color='gray')
