@@ -120,7 +120,7 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
         else:
             sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
 
-        if config.zero_cut:
+        if config.zero_cut and test:
             sys_inds = [trace_conf] #set the system index to the trace_conf
         else:
             #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
