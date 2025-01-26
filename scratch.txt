@@ -16,3 +16,5 @@ scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250114_202420.3c1184_multi_sys_t
 
 
 scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2 sultandaniels@hpc.brc.berkeley.edu:/global/scratch/users/sultandaniels/
+
+git config --global user.email "sultan_daniels@berkeley.edu"
