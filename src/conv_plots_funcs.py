@@ -38,7 +38,7 @@ def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg
                 
         return seg_starts_per_config
 
-def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3, nope=False):
+def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3, nope=False, batch_size=512, gpus=1):
     num_preds = 3+(3*2) #len(experiments) #number of predictors to plot
 
     colors = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE"]
@@ -59,7 +59,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
     i = 0
     for experiment in experiments:
-        if not (os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz") or (single_system and not os.path.exists(parent_path + experiment + "/train_conv/quantiles_5.npz"))) or compute_more_ckpts:
+        if (not (os.path.exists(parent_path + experiment + "/train_conv/quantiles.npz")) or (single_system and not os.path.exists(parent_path + experiment + "/train_conv/quantiles_5.npz"))) or compute_more_ckpts:
             kal_err = None #initialize kalman error
             pred_ckpts = []
             quantiles = []
@@ -195,7 +195,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                     ols_quantile_5[ir] -= 1
                     ols_quantile_20[ir] -= 1
 
-        pred_ckpts = [2*ckpt for ckpt in pred_ckpts] #trained on 2 GPUs
+        pred_ckpts = [(batch_size/512)*gpus*ckpt for ckpt in pred_ckpts] #trained on 2 GPUs
         # # for the ortho regular training run since the first ckpt was trained on 3 GPUs
         # count = 0
         # for pred_ckpt in pred_ckpts:

@@ -18,25 +18,22 @@ class Config(object, metaclass=Singleton):
     # Dataset settings
     num_tasks = 40000 #number of training systems
     num_val_tasks = 25 #number of test systems
-    dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+    dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
     max_cond_num = 100
     distinct_cond_nums = 10
-    val_dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
-    C_dist = "_gauss_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
-    nx = 10
-    val_dataset_typ = "gaussA" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
-    C_dist = "_gauss_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
-    nx = 10
+    val_dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+    C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+    nx = 5
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 1}
+    num_traces = {"train": 1, "val": 2000}
     changing = False #used only for plotting
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
-    single_system = False #only use a single system in the test trace
-    zero_cut = True #no cuts in the trace interleaving
+    single_system = True #only use a single system in the test trace
+    zero_cut = False #no cuts in the trace interleaving
     needle_in_haystack = False #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
@@ -58,11 +55,11 @@ class Config(object, metaclass=Singleton):
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = False #use positional embeddings
+    use_pos_emb = True #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
-    n_embd = 128
-    n_layer = 12
-    n_head = 8
+    n_embd = 96
+    n_layer = 6
+    n_head = 6
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 

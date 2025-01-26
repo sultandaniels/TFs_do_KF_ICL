@@ -657,7 +657,7 @@ if __name__ == '__main__':
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
         
     elif train_conv:
-        output_dir = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250125_110549.80eba5_multi_sys_trace_ident_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000"
 
         if make_preds:
             predict_all_checkpoints(config, output_dir, logscale)

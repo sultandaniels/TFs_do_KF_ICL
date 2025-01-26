@@ -1260,7 +1260,6 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False):
 
     ckpt_steps = get_step_number(config.ckpt_path)
     
-
     #create a directory to save the prediction errors
     errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
     errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
