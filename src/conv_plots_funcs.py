@@ -70,7 +70,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 quantiles_20 = []
             print("\n\ni", i)
             if not needle_in_haystack and not (valA == "ortho" or valA == "ident"): 
-                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman", nx=nx, single_system=single_system)
+                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman_rem", nx=nx, single_system=single_system)
 
 
                     if single_system:
