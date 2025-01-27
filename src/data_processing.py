@@ -47,8 +47,8 @@ def move_dict_to_device(d, device):
             d[key] = torch.Tensor(value).to(device)
     return d
 
-def get_other_err(valA, C_dist, ckpt_step, exper, curve, nx, single_system=False):
-    path = f"../outputs/GPT2/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/" + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
+def get_other_err(valA, C_dist, ckpt_step, exper, curve, nx, single_system=False, nope=False):
+    path = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/" + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
     curve_err = None
 
     if os.path.exists(path):

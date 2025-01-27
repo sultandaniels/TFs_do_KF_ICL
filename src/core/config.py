@@ -55,11 +55,11 @@ class Config(object, metaclass=Singleton):
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = True #use positional embeddings
+    use_pos_emb = False #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
-    n_embd = 96
-    n_layer = 6
-    n_head = 6
+    n_embd = 128
+    n_layer = 12
+    n_head = 8
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
