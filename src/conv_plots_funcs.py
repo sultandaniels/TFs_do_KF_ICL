@@ -238,17 +238,17 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             ax.plot(pred_ckpts, quantiles_20[:,1], marker=".", linewidth=3, color= colors[2], label=(trainAs[i] if not single_system else "") + " TF" + (" 20 steps" if single_system else ""), markersize=10)
             plt.fill_between(pred_ckpts, quantiles_20[:,0], quantiles_20[:,2], color=colors[2], alpha=0.2) #, label='25th-75th Percentile Range')
 
-            # if not (valA == "ortho" or valA == "ident"):
-            #     for ir in range(2, max_ir_len+1):
-            #         ols_markers = ["x", "o"]
-            #         ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[3], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 1 step" if single_system else ""), markersize=10)
-            #         plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3], alpha=0.05) #, label='25th-75th Percentile Range')
+            if not (valA == "ortho" or valA == "ident"):
+                for ir in range(2, max_ir_len+1):
+                    ols_markers = ["x", "o"]
+                    ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[3], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 1 step" if single_system else ""), markersize=10)
+                    plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3], alpha=0.05) #, label='25th-75th Percentile Range')
 
-            #         ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[4], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 5 steps" if single_system else ""), markersize=10)
-            #         plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[4], alpha=0.05) #, label='25th-75th Percentile Range')
+                    ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[4], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 5 steps" if single_system else ""), markersize=10)
+                    plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[4], alpha=0.05) #, label='25th-75th Percentile Range')
 
-            #         ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[5], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 20 steps" if single_system else ""), markersize=10)
-            #         plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[5], alpha=0.05) #, label='25th-75th Percentile Range')
+                    ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[5], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 20 steps" if single_system else ""), markersize=10)
+                    plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[5], alpha=0.05) #, label='25th-75th Percentile Range')
 
         torch.cuda.empty_cache()
         gc.collect()
