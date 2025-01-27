@@ -55,6 +55,8 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     filepath = os.path.abspath(f"../outputs/train_conv/{filename}")
     print(filepath)
 
+    print(f"quantiles 5 path exists?: {os.path.exists(parent_path + experiments[0] + "/train_conv/quantiles_5.npz")}")
+
     ckpt_steps = gen_ckpt_steps(min_ckpt, max_ckpt, interval)
 
     i = 0
@@ -180,6 +182,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             print(f"quantiles shape after load: {quantiles.shape}")
 
             if single_system:
+                print(f"loading quantiles_5 and quantiles_20")
                 data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=True)
                 quantiles_5 = data["quantiles"]
 
@@ -251,8 +254,8 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         gc.collect()
 
         if single_system:
-            # print(f"no title for single system")
-            ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution." + (" NoPE" if nope else ""), fontsize=8)
+            print(f"no title for single system")
+            # ax.set_title(f"Error" + (" Ratio" if not (valA == "ortho" or valA == "ident") else "") + " of Instance After Punctuation vs Training Iteration: " + ("Gaussian" if valA == "gaussA" else ("Orthogonal" if valA == "ortho" else ("Identity" if valA == "ident" else ""))) + " Test Distribution." + (" NoPE" if nope else ""), fontsize=8)
         else:
             ax.set_title(f"Error Ratio of Median Test System vs Training Iteration: Gaussian Test Distribution.")
         ax.grid(True)
