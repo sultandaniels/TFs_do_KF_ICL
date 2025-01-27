@@ -174,7 +174,7 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             else:
                 #pick a random system index
                 sys_ind = np.random.choice(sys_inds)
-                if config.zero_cut:
+                if config.zero_cut and test:
                     print(f"sys_ind: {sys_ind}")
 
             sys_choices.append(sys_ind) #add the system index to the list of system choices
