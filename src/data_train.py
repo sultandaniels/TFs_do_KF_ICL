@@ -61,7 +61,7 @@ def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_
     # config.override("C_dist", test_C_dist)
     return None
 
-def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist=False, train_mix_state_dim=False):
+def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
     # create prediction plots
     run_preds = make_preds # run the predictions evaluation
     run_deg_kf_test = False #run degenerate KF test
@@ -545,12 +545,15 @@ def predict_all_checkpoints(config, output_dir, logscale):
         config.override("needle_in_haystack", False)
         config.override("single_system", True)
         filecount = 0
+
+        run_kf_ols = True
         for filename in os.listdir(output_dir + "/checkpoints/"):
             filecount += 1
             print("filecount:", filecount)
             ckpt_path = output_dir + "/checkpoints/" + filename
             print("ckpt_path:", ckpt_path)
-            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True)
+            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols)
+            run_kf_ols = False
 
 
 # main function
@@ -648,7 +651,7 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not train_conv) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=141000.ckpt"
+        ckpt_path = "../outputs/GPT2/250125_103302.919337_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_3.169786384922228e-05_num_train_sys_40000/checkpoints/step=70000.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
@@ -657,7 +660,7 @@ if __name__ == '__main__':
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
         
     elif train_conv:
-        output_dir = "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250125_103302.919337_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_3.169786384922228e-05_num_train_sys_40000"
 
         if make_preds:
             predict_all_checkpoints(config, output_dir, logscale)

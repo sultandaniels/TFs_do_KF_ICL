@@ -1228,7 +1228,7 @@ def interleave_kf_OLS_needle(num_trace_configs, ys, errs_all, seg_lens_per_confi
 
     return err_lss
 
-def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False):
+def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=True):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     logger = logging.getLogger(__name__)  # get the logger
@@ -1429,7 +1429,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False):
     torch.cuda.empty_cache()
     gc.collect()
 
-    if tf: #only run transformer predictions
+    if tf and not (run_kf or run_OLS): #only run transformer predictions
         return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
     print("start zero predictor")
@@ -1756,7 +1756,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
 
 
 
-def save_preds(run_deg_kf_test, config, train_conv, tf):
+def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
     # make the prediction errors directory
     # get the parent directory of the ckpt_path
     parent_dir = os.path.dirname(config.ckpt_path)
@@ -1780,7 +1780,10 @@ def save_preds(run_deg_kf_test, config, train_conv, tf):
         print(f"config.single_system: {config.single_system}")
         print(f"config.needle_in_haystack: {config.needle_in_haystack}")
 
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=False, train_conv=train_conv)
+        run_OLS = run_kf_ols
+        run_kf = run_kf_ols
+
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=run_OLS, train_conv=train_conv, run_kf=run_kf)
 
         #save the system indices, starting indices, and token segment lengths to pickle file
         with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
@@ -2094,7 +2097,7 @@ def setup_deg_kf_axs_arrs(num_systems):
     return cos_sims, err_ratios, zero_ratios, deg_fig, axs
 
 
-def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf):
+def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf, run_kf_ols=True):
     C_dist = config.C_dist
     
     if excess:
@@ -2103,7 +2106,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
     if run_preds:
         print("config path:", config.ckpt_path)
-        save_preds(run_deg_kf_test, config, train_conv, tf)  # save the predictions to a file
+        save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=run_kf_ols)  # save the predictions to a file
 
         if train_conv:
             return None
