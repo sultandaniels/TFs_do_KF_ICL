@@ -160,8 +160,16 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_20.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_20)
 
                 if not (valA == "ortho" or valA == "ident"):
-                    print(f"ols_quantile shape: {ols_quantile[1].shape}")
-                    np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols.npz", pred_ckpts=pred_ckpts, quantiles_ols=ols_quantile, quantiles_ols_5=ols_quantile_5, quantiles_ols_20=ols_quantile_20)
+                    # Convert keys to strings
+                    ols_quantile_str_keys = {str(k): v for k, v in ols_quantile.items()}
+                    ols_quantile_5_str_keys = {str(k): v for k, v in ols_quantile_5.items()}
+                    ols_quantile_20_str_keys = {str(k): v for k, v in ols_quantile_20.items()}
+
+                    np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols.npz", **ols_quantile_str_keys)
+                    np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols_5.npz", **ols_quantile_5_str_keys)
+                    np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols_20.npz", **ols_quantile_20_str_keys)
+
+                    # np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols.npz", pred_ckpts=pred_ckpts, quantiles_ols=ols_quantile, quantiles_ols_5=ols_quantile_5, quantiles_ols_20=ols_quantile_20)
         else:
             print(f"quantiles already exist for {experiment}, and single_system={single_system}")
 
@@ -179,10 +187,19 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 quantiles_20 = data["quantiles"]
 
                 if not (valA == "ortho" or valA == "ident"):
-                    data = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=True)
-                    ols_quantile = data["quantiles_ols"]
-                    ols_quantile_5 = data["quantiles_ols_5"]
-                    ols_quantile_20 = data["quantiles_ols_20"]
+                    ols_quantile = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=True)
+                    ols_quantile_5 = np.load(parent_path + experiment + "/train_conv/quantiles_ols_5.npz", allow_pickle=True)
+                    ols_quantile_20 = np.load(parent_path + experiment + "/train_conv/quantiles_ols_20.npz", allow_pickle=True)
+
+                    #convert keys back to ints
+                    ols_quantile = {int(k): v for k, v in ols_quantile.items()}
+                    ols_quantile_5 = {int(k): v for k, v in ols_quantile_5.items()}
+                    ols_quantile_20 = {int(k): v for k, v in ols_quantile_20.items()}
+
+                    # data = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=True)
+                    # ols_quantile = data["quantiles_ols"]
+                    # ols_quantile_5 = data["quantiles_ols_5"]
+                    # ols_quantile_20 = data["quantiles_ols_20"]
 
 
         if not (valA == "ortho" or valA == "ident"):
