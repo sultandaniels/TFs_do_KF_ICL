@@ -1,5 +1,0 @@
-trained on 4 GPUs up to ckpt 237,000 (948,000 effective steps)
-need to train on 3 GPUs to ckpt 255,000 (1,002,000 effective)
-
-
-seems to figure out punctuation by 672,000 effective steps
