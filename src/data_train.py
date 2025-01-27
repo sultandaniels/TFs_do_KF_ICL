@@ -83,7 +83,7 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
         
         wandb_train(config_dict, model, output_dir, train_mix_dist, train_mix_state_dim)
 
-    create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf)
+    create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, run_kf_ols=run_kf_ols)
 
     return run_preds, run_deg_kf_test, excess, shade
 
