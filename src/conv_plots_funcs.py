@@ -164,21 +164,21 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         else:
             print(f"quantiles already exist for {experiment}, and single_system={single_system}")
 
-            data = np.load(parent_path + experiment + "/train_conv/quantiles.npz", allow_pickle=False)
+            data = np.load(parent_path + experiment + "/train_conv/quantiles.npz", allow_pickle=True)
             print(f"keys in the file: {data.files}")
             pred_ckpts = data["pred_ckpts"]
             quantiles = data["quantiles"]
             print(f"quantiles shape after load: {quantiles.shape}")
 
             if single_system:
-                data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=False)
+                data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=True)
                 quantiles_5 = data["quantiles"]
 
-                data = np.load(parent_path + experiment + "/train_conv/quantiles_20.npz", allow_pickle=False)
+                data = np.load(parent_path + experiment + "/train_conv/quantiles_20.npz", allow_pickle=True)
                 quantiles_20 = data["quantiles"]
 
                 if not (valA == "ortho" or valA == "ident"):
-                    data = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=False)
+                    data = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=True)
                     ols_quantile = data["quantiles_ols"]
                     ols_quantile_5 = data["quantiles_ols_5"]
                     ols_quantile_20 = data["quantiles_ols_20"]
