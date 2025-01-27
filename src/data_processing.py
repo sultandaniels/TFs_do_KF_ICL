@@ -99,7 +99,7 @@ def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False,
 
 def compute_ratio(ind, err, kalman_err, single_system=False):
     
-    if not (kalman_err is None):
+    if kalman_err is None:
         print(f"err shape: {err.shape}")
         ratios = err
     elif err.shape != kalman_err.shape:
