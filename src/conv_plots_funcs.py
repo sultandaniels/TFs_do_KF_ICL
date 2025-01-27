@@ -41,7 +41,7 @@ def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg
 def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3, nope=False, batch_size=512, gpus=1):
     num_preds = 3+(3*2) #len(experiments) #number of predictors to plot
 
-    colors = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE"]
+    colors = ["#4477AA", "#EE6677", "#228833", "#CCBB44", "#66CCEE", "#AA3377"]
 
 
     plot_time = time.ctime()
@@ -235,17 +235,17 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             ax.plot(pred_ckpts, quantiles_20[:,1], marker=".", linewidth=3, color= colors[2], label=(trainAs[i] if not single_system else "") + " TF" + (" 20 steps" if single_system else ""), markersize=10)
             plt.fill_between(pred_ckpts, quantiles_20[:,0], quantiles_20[:,2], color=colors[2], alpha=0.2) #, label='25th-75th Percentile Range')
 
-            if not (valA == "ortho" or valA == "ident"):
-                for ir in range(2, max_ir_len+1):
-                    ols_markers = ["x", "o"]
-                    ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[3], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 1 step" if single_system else ""), markersize=10)
-                    plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3], alpha=0.05) #, label='25th-75th Percentile Range')
+            # if not (valA == "ortho" or valA == "ident"):
+            #     for ir in range(2, max_ir_len+1):
+            #         ols_markers = ["x", "o"]
+            #         ax.plot(pred_ckpts, [ols_quantile[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[3], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 1 step" if single_system else ""), markersize=10)
+            #         plt.fill_between(pred_ckpts, [ols_quantile[ir][0]]*len(pred_ckpts), [ols_quantile[ir][2]]*len(pred_ckpts), color=colors[3], alpha=0.05) #, label='25th-75th Percentile Range')
 
-                    ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[4], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 5 steps" if single_system else ""), markersize=10)
-                    plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[4], alpha=0.05) #, label='25th-75th Percentile Range')
+            #         ax.plot(pred_ckpts, [ols_quantile_5[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[4], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 5 steps" if single_system else ""), markersize=10)
+            #         plt.fill_between(pred_ckpts, [ols_quantile_5[ir][0]]*len(pred_ckpts), [ols_quantile_5[ir][2]]*len(pred_ckpts), color=colors[4], alpha=0.05) #, label='25th-75th Percentile Range')
 
-                    ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[5], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 20 steps" if single_system else ""), markersize=10)
-                    plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[5], alpha=0.05) #, label='25th-75th Percentile Range')
+            #         ax.plot(pred_ckpts, [ols_quantile_20[ir][1]]*len(pred_ckpts), marker=ols_markers[ir - 2], linewidth=3, color= colors[5], label=(trainAs[i] if not single_system else "") + f" OLS ir={ir}" + (" 20 steps" if single_system else ""), markersize=10)
+            #         plt.fill_between(pred_ckpts, [ols_quantile_20[ir][0]]*len(pred_ckpts), [ols_quantile_20[ir][2]]*len(pred_ckpts), color=colors[5], alpha=0.05) #, label='25th-75th Percentile Range')
 
         torch.cuda.empty_cache()
         gc.collect()
