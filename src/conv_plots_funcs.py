@@ -160,6 +160,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_20.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_20)
 
                 if not (valA == "ortho" or valA == "ident"):
+                    print(f"ols_quantile shape: {ols_quantile[1].shape}")
                     np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_ols.npz", pred_ckpts=pred_ckpts, quantiles_ols=ols_quantile, quantiles_ols_5=ols_quantile_5, quantiles_ols_20=ols_quantile_20)
         else:
             print(f"quantiles already exist for {experiment}, and single_system={single_system}")
