@@ -231,7 +231,7 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             seg_count += 1
             continue
         else:
-
+            
             if next_start[sys_ind] + seg_len > sys_trace_obs.shape[0]: #if the next starting index plus the segment length is greater than the length of the trace
                 if next_start[sys_ind] >= sys_trace_obs.shape[0]: #if the next starting index is greater than the length of the trace, skip to the next trace
                     continue

@@ -1754,10 +1754,10 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
 
-def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, run_kf_ols=True):
+def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=True):
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     if (config.datasource == "val"):
 
@@ -1909,7 +1909,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
         err_lss, irreducible_error = compute_errors_conv(config)
     elif train_conv and config.multi_sys_trace:
 
-        if config.needle_in_haystack:
+        if not config.needle_in_haystack:
             print(f"in train conv and multi sys trace")
             print(f"config.single_system: {config.single_system}")
             print(f"config.needle_in_haystack: {config.needle_in_haystack}")
@@ -1930,7 +1930,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
             return None
         else:
 
-            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, run_kf_ols=run_kf_ols)
+            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=run_kf_ols)
 
 
 
@@ -2013,7 +2013,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
                 raise ValueError(f"datasource {config.datasource} not recognized")
             
 
-            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc)
+            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv)
 
             # err_lss_all = {}
 

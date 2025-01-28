@@ -546,7 +546,7 @@ def predict_all_checkpoints(config, output_dir, logscale):
             num_sys_haystack = 4
             config.override("num_test_traces_configs", num_sys_haystack)
             config.override("num_sys_haystack", num_sys_haystack)
-            config.override("len_seg_haystack", (config.n_positions/(num_sys_haystack + 1)) - 2)
+            config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
             config.override("num_haystack_examples", 100)
         else:
             config.override("num_test_traces_configs", 1)
