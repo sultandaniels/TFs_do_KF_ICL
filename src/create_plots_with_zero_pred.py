@@ -1868,7 +1868,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
         gc.collect()
     
         #save the system indices, starting indices, and token segment lengths to pickle file
-        with open(errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
+        with open(save_errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
             pickle.dump({
                 'sys_choices_per_config': sys_choices_per_config,
                 'sys_dict_per_config': sys_dict_per_config,
@@ -1884,7 +1884,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
         err_lss_examples[key] = np.array(err_lss_examples[key])
         # print(f"err_lss_examples[{key}] shape: {err_lss_examples[key].shape}")
 
-    with open(errs_loc + "err_lss_examples.pkl", 'wb') as f:
+    with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)
 
     return None
@@ -1931,6 +1931,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
         else:
 
             needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=run_kf_ols)
+            return None
 
 
 
@@ -2014,6 +2015,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
             
 
             needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv)
+            return None
 
             # err_lss_all = {}
 
