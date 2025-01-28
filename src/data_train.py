@@ -543,10 +543,10 @@ def initialize_err_list(ts):
 def predict_all_checkpoints(config, output_dir, logscale):
         
         if config.needle_in_haystack:
-            num_sys_haystack = 4
-            config.override("num_test_traces_configs", num_sys_haystack)
-            config.override("num_sys_haystack", num_sys_haystack)
-            config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
+            # num_sys_haystack = 4
+            config.override("num_test_traces_configs", 1)
+            # config.override("num_sys_haystack", num_sys_haystack)
+            # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
             config.override("num_haystack_examples", 100)
         else:
             config.override("num_test_traces_configs", 1)
@@ -667,7 +667,7 @@ if __name__ == '__main__':
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
         
     elif train_conv:
-        output_dir = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
         if make_preds:
             predict_all_checkpoints(config, output_dir, logscale)

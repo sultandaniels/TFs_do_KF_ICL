@@ -1757,7 +1757,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
 def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=True):
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     if (config.datasource == "val"):
 
