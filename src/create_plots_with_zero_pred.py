@@ -1754,7 +1754,140 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
 
+def needle_in_haystack_preds(config, ckpt_steps, errs_dir, errs_loc, run_kf_ols=True):
 
+    save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+
+    if (config.datasource == "val"):
+
+        print(f"getting test data from datasource {config.datasource}")
+
+        # get the sim objs for the validation data
+        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            sim_objs = pickle.load(f)
+
+        #set ys to be the validation data
+        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            samples = pickle.load(f)
+            # for every 2000 entries in samples, get the observation values and append them to the ys list
+            ys = np.stack(
+                [entry["obs"] for entry in samples], axis=0
+            ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+            gc.collect()  # Start the garbage collector
+
+
+    #     #now that I have err_lss_all, I just need to interleave everything instead of computing for each example and trace configuration
+
+    # elif config.datasource == "train":
+
+    #     print(f"getting test data from datasource {config.datasource}")
+
+    #     #get the sim_objs for the training data
+    #     with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+    #         sim_objs = pickle.load(f)
+
+    #     #set ys to be the training data
+    #     with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+    #         #get train traces
+    #         samples = pickle.load(f)
+    #         ys = np.stack(
+    #             [entry["obs"] for entry in samples], axis=0
+    #         ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+    #         gc.collect()  # Start the garbage collector
+
+    # elif config.datasource == "train_systems":
+
+    #     print(f"getting test data from datasource {config.datasource}")
+
+    #     #get the sim_objs for the training data
+    #     with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+    #         sim_objs = pickle.load(f)
+
+    #     #generate traces from the training systems
+    #     collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs) 
+
+    #     with open(parent_parent_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+    #         #get train traces
+    #         samples = pickle.load(f)
+    #         ys = np.stack(
+    #             [entry["obs"] for entry in samples], axis=0
+    #         ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+    #         gc.collect()  # Start the garbage collector
+
+    # else:
+    #     raise ValueError(f"datasource {config.datasource} not recognized")
+    
+
+    err_lss_all = {}
+
+    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho")) and run_kf_ols:
+    
+        start = time.time()  # start the timer for kf predictions
+        errs_kf = compute_kf(config, ys, sim_objs)
+        end = time.time()  # end the timer for kf predictions
+        print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
+        err_lss_all["Kalman"] = errs_kf
+
+        start = time.time()  # start the timer for ols predictions
+        err_lss_all = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss_all)
+        end = time.time()
+        print("time elapsed for OLS Pred:", (end - start) / 60, "min")  # print the time elapsed for OLS predictions
+
+        # #for quick debugging
+        # names = ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]
+        # for name in names:
+        #     err_lss_all[name] = np.zeros((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1))
+
+        analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs)
+        err_lss_all["Analytical_Kalman"] = analytical_kf
+        err_lss_all["Analytical_Simulation"] = an_sims
+
+    err_lss_examples = {}
+    for ex in range(config.num_haystack_examples):
+        start = time.time()  # start the timer for needle predictions
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc)
+
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
+            err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
+
+        os.makedirs(save_errs_dir, exist_ok=True)
+        with open(save_errs_loc, 'wb') as f:
+                pickle.dump(err_lss, f)
+
+        for key in err_lss.keys():
+            # print(f"err_lss[{key}] len: {len(err_lss[key])}")
+            if ex == 0:
+                err_lss_examples[key] = [] #initialize the list for the prediction errors
+            err_lss_examples[key].append(err_lss[key])
+
+
+        del err_lss
+        torch.cuda.empty_cache()
+        gc.collect()
+    
+        #save the system indices, starting indices, and token segment lengths to pickle file
+        with open(errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
+            pickle.dump({
+                'sys_choices_per_config': sys_choices_per_config,
+                'sys_dict_per_config': sys_dict_per_config,
+                'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                'seg_starts_per_config': seg_starts_per_config
+            }, f)
+        
+        end = time.time()  # end the timer for needle predictions
+        print(f"time elapsed for Needle Pred example {ex}:", (end - start) / 60, "min\n\n\n")  # print the time elapsed for needle predictions
+
+    for key in err_lss_examples.keys():
+        # print(f"err_lss_examples[{key}] len: {len(err_lss_examples[key])}")
+        err_lss_examples[key] = np.array(err_lss_examples[key])
+        # print(f"err_lss_examples[{key}] shape: {err_lss_examples[key].shape}")
+
+    with open(errs_loc + "err_lss_examples.pkl", 'wb') as f:
+        pickle.dump(err_lss_examples, f)
+
+    return None
 
 def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
     # make the prediction errors directory
@@ -1776,24 +1909,27 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
         err_lss, irreducible_error = compute_errors_conv(config)
     elif train_conv and config.multi_sys_trace:
 
-        print(f"in train conv and multi sys trace")
-        print(f"config.single_system: {config.single_system}")
-        print(f"config.needle_in_haystack: {config.needle_in_haystack}")
+        if config.needle_in_haystack:
+            print(f"in train conv and multi sys trace")
+            print(f"config.single_system: {config.single_system}")
+            print(f"config.needle_in_haystack: {config.needle_in_haystack}")
 
-        run_OLS = run_kf_ols
-        run_kf = run_kf_ols
+            run_OLS = run_kf_ols
+            run_kf = run_kf_ols
 
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=run_OLS, train_conv=train_conv, run_kf=run_kf)
+            err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=run_OLS, train_conv=train_conv, run_kf=run_kf)
 
-        #save the system indices, starting indices, and token segment lengths to pickle file
-        with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
-            pickle.dump({
-                'sys_choices_per_config': sys_choices_per_config,
-                'sys_dict_per_config': sys_dict_per_config,
-                'tok_seg_lens_per_config': tok_seg_lens_per_config,
-                'seg_starts_per_config': seg_starts_per_config
-            }, f)
-        return None
+            #save the system indices, starting indices, and token segment lengths to pickle file
+            with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+                pickle.dump({
+                    'sys_choices_per_config': sys_choices_per_config,
+                    'sys_dict_per_config': sys_dict_per_config,
+                    'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                    'seg_starts_per_config': seg_starts_per_config
+                }, f)
+            return None
+        else:
+
 
 
     elif not train_conv and config.multi_sys_trace:

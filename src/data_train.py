@@ -541,9 +541,16 @@ def initialize_err_list(ts):
 
 
 def predict_all_checkpoints(config, output_dir, logscale):
-        config.override("num_test_traces_configs", 1)
-        config.override("needle_in_haystack", False)
-        config.override("single_system", True)
+        
+        if config.needle_in_haystack:
+            num_sys_haystack = 4
+            config.override("num_test_traces_configs", num_sys_haystack)
+            config.override("num_sys_haystack", num_sys_haystack)
+            config.override("len_seg_haystack", (config.n_positions/(num_sys_haystack + 1)) - 2)
+            config.override("num_haystack_examples", 100)
+        else:
+            config.override("num_test_traces_configs", 1)
+            config.override("single_system", True)
         filecount = 0
 
         run_kf_ols = True
