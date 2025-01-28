@@ -1,5 +1,0 @@
-for this training run the special tokens were
-start: 100 * system index
-end: 100 * system index + 1.
-
-This choice of special token led to dynamic range issues for the transformer as expected.

@@ -1,1 +1,0 @@
-bug when generating the segment lengths because 0 was in their support.

@@ -1,2 +1,0 @@
-trained on 4 GPUs up to ckpt 75,000 (300,000 effective steps)
-need to train on 3 GPUs to ckpt 309,000 (1,002,000 effective)
