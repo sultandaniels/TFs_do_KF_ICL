@@ -13,8 +13,6 @@ import sys
 # sys.path.append(os.path.abspath('streamlined_mop/src'))
 # sys.path.append(os.path.abspath('..'))
 
-from check_ecdf import get_empirical_cdf
-
 # Check if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)

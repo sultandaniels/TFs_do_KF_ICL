@@ -1757,7 +1757,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
 def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=True):
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
     if (config.datasource == "val"):
 
@@ -1847,13 +1847,13 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
     err_lss_examples = {}
     for ex in range(config.num_haystack_examples):
         start = time.time()  # start the timer for needle predictions
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc)
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc + "err_lss.pkl")
 
         if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
             err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
         os.makedirs(save_errs_dir, exist_ok=True)
-        with open(save_errs_loc, 'wb') as f:
+        with open(save_errs_loc + "err_lss.pkl", 'wb') as f:
                 pickle.dump(err_lss, f)
 
         for key in err_lss.keys():
@@ -1901,7 +1901,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
     print("ckpt_steps:", ckpt_steps)
 
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
     os.makedirs(errs_dir, exist_ok=True)
 
@@ -2269,7 +2269,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         print(f"\n\n config.val_dataset_typ: {config.val_dataset_typ} in create_plots")
 
         errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
         #load the system indices, starting indices, and token segment lengths from the pickle file
         with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if config.needle_in_haystack else "") + ".pkl", 'rb') as f:
