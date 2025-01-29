@@ -21,11 +21,11 @@ from check_ecdf import get_empirical_cdf
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False, nope=False, needle=False, fin_seg_ext=False):
+def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False, nope=False, needle=False, fin_seg_ext=False, haystack_len=19, train_conv=False):
     # load the sys choices etc
     errs_dir = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
     # + ("train_conv_" if needle else "")
-    errs_loc = errs_dir + f"/" + ("single_system_" if not needle else "") + (f"needle_val_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts_example_0.pkl"
+    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if not needle else "") + (f"needle_haystack_len_{haystack_len}_val_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts_example_0.pkl"
 
     if not os.path.exists(errs_loc):
         print(f"errs_loc {errs_loc} does not exist")
