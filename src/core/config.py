@@ -33,12 +33,12 @@ class Config(object, metaclass=Singleton):
     multi_sys_trace = True #have multiple systems in a single trace
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
-    zero_cut = True #no cuts in the trace interleaving
-    needle_in_haystack = False #run needle in haystack tests
+    zero_cut = False #no cuts in the trace interleaving
+    needle_in_haystack = True #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
-    num_sys_haystack = 14 #19 #number of systems in the haystack
-    len_seg_haystack = 15 #length of a haystack segment
+    num_sys_haystack = 19 #4 #9 #14 #19 #number of systems in the haystack
+    len_seg_haystack = 10 #48 #23 #15 #10 #length of a haystack segment
     num_haystack_examples = 200 #number of haystack examples to generate
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
