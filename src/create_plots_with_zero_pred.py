@@ -1866,15 +1866,16 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
         del err_lss
         torch.cuda.empty_cache()
         gc.collect()
-    
-        #save the system indices, starting indices, and token segment lengths to pickle file
-        with open(save_errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
-            pickle.dump({
-                'sys_choices_per_config': sys_choices_per_config,
-                'sys_dict_per_config': sys_dict_per_config,
-                'tok_seg_lens_per_config': tok_seg_lens_per_config,
-                'seg_starts_per_config': seg_starts_per_config
-            }, f)
+        
+        if ex == 0:
+            #save the system indices, starting indices, and token segment lengths to pickle file
+            with open(save_errs_loc + f"sys_choices_sys_dict_tok_seg_lens_seg_starts_example_{ex}.pkl", 'wb') as f:
+                pickle.dump({
+                    'sys_choices_per_config': sys_choices_per_config,
+                    'sys_dict_per_config': sys_dict_per_config,
+                    'tok_seg_lens_per_config': tok_seg_lens_per_config,
+                    'seg_starts_per_config': seg_starts_per_config
+                }, f)
         
         end = time.time()  # end the timer for needle predictions
         print(f"time elapsed for Needle Pred example {ex}:", (end - start) / 60, "min\n\n\n")  # print the time elapsed for needle predictions
