@@ -48,7 +48,7 @@ def generate_seg_lens(n_positions, sys_in_trace):
     positions = np.append(positions, n_positions)
     positions.sort() # sort the positions in ascending order
 
-    # calculate the differenc between successive positions
+    # calculate the difference between successive positions
     diffs = np.diff(positions)
 
     # calculate the real segment lengths
