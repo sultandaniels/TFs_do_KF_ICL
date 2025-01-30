@@ -1262,7 +1262,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     
     #create a directory to save the prediction errors
     errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     if os.path.exists(errs_loc):
         with open(errs_loc, 'rb') as f:
