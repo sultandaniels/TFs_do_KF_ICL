@@ -25,7 +25,7 @@ def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg
     # load the sys choices etc
     errs_dir = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
     # + ("train_conv_" if needle else "")
-    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if not needle else "") + (f"needle_haystack_len_{haystack_len}_val_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts_example_0.pkl"
+    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if not needle else "") + (f"needle_haystack_len_{haystack_len}_val_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if needle else "") + ".pkl"
 
     if not os.path.exists(errs_loc):
         print(f"errs_loc {errs_loc} does not exist")
@@ -39,7 +39,7 @@ def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg
                 
         return seg_starts_per_config
 
-def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3, nope=False, batch_size=512, gpus=1):
+def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_systems, compute_more_ckpts=False, ind=250, min_ckpt=79, max_ckpt=79000, interval=79, nx=10, needle_in_haystack=False, single_system=False, max_ir_len=3, nope=False, batch_size=512, gpus=1, zero_cut=False):
     num_preds = 3+(3*2) #len(experiments) #number of predictors to plot
 
     colors = ["#4477AA", "#EE6677", "#228833", "#66CCEE", "#AA3377", "#FFCC33", "#33AA22", "#D55E00", "#CCBB44"]
@@ -71,7 +71,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 quantiles_20 = []
             print("\n\ni", i)
             if not needle_in_haystack and not (valA == "ortho" or valA == "ident"): 
-                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman_rem", nx=nx, single_system=single_system, nope=nope)
+                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman_rem", nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
 
 
                     if single_system:
@@ -83,7 +83,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                         ols_quantile_20 = {}
                         for ir in range(1, max_ir_len+1):
 
-                            ols_errs = get_other_err(valA, C_dist, kal_ckpt[i], experiment, f"OLS_ir_{ir}", nx=nx, single_system=single_system, nope=nope)
+                            ols_errs = get_other_err(valA, C_dist, kal_ckpt[i], experiment, f"OLS_ir_{ir}", nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
                             ols_err_rat = compute_ratio(ind=ind, err=ols_errs, kalman_err=kal_err, single_system=single_system)
 
                             if len(seg_starts) > 1:
@@ -101,11 +101,11 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
                     
             for ckpt_step in ckpt_steps:
-                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, single_system=single_system, nope=nope)
+                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
                 if pred_ckpt:
                 
                     if needle_in_haystack and not (valA == "ortho" or valA == "ident"):
-                        kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system, nope=nope)
+                        kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
 
                     quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err, single_system=single_system)
                     if single_system:
@@ -156,11 +156,11 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
             
             #save quantiles to file
             os.makedirs(parent_path + experiment + "/train_conv", exist_ok=True)
-            np.savez_compressed(parent_path + experiment + "/train_conv/quantiles.npz", pred_ckpts=pred_ckpts, quantiles=quantiles)
+            np.savez_compressed(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles.npz", pred_ckpts=pred_ckpts, quantiles=quantiles)
             if single_system:
-                np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_5.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_5)
+                np.savez_compressed(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_5.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_5)
 
-                np.savez_compressed(parent_path + experiment + "/train_conv/quantiles_20.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_20)
+                np.savez_compressed(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_20.npz", pred_ckpts=pred_ckpts, quantiles=quantiles_20)
 
                 if not (valA == "ortho" or valA == "ident"):
                     # Convert keys to strings
@@ -176,7 +176,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         else:
             print(f"quantiles already exist for {experiment}, and single_system={single_system}")
 
-            data = np.load(parent_path + experiment + "/train_conv/quantiles.npz", allow_pickle=True)
+            data = np.load(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles.npz", allow_pickle=True)
             print(f"keys in the file: {data.files}")
             pred_ckpts = data["pred_ckpts"]
             quantiles = data["quantiles"]
@@ -184,16 +184,16 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
             if single_system:
                 print(f"loading quantiles_5 and quantiles_20")
-                data = np.load(parent_path + experiment + "/train_conv/quantiles_5.npz", allow_pickle=True)
+                data = np.load(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_5.npz", allow_pickle=True)
                 quantiles_5 = data["quantiles"]
 
-                data = np.load(parent_path + experiment + "/train_conv/quantiles_20.npz", allow_pickle=True)
+                data = np.load(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_20.npz", allow_pickle=True)
                 quantiles_20 = data["quantiles"]
 
                 if not (valA == "ortho" or valA == "ident"):
-                    ols_quantile = np.load(parent_path + experiment + "/train_conv/quantiles_ols.npz", allow_pickle=True)
-                    ols_quantile_5 = np.load(parent_path + experiment + "/train_conv/quantiles_ols_5.npz", allow_pickle=True)
-                    ols_quantile_20 = np.load(parent_path + experiment + "/train_conv/quantiles_ols_20.npz", allow_pickle=True)
+                    ols_quantile = np.load(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_ols.npz", allow_pickle=True)
+                    ols_quantile_5 = np.load(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_ols_5.npz", allow_pickle=True)
+                    ols_quantile_20 = np.load(parent_path + experiment + "/train_conv/" + ("zero_cut_" if zero_cut else "") + "quantiles_ols_20.npz", allow_pickle=True)
 
                     #convert keys back to ints
                     ols_quantile = {int(k): v for k, v in ols_quantile.items()}
