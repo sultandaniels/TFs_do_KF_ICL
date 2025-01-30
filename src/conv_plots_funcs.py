@@ -71,7 +71,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                 quantiles_20 = []
             print("\n\ni", i)
             if not needle_in_haystack and not (valA == "ortho" or valA == "ident"): 
-                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman_rem", nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
+                    kal_err = get_other_err(valA, C_dist, kal_ckpt[i], experiment, "Kalman_rem", nx=nx, single_system=single_system, nope=nope)
 
 
                     if single_system:
@@ -83,7 +83,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
                         ols_quantile_20 = {}
                         for ir in range(1, max_ir_len+1):
 
-                            ols_errs = get_other_err(valA, C_dist, kal_ckpt[i], experiment, f"OLS_ir_{ir}", nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
+                            ols_errs = get_other_err(valA, C_dist, kal_ckpt[i], experiment, f"OLS_ir_{ir}", nx=nx, single_system=single_system, nope=nope)
                             ols_err_rat = compute_ratio(ind=ind, err=ols_errs, kalman_err=kal_err, single_system=single_system)
 
                             if len(seg_starts) > 1:
@@ -101,11 +101,12 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
 
                     
             for ckpt_step in ckpt_steps:
-                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
+
+                mop_err, pred_ckpt = get_mop_ratios_ckpt(valA, C_dist, ckpt_step, experiment, nx=nx, single_system=single_system, nope=nope)
                 if pred_ckpt:
-                
+
                     if needle_in_haystack and not (valA == "ortho" or valA == "ident"):
-                        kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system, nope=nope, zero_cut=zero_cut)
+                        kal_err = get_other_err(valA, C_dist, ckpt_step, experiment, "Kalman", nx=nx, single_system=single_system, nope=nope)
 
                     quantile = compute_ratio(ind=ind, err=mop_err, kalman_err=kal_err, single_system=single_system)
                     if single_system:
