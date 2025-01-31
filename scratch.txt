@@ -23,4 +23,4 @@ git config --global user.name "sultandaniels"
 
 
 
-colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651']
+colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
