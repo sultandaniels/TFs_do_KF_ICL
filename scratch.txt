@@ -20,3 +20,7 @@ scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2 sultandaniels@hpc.brc.berkeley.e
 git config --global user.email "sultan_daniels@berkeley.edu"
 
 git config --global user.name "sultandaniels"
+
+
+
+colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651']
