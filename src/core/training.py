@@ -9,6 +9,7 @@ import os
 import glob
 from pytorch_lightning import callbacks as pl_callbacks
 from pytorch_lightning import loggers as pl_loggers
+from log_scale_checkpoints import LogScaleCheckpoint
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -137,3 +138,12 @@ def get_callbacks_and_loggers(output_dir, train_int): #add emb_dim as a paramete
 
     callbacks = [checkpoint_callback, lr_monitor]
     return callbacks, loggers
+
+
+## experiment with log scale checkpoints
+    # log_scale_checkpoint = LogScaleCheckpoint(
+    #     dirpath='checkpoints/',
+    #     filename='{epoch}-{step}',
+    #     save_top_k=-1,  # Save all checkpoints
+    #     verbose=True
+    # )
