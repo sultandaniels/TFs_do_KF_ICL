@@ -714,7 +714,7 @@ if __name__ == '__main__':
                 else:
                     raise ValueError("get_last_checkpoint returned None")
 
-                haystack_plots()
+                haystack_plots(config, num_sys, output_dir, last_ckpt)
         else:
             if make_preds:
                 predict_all_checkpoints(config, output_dir, logscale)

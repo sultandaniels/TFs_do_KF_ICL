@@ -15,6 +15,16 @@ def get_last_checkpoint(directory):
     else:
         return None
 
+def split_path(path):
+    # Split the path into its components
+    parts = path.split('/')
+
+    # Join the first three parts with '/' and the rest separately
+    first_part = '/'.join(parts[:3]) + "/"
+    second_part = '/'.join(parts[3:])
+
+    return first_part, second_part
+
 
 if __name__ == "__main__":
     # Example usage

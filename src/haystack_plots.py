@@ -8,6 +8,7 @@ from datetime import datetime
 import os
 from data_processing import gen_ckpt_steps
 from conv_plots_funcs import get_seg_starts_per_config
+from get_last_checkpoint import split_path
 import torch
 import gc
 
@@ -32,8 +33,32 @@ def comp_quartiles(err_lss_examples, ratio=False, train_conv=False, kal_err=None
             
     return quartiles
 
+def save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles):
+    os.makedirs(os.path.dirname(quartiles_file), exist_ok=True)
+    np.savez(quartiles_file, **quartiles)
+
+    os.makedirs(os.path.dirname(seg_ext_quartiles_file), exist_ok=True)
+    np.savez(seg_ext_quartiles_file, **seg_ext_quartiles)
+    return None
+
+def load_quartiles(model_dir, experiment, valC, ckpt_step, valA, state_dim, datasource):
+    errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={ckpt_step}.ckpt"
+
+    quartiles_file = model_dir + experiment + "/needles/quartiles.npz"
+
+    seg_ext_quartiles_file = model_dir + experiment + "/needles/seg_ext_quartiles.npz"
+
+    if os.path.exists(quartiles_file):
+        print(f"Loading quartiles from {quartiles_file}")
+        quartiles = np.load(quartiles_file)
+
+    if os.path.exists(seg_ext_quartiles_file):
+        print(f"Loading seg ext quartiles from {seg_ext_quartiles_file}")
+        seg_ext_quartiles = np.load(seg_ext_quartiles_file)
 
 
+    return quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles
+ 
 def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, valC, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors):
 
     real_steps = [x + open_paren_ind for x in steps_in]
@@ -209,6 +234,17 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
 
 
 def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource):
+
+    if valA == "gaussA":
+        quartilez_npz = quartiles
+        seg_ext_quartiles_npz = seg_ext_quartiles
+        quartiles = {key: quartiles[key] for key in quartiles.keys()}
+        seg_ext_quartiles = {key: seg_ext_quartiles_npz[key] for key in seg_ext_quartiles_npz.keys()}
+        for key in quartiles.keys():
+            seg_ext_quartiles[key] -= 1
+            quartiles[key] -= 1
+
+
     #make a figure with haystack_len subplots
     fig, ax = plt.subplots(1, 1, sharex=True, figsize=(6, 3.5))
     # fig, ax = plt.subplots(haystack_len, 1, sharex=True, figsize=(5, 5*haystack_len))
@@ -412,7 +448,124 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
     np.save(x_values_file, x_values)
 
 
-    return fin_quartiles_ckpt, beg_quartiles_ckpt
-
-def plot_haystack_train_conv():
     return None
+
+def load_quartiles_ckpt_files(haystack_len, model_dir, experiment):
+    train_conv_fin_quartiles_file = model_dir + experiment + f"/needles/train_conv/train_conv_fin_quartiles_haystack_len_{haystack_len}.pkl"
+    train_conv_beg_quartiles_file = model_dir + experiment + f"/needles/train_conv/train_conv_beg_quartiles_haystack_len_{haystack_len}.pkl"
+    x_values_file = model_dir + experiment + f"/needles/train_conv/x_values_haystack_len_{haystack_len}.npy"
+    
+
+
+    if os.path.exists(train_conv_fin_quartiles_file):
+        print(f"Loading train conv quartiles from {train_conv_fin_quartiles_file}")
+        with open(train_conv_fin_quartiles_file, "rb") as f:
+            fin_quartiles_ckpt = pickle.load(f)
+
+    if os.path.exists(train_conv_beg_quartiles_file):
+        print(f"Loading train conv quartiles from {train_conv_beg_quartiles_file}")
+        with open(train_conv_beg_quartiles_file, "rb") as f:
+            beg_quartiles_ckpt = pickle.load(f)
+
+    if os.path.exists(x_values_file):
+        x_values = np.load(x_values_file)
+
+    return train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values
+
+def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, valA, haystack_len, experiment, steps):
+    fig, ax = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
+
+    # if valA == "ortho":
+    #     steps = [1,2,3,5,10]
+    # else:
+    #     steps = [1,2,3]
+
+    for key in fin_quartiles_ckpt.keys():
+        if key == "MOP":
+            col_count = 0
+            for step in steps:
+
+                key_lab = "TF" if key == "MOP" else key
+                qs = np.array(fin_quartiles_ckpt[key][step])
+                qs = np.transpose(qs)
+
+                if valA == "gaussA":
+                    qs -= 1
+
+                #if key contains OLS then repeat the values in qs to be the length of x_values
+                if "OLS" in key:
+                    print(f"key: {key} qs shape: {qs.shape}")
+                    qs = np.repeat(qs, len(x_values), axis=0)
+                    print(f"qs shape after repeat: {qs.shape}")
+                ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
+                if not valA == "gaussA":
+                    ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+
+                beg_qs = np.array(beg_quartiles_ckpt[key][step])
+                beg_qs = np.transpose(beg_qs)
+                #set the color to the same as the fin quartiles
+                color = ax.get_lines()[-1].get_color()
+                ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
+
+                if not valA == "gaussA":
+                    ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
+
+                col_count += 1
+
+
+    ax.set_xlabel("# of Training Examples", fontsize=14)
+    ax.set_ylabel(f"Error " + ("Ratio" if valA == "gaussA" else ""), fontsize=14)
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.grid(True, which="both")
+    ax.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left")
+    ax.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
+    ax.set_ylim([5e-2, 3e0])
+    # ax.set_title(("Ortho" if valA == "ortho" else ("Gaussian" if valA == "gaussA" else "Identity")) + f" Haystack Length: {haystack_len} vs Training Examples")
+    plt.tight_layout()
+
+    fig.savefig(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}.pdf", transparent=True, format="pdf")
+
+    plt.show()
+    return None
+
+def haystack_plots(config, haystack_len, output_dir, ckpt_step):
+
+    model_dir, experiment = split_path(output_dir)
+    
+    if haystack_len == 19:
+        if ckpt_step is not None:
+            quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(model_dir, experiment, valC=config.C_dist, ckpt_step=ckpt_step, valA=config.val_dataset_typ, state_dim=config.nx, datasource=config.datasource)
+
+            if quartiles is None or seg_ext_quartiles is None:
+                #get the err_lss_examples
+                errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
+                errs_loc = errs_dir + f"/needle_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+                seg_ext_errs_loc = errs_dir + f"/needle_{config.datasource}_fin_seg_ext_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+
+                with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
+                    err_lss_examples = pickle.load(f)
+
+                with open(seg_ext_errs_loc + "err_lss_examples.pkl", "rb") as f:
+                    seg_ext_err_lss_examples = pickle.load(f)
+
+                
+                if config.val_dataset_typ == "gaussA":
+                    rat = True
+                else:
+                    rat = False
+                quartiles = comp_quartiles(err_lss_examples, ratio=rat)
+                seg_ext_quartiles = comp_quartiles(seg_ext_err_lss_examples, ratio=rat)
+
+                save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
+
+            #plot needle position
+
+            #plot steps after open token
+
+                
+        else:
+            raise ValueError("last ckpt_step is none for haystack_len 19")
+        
+    
+    # plot train_conv haystack
