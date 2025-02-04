@@ -18,6 +18,7 @@ from check_ecdf import get_empirical_cdf
 import gc
 import torch
 import shutil
+from get_last_checkpoint import get_last_checkpoint
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
@@ -681,14 +682,37 @@ if __name__ == '__main__':
         num_sys_haystacks = [1, 2, 3, 4, 9, 14]
 
         if multi_haystack:
+
+            config.override("needle_in_haystack", True)
+            
             for num_sys in num_sys_haystacks:
+
                 config.override("needle_final_seg_extended", False)
                 config.override("num_sys_haystack", num_sys)
-                config.override("needle_in_haystack", True)
+
+                #run train_conv
                 predict_all_checkpoints(config, output_dir, logscale)
 
-                config.override("needle_final_seg_extended", True)
-                predict_all_checkpoints(config, output_dir, logscale)
+                if num_sys == 19:
+                    #get the last checkpoint
+                    last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                    if last_ckpt is not None:
+
+                        ckpt_path = output_dir + "/checkpoints/" + last_ckpt
+
+                        #run none train_conv
+                        config.override("num_test_traces_configs", num_sys)
+                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim)
+
+
+                        #run no punctuation final segment
+                        config.override("needle_final_seg_extended", True)
+
+                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim)
+
+                else:
+                    raise ValueError("get_last_checkpoint returned None")
 
                 haystack_plots()
         else:
@@ -696,6 +720,7 @@ if __name__ == '__main__':
                 predict_all_checkpoints(config, output_dir, logscale)
         
     else:
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print("\ndevice:", device)
         # instantiate gpt2 model
