@@ -581,6 +581,7 @@ if __name__ == '__main__':
     parser.add_argument('--tf', help='Boolean. Run predictions for just the transformer and plot the errors for a previously trained checkpoint', action='store_true')
     parser.add_argument('--resume_train', help='Boolean. Resume training from a specific checkpoint', action='store_true')
     parser.add_argument('--train_conv', help='Boolean. make predictions for all checkpoints', action='store_true')
+    parser.add_argument('--multi_haystack', help='Boolean. Run predictions for multiple haystack lengths', action='store_true')
     parser.add_argument('--kfnorm', help='Boolean. subtract kalman performance from error', action='store_true')
     parser.add_argument('--olsnorm', help='Boolean. subtract kalman performance from error', action='store_true')
     parser.add_argument('--t_conv_plot', help='Boolean. plot the convergence plots with t as the indep. var.', action='store_true')
@@ -672,10 +673,21 @@ if __name__ == '__main__':
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
         
     elif train_conv:
-        output_dir = "../outputs/GPT2/250129_220259.6f0c1f_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
-        if make_preds:
-            predict_all_checkpoints(config, output_dir, logscale)
+
+        output_dir = "../outputs/GPT2/250129_220259.6f0c1f_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        
+        num_sys_haystacks = [1, 2, 3, 4, 9, 14, 19]
+
+        if multi_haystack:
+            for num_sys in num_sys_haystacks:
+                config.override("num_sys_haystack", num_sys)
+                config.override("needle_in_haystack", True)
+
+                predict_all_checkpoints(config, output_dir, logscale)
+        else:
+            if make_preds:
+                predict_all_checkpoints(config, output_dir, logscale)
         
     else:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
