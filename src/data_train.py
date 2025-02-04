@@ -606,6 +606,8 @@ if __name__ == '__main__':
     resume_train = args.resume_train
     print("train conv arg", args.train_conv)
     train_conv = args.train_conv
+    print("multi_haystack arg", args.multi_haystack)
+    multi_haystack = args.multi_haystack
     print("kfnorm arg", args.kfnorm)
     kfnorm = args.kfnorm
     print("olsnorm arg", args.olsnorm)
@@ -672,19 +674,23 @@ if __name__ == '__main__':
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
         
-    elif train_conv:
-
+    elif train_conv or multi_haystack:
 
         output_dir = "../outputs/GPT2/250129_220259.6f0c1f_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
         
-        num_sys_haystacks = [1, 2, 3, 4, 9, 14, 19]
+        num_sys_haystacks = [1, 2, 3, 4, 9, 14]
 
         if multi_haystack:
             for num_sys in num_sys_haystacks:
+                config.override("needle_final_seg_extended", False)
                 config.override("num_sys_haystack", num_sys)
                 config.override("needle_in_haystack", True)
-
                 predict_all_checkpoints(config, output_dir, logscale)
+
+                config.override("needle_final_seg_extended", True)
+                predict_all_checkpoints(config, output_dir, logscale)
+
+                haystack_plots()
         else:
             if make_preds:
                 predict_all_checkpoints(config, output_dir, logscale)
