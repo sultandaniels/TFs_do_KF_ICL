@@ -18,6 +18,7 @@ from check_ecdf import get_empirical_cdf
 import gc
 import torch
 import shutil
+import time
 from get_last_checkpoint import get_last_checkpoint
 from haystack_plots import haystack_plots
 
@@ -554,7 +555,7 @@ def predict_all_checkpoints(config, output_dir, logscale):
         if config.num_sys_haystack == 1:
             num_haystack_examples = 25
         else:
-            num_haystack_examples = 100
+            num_haystack_examples = 1 #100
         config.override("num_haystack_examples", num_haystack_examples)
     else:
         if not config.zero_cut:
@@ -691,9 +692,11 @@ if __name__ == '__main__':
         
     elif train_conv or multi_haystack:
 
+        last_ckpt = None
+
         output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
         
-        num_sys_haystacks = list(range(1,19))
+        num_sys_haystacks = list(range(2,19))
         print("num_sys_haystacks:", num_sys_haystacks)
 
         if multi_haystack:
@@ -701,6 +704,8 @@ if __name__ == '__main__':
             config.override("needle_in_haystack", True)
             
             for num_sys in num_sys_haystacks:
+                print("\n\n\nstarting predictions for haystack len:", num_sys)
+                start = time.time()
 
                 config.override("needle_final_seg_extended", False)
                 config.override("num_sys_haystack", num_sys)
@@ -729,9 +734,13 @@ if __name__ == '__main__':
 
                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim)
 
-                else:
-                    raise ValueError("get_last_checkpoint returned None")
-
+                    else:
+                        raise ValueError("get_last_checkpoint returned None")
+                
+                end = time.time()
+                print(f"time elapsed for haystack len {num_sys} predictions (min): {(end - start)/60}")
+                
+                
                 haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step)
         else:
             if make_preds:

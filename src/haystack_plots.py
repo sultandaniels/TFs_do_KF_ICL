@@ -43,7 +43,8 @@ def save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_qu
     return None
 
 def load_quartiles(model_dir, experiment, valC, ckpt_step, valA, state_dim, datasource):
-    errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={ckpt_step}.ckpt"
+    quartiles = None
+    seg_ext_quartiles = None
 
     quartiles_file = model_dir + experiment + "/needles/quartiles.npz"
 
@@ -457,6 +458,9 @@ def load_quartiles_ckpt_files(haystack_len, model_dir, experiment):
     train_conv_fin_quartiles_file = model_dir + experiment + f"/needles/train_conv/train_conv_fin_quartiles_haystack_len_{haystack_len}.pkl"
     train_conv_beg_quartiles_file = model_dir + experiment + f"/needles/train_conv/train_conv_beg_quartiles_haystack_len_{haystack_len}.pkl"
     x_values_file = model_dir + experiment + f"/needles/train_conv/x_values_haystack_len_{haystack_len}.npy"
+
+    fin_quartiles_ckpt = None
+    beg_quartiles_ckpt = None
     
 
 

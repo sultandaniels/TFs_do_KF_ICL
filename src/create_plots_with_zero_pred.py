@@ -1665,7 +1665,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
         real_seg_lens_per_config.append(real_seg_lens)
         sys_inds_per_config.append(sys_inds)
 
-    print("\nstart tf pred")
+    # print("\nstart tf pred")
     start = time.time()  # start the timer for transformer predictions
     with torch.no_grad():  # no gradients
         I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
@@ -1689,7 +1689,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
                                 axis=-2)  # concatenate the predictions
         # print("preds_tf.shape:", preds_tf.shape)
     end = time.time()  # end the timer for transformer predictions
-    print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
+    # print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
 
     #take the last config.ny columns of axis=-1 as the true test observations
     multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
@@ -1722,7 +1722,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     torch.cuda.empty_cache()
     gc.collect()
 
-    print("start zero predictor")
+    # print("start zero predictor")
     # zero predictor predictions
     errs_zero = np.linalg.norm(multi_sys_ys_true, axis=-1) ** 2  # get the errors of zero predictions
     err_lss["Zero"] = errs_zero
@@ -1756,6 +1756,8 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
 
 def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=True):
 
+    print(f"config.num_haystack_examples: {config.num_haystack_examples}")
+
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
     save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
@@ -1772,7 +1774,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
             samples = pickle.load(f)
             # for every 2000 entries in samples, get the observation values and append them to the ys list
             ys = np.stack(
-                [entry["obs"] for entry in samples], axis=0
+                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
             ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
 
             gc.collect()  # Start the garbage collector
