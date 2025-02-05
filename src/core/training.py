@@ -9,7 +9,7 @@ import os
 import glob
 from pytorch_lightning import callbacks as pl_callbacks
 from pytorch_lightning import loggers as pl_loggers
-from log_scale_checkpoints import LogScaleCheckpoint
+# from log_scale_checkpoints import LogScaleCheckpoint
 
 # Setup logger
 logger = logging.getLogger(__name__)

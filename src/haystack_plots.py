@@ -9,6 +9,7 @@ import os
 from data_processing import gen_ckpt_steps
 from conv_plots_funcs import get_seg_starts_per_config
 from get_last_checkpoint import split_path
+from get_last_checkpoint import get_last_checkpoint
 import torch
 import gc
 
@@ -233,7 +234,7 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
     return None
 
 
-def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource):
+def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack):
 
     if valA == "gaussA":
         quartilez_npz = quartiles
@@ -252,12 +253,10 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     col_count = 0
     dither = 0.05
 
-    open_paren_ind = 229
-    fin_seg_len = 250-open_paren_ind -1
+    fin_seg_len = n_positions-open_paren_ind -1
     x_values = np.arange(1, fin_seg_len+1)
 
     print(f"haystack_len: {haystack_len}")
-    ax_count = 0
     needle = haystack_len - 1
     for key in quartiles.keys():
         if "OLS_analytical" not in key and "Simulation" not in key and key != "OLS_ir_2":
@@ -281,7 +280,7 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     open_paren_ind = 1
     key = "MOP"
 
-    fin_seg_len = 10
+    fin_seg_len = len_seg_haystack
 
     ax.errorbar(x_values[:10] + -dither, quartiles[key][1, needle][open_paren_ind+1: open_paren_ind + 1 + fin_seg_len], yerr=[quartiles[key][1, needle][open_paren_ind+1: open_paren_ind + 1 + fin_seg_len] - quartiles[key][0, needle][open_paren_ind+1: open_paren_ind + 1 + fin_seg_len], quartiles[key][2, needle][open_paren_ind+1: open_paren_ind + 1 + fin_seg_len] - quartiles[key][1, needle][open_paren_ind+1: open_paren_ind + 1 + fin_seg_len]], fmt='o', label="TF: Needle 0", capsize=2, zorder=haystack_len if key == "MOP" else 0, color=colors[col_count])
     col_count += 1
@@ -326,7 +325,7 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     return None
 
 
-def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt, haystack_len, datasource, state_dim, ckpt_steps, gpus, batch_size, nope, rat, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file):
+def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt, haystack_len, datasource, state_dim, ckpt_steps, gpus, batch_size, nope, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file):
 
     pred_ckpts = []
     last_pred_ckpt = 0
@@ -337,6 +336,7 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
     beg_quartiles_ckpt = {}
 
     if valA == "gaussA":
+        rat = True
         errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={kal_ckpt}.ckpt"
         # errs_loc = errs_dir + f"/single_system_" + f"{valA}_state_dim_{state_dim}_" 
         errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{datasource}_" + f"{valA}_state_dim_{state_dim}_"
@@ -345,6 +345,9 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
                 kal_ckpt_errs = pickle.load(f)
 
         kal_err = kal_ckpt_errs["Kalman_rem"]
+
+    else:
+        rat = False
 
     for ckpt_step in ckpt_steps:
 
@@ -428,10 +431,10 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
 
 
             pred_ckpts.append(ckpt_step)
+
+            os.remove(errs_loc + "err_lss_examples.pkl") #delete the err_lss_examples.pkl file
         else:
             print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} does not exist.")
-    
-    plt.show()
 
 
     os.makedirs(os.path.dirname(train_conv_fin_quartiles_file), exist_ok=True)
@@ -448,7 +451,7 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
     np.save(x_values_file, x_values)
 
 
-    return None
+    return fin_quartiles_ckpt, beg_quartiles_ckpt, x_values
 
 def load_quartiles_ckpt_files(haystack_len, model_dir, experiment):
     train_conv_fin_quartiles_file = model_dir + experiment + f"/needles/train_conv/train_conv_fin_quartiles_haystack_len_{haystack_len}.pkl"
@@ -529,7 +532,13 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
     plt.show()
     return None
 
-def haystack_plots(config, haystack_len, output_dir, ckpt_step):
+def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step):
+
+    colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
+
+    open_paren_ind = (config.len_seg_haystack + 2)*haystack_len + 1 #compute teh open paren index
+
+    steps_in = [1,2,3,5,10]
 
     model_dir, experiment = split_path(output_dir)
     
@@ -560,12 +569,43 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step):
                 save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
 
             #plot needle position
+            plot_needle_position(experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors)
 
             #plot steps after open token
+            plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack)
+
+            print(f"open_paren_ind: {open_paren_ind}")
 
                 
         else:
             raise ValueError("last ckpt_step is none for haystack_len 19")
         
     
-    # plot train_conv haystack
+    # load quartiles_ckpt_files
+    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(haystack_len, model_dir, experiment)
+
+    if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None:
+        last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
+        last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
+
+        print(f"config.train_int: {config.train_int}, last_ckpt: {last_ckpt}")
+
+        ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
+
+        #compute quartiles for train conv
+        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(steps_in, config.val_dataset_typ, model_dir, experiment, config.C_dist, kal_step, haystack_len, config.datasource, config.nx, ckpt_steps, len(config.devices), config.batch_size, config.use_pos_embd,train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file)
+
+
+    #plot haystack train conv
+    plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in)
+
+    #delete big files
+    #delete the err_lss_examples for this test run
+    if os.path.exists(errs_loc + "err_lss_examples.pkl"):
+        os.remove(errs_loc + "err_lss_examples.pkl")
+    #delete the seg_ext_err_lss_examples for this test run
+    if os.path.exists(seg_ext_errs_loc + "err_lss_examples.pkl"):
+        os.remove(seg_ext_errs_loc + "err_lss_examples.pkl")
+
+
+    return None

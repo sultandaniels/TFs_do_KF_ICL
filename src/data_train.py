@@ -19,6 +19,7 @@ import gc
 import torch
 import shutil
 from get_last_checkpoint import get_last_checkpoint
+from haystack_plots import haystack_plots
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
@@ -543,30 +544,43 @@ def initialize_err_list(ts):
 
 def predict_all_checkpoints(config, output_dir, logscale):
         
-        if config.needle_in_haystack:
-            # num_sys_haystack = 4
-            config.override("num_test_traces_configs", 1)
-            # config.override("num_sys_haystack", num_sys_haystack)
-            # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
-            if config.num_sys_haystack == 1:
-                num_haystack_examples = 25
-            else:
-                num_haystack_examples = 100
-            config.override("num_haystack_examples", num_haystack_examples)
+    kal_step = None
+    
+    if config.needle_in_haystack:
+        # num_sys_haystack = 4
+        config.override("num_test_traces_configs", 1)
+        # config.override("num_sys_haystack", num_sys_haystack)
+        # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
+        if config.num_sys_haystack == 1:
+            num_haystack_examples = 25
         else:
-            if not config.zero_cut:
-                config.override("num_test_traces_configs", 1)
-                config.override("single_system", True)
-        filecount = 0
+            num_haystack_examples = 100
+        config.override("num_haystack_examples", num_haystack_examples)
+    else:
+        if not config.zero_cut:
+            config.override("num_test_traces_configs", 1)
+            config.override("single_system", True)
+    filecount = 0
 
-        run_kf_ols = True
-        for filename in os.listdir(output_dir + "/checkpoints/"):
-            filecount += 1
-            print("filecount:", filecount)
-            ckpt_path = output_dir + "/checkpoints/" + filename
-            print("ckpt_path:", ckpt_path)
-            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols)
-            run_kf_ols = False
+    run_kf_ols = True
+    for filename in os.listdir(output_dir + "/checkpoints/"):
+        filecount += 1
+        print("filecount:", filecount)
+        ckpt_path = output_dir + "/checkpoints/" + filename
+        print("ckpt_path:", ckpt_path)
+        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols)
+
+        if run_kf_ols:
+            # filename looks like "step=40000.ckpt" get the step number
+            kal_step = filename.split("=")[1].split(".")[0]
+
+        run_kf_ols = False
+
+    print(f"kal_step: {kal_step}")
+
+    return kal_step
+
+
 
 
 # main function
@@ -677,9 +691,10 @@ if __name__ == '__main__':
         
     elif train_conv or multi_haystack:
 
-        output_dir = "../outputs/GPT2/250129_220259.6f0c1f_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
         
-        num_sys_haystacks = [1, 2, 3, 4, 9, 14]
+        num_sys_haystacks = list(range(1,19))
+        print("num_sys_haystacks:", num_sys_haystacks)
 
         if multi_haystack:
 
@@ -689,9 +704,10 @@ if __name__ == '__main__':
 
                 config.override("needle_final_seg_extended", False)
                 config.override("num_sys_haystack", num_sys)
+                config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys+1))
 
                 #run train_conv
-                predict_all_checkpoints(config, output_dir, logscale)
+                kal_step = predict_all_checkpoints(config, output_dir, logscale)
 
                 if num_sys == 19:
                     #get the last checkpoint
@@ -700,6 +716,8 @@ if __name__ == '__main__':
                     if last_ckpt is not None:
 
                         ckpt_path = output_dir + "/checkpoints/" + last_ckpt
+
+                        print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 
                         #run none train_conv
                         config.override("num_test_traces_configs", num_sys)
@@ -714,7 +732,7 @@ if __name__ == '__main__':
                 else:
                     raise ValueError("get_last_checkpoint returned None")
 
-                haystack_plots(config, num_sys, output_dir, last_ckpt)
+                haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step)
         else:
             if make_preds:
                 predict_all_checkpoints(config, output_dir, logscale)
