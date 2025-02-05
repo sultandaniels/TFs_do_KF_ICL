@@ -1880,7 +1880,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
                 }, f)
         
         end = time.time()  # end the timer for needle predictions
-        print(f"time elapsed for Needle Pred example {ex}:", (end - start) / 60, "min\n\n\n")  # print the time elapsed for needle predictions
+        # print(f"time elapsed for Needle Pred example {ex}:", (end - start) / 60, "min\n\n\n")  # print the time elapsed for needle predictions
 
     for key in err_lss_examples.keys():
         # print(f"err_lss_examples[{key}] len: {len(err_lss_examples[key])}")

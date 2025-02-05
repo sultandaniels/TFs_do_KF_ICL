@@ -215,7 +215,7 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
                     #set the grid to be on integer values for x-axis
                     ax[step_count].set_xticks(np.arange(-2, haystack_len, 1))
                     ax[step_count].set_yscale('log')
-                    ax[step_count].set_ylim([2e-1, 3])
+                    # ax[step_count].set_ylim([2e-1, 3])
                     ax[step_count].tick_params(axis='x', which='both', labelbottom=True, labelsize=12)
                     step_count += 1
                 key_count += 1
@@ -310,8 +310,8 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     ax.set_xlabel("Steps after the Open Token", fontsize=14)
     ax.set_yscale('log')
     # ax.set_title(f"Prediction Error for Needle Position {needle}", fontsize=30)
-    if valA == "gaussA":
-        ax.set_ylim([2e-1, 3])
+    # if valA == "gaussA":
+    #     ax.set_ylim([2e-1, 3])
 
     #add the date and time to the filename
     now = datetime.now()
@@ -328,6 +328,8 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
 
 def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt, haystack_len, datasource, state_dim, ckpt_steps, gpus, batch_size, nope, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file):
 
+    kal_err = None
+
     pred_ckpts = []
     last_pred_ckpt = 0
     x_values = []
@@ -339,7 +341,6 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
     if valA == "gaussA":
         rat = True
         errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={kal_ckpt}.ckpt"
-        # errs_loc = errs_dir + f"/single_system_" + f"{valA}_state_dim_{state_dim}_" 
         errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{datasource}_" + f"{valA}_state_dim_{state_dim}_"
 
         with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
@@ -353,8 +354,7 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
     for ckpt_step in ckpt_steps:
 
         errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={ckpt_step}.ckpt"
-        errs_loc = errs_dir + f"/single_system_" + f"{valA}_state_dim_{state_dim}_"
-        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{datasource}_" + f"{valA}_state_dim_{state_dim}_" 
+        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{datasource}_{valA}_state_dim_{state_dim}_" 
 
         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
             print(f"loading errors for ckpt_step: {ckpt_step}")
@@ -433,7 +433,13 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
 
             pred_ckpts.append(ckpt_step)
 
-            os.remove(errs_loc + "err_lss_examples.pkl") #delete the err_lss_examples.pkl file
+            if os.path.exists(errs_loc + "err_lss_examples.pkl"):
+                if os.access(errs_loc + "err_lss_examples.pkl", os.W_OK):
+                    os.remove(errs_loc + "err_lss_examples.pkl") #delete the err_lss_examples.pkl file
+                else:
+                    print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} is not writable.")
+            else:
+                print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} does not exist.")
         else:
             print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} does not exist.")
 
@@ -461,6 +467,7 @@ def load_quartiles_ckpt_files(haystack_len, model_dir, experiment):
 
     fin_quartiles_ckpt = None
     beg_quartiles_ckpt = None
+    x_values = None
     
 
 
@@ -487,6 +494,8 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
     # else:
     #     steps = [1,2,3]
 
+    print(f"\n\n in haystack train conv plot valA: {valA}")
+
     for key in fin_quartiles_ckpt.keys():
         if key == "MOP":
             col_count = 0
@@ -506,6 +515,7 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
                     print(f"qs shape after repeat: {qs.shape}")
                 ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
                 if not valA == "gaussA":
+                    print("plotting error bars for fin")
                     ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
                 beg_qs = np.array(beg_quartiles_ckpt[key][step])
@@ -515,6 +525,7 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
                 ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
 
                 if not valA == "gaussA":
+                    print("plotting error bars for beg")
                     ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
                 col_count += 1
@@ -527,11 +538,15 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
     ax.grid(True, which="both")
     ax.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left")
     ax.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
-    ax.set_ylim([5e-2, 3e0])
+    # ax.set_ylim([5e-2, 3e0])
     # ax.set_title(("Ortho" if valA == "ortho" else ("Gaussian" if valA == "gaussA" else "Identity")) + f" Haystack Length: {haystack_len} vs Training Examples")
     plt.tight_layout()
 
-    fig.savefig(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}.pdf", transparent=True, format="pdf")
+    #add the date and time to the filename
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+    fig.savefig(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True, format="pdf")
 
     plt.show()
     return None
@@ -591,25 +606,26 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step):
     if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None:
         last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
         last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
+        last_ckpt = int(last_ckpt)
 
         print(f"config.train_int: {config.train_int}, last_ckpt: {last_ckpt}")
 
         ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
 
         #compute quartiles for train conv
-        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(steps_in, config.val_dataset_typ, model_dir, experiment, config.C_dist, kal_step, haystack_len, config.datasource, config.nx, ckpt_steps, len(config.devices), config.batch_size, config.use_pos_embd,train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file)
+        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(steps_in, config.val_dataset_typ, model_dir, experiment, config.C_dist, kal_step, haystack_len, config.datasource, config.nx, ckpt_steps, len(config.devices), config.batch_size, not config.use_pos_emb,train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file)
 
 
     #plot haystack train conv
     plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in)
 
-    #delete big files
-    #delete the err_lss_examples for this test run
-    if os.path.exists(errs_loc + "err_lss_examples.pkl"):
-        os.remove(errs_loc + "err_lss_examples.pkl")
-    #delete the seg_ext_err_lss_examples for this test run
-    if os.path.exists(seg_ext_errs_loc + "err_lss_examples.pkl"):
-        os.remove(seg_ext_errs_loc + "err_lss_examples.pkl")
+    # #delete big files
+    # #delete the err_lss_examples for this test run
+    # if os.path.exists(errs_loc + "err_lss_examples.pkl"):
+    #     os.remove(errs_loc + "err_lss_examples.pkl")
+    # #delete the seg_ext_err_lss_examples for this test run
+    # if os.path.exists(seg_ext_errs_loc + "err_lss_examples.pkl"):
+    #     os.remove(seg_ext_errs_loc + "err_lss_examples.pkl")
 
 
     return None

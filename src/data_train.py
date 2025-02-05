@@ -555,7 +555,7 @@ def predict_all_checkpoints(config, output_dir, logscale):
         if config.num_sys_haystack == 1:
             num_haystack_examples = 25
         else:
-            num_haystack_examples = 1 #100
+            num_haystack_examples = 100
         config.override("num_haystack_examples", num_haystack_examples)
     else:
         if not config.zero_cut:
@@ -574,6 +574,7 @@ def predict_all_checkpoints(config, output_dir, logscale):
         if run_kf_ols:
             # filename looks like "step=40000.ckpt" get the step number
             kal_step = filename.split("=")[1].split(".")[0]
+            kal_step = int(kal_step)
 
         run_kf_ols = False
 
@@ -694,9 +695,9 @@ if __name__ == '__main__':
 
         last_ckpt = None
 
-        output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
         
-        num_sys_haystacks = list(range(2,19))
+        num_sys_haystacks = list(range(1,19))
         print("num_sys_haystacks:", num_sys_haystacks)
 
         if multi_haystack:
