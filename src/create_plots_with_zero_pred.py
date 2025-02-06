@@ -1203,10 +1203,7 @@ def interleave_kf_OLS_needle(num_trace_configs, ys, errs_all, seg_lens_per_confi
         err_lss[f"OLS_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
         err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
 
-    print("interleaving kf and OLS errors")
     for trace_conf in range(num_trace_configs):
-            
-            print(f"\n\nTrace config: {trace_conf}")
 
             sys_start = {sys: 0 for sys in sys_inds_per_config[trace_conf]} #initialize the starting index for each system trace
             seg_count = 0
@@ -1754,30 +1751,30 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
 
-def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=True):
+def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=True):
 
     print(f"config.num_haystack_examples: {config.num_haystack_examples}")
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
     save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
-    if (config.datasource == "val"):
+    # if (config.datasource == "val"):
 
-        print(f"getting test data from datasource {config.datasource}")
+    #     print(f"getting test data from datasource {config.datasource}")
 
-        # get the sim objs for the validation data
-        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-            sim_objs = pickle.load(f)
+    #     # get the sim objs for the validation data
+    #     with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+    #         sim_objs = pickle.load(f)
 
-        #set ys to be the validation data
-        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-            samples = pickle.load(f)
-            # for every 2000 entries in samples, get the observation values and append them to the ys list
-            ys = np.stack(
-                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-            ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+    #     #set ys to be the validation data
+    #     with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+    #         samples = pickle.load(f)
+    #         # for every 2000 entries in samples, get the observation values and append them to the ys list
+    #         ys = np.stack(
+    #             [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+    #         ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
 
-            gc.collect()  # Start the garbage collector
+    #         gc.collect()  # Start the garbage collector
 
 
     #     #now that I have err_lss_all, I just need to interleave everything instead of computing for each example and trace configuration
@@ -1852,11 +1849,9 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
         err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc + "err_lss.pkl")
 
         if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
-            err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
-        os.makedirs(save_errs_dir, exist_ok=True)
-        with open(save_errs_loc + "err_lss.pkl", 'wb') as f:
-                pickle.dump(err_lss, f)
+            print("interleaving kf and OLS errors")
+            err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
         for key in err_lss.keys():
             # print(f"err_lss[{key}] len: {len(err_lss[key])}")
@@ -1892,7 +1887,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, er
 
     return None
 
-def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
+def save_preds(run_deg_kf_test, config, train_conv, tf, ys, sim_objs, run_kf_ols=True):
     # make the prediction errors directory
     # get the parent directory of the ckpt_path
     parent_dir = os.path.dirname(config.ckpt_path)
@@ -1933,7 +1928,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
             return None
         else:
 
-            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv, run_kf_ols=run_kf_ols)
+            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=run_kf_ols)
             return None
 
 
@@ -2017,7 +2012,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=True):
                 raise ValueError(f"datasource {config.datasource} not recognized")
             
 
-            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, errs_loc, train_conv)
+            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs)
             return None
 
             # err_lss_all = {}
@@ -2251,7 +2246,7 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
 
     if run_preds:
         print("config path:", config.ckpt_path)
-        save_preds(run_deg_kf_test, config, train_conv, tf, run_kf_ols=run_kf_ols)  # save the predictions to a file
+        save_preds(run_deg_kf_test, config, train_conv, tf, ys, sim_objs, run_kf_ols=run_kf_ols)  # save the predictions to a file
 
         if train_conv:
             return None

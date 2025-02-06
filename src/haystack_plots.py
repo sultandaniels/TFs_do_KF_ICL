@@ -362,8 +362,11 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
             if len(pred_ckpts) > 0:
                 last_pred_ckpt = pred_ckpts[-1]
                 
-                if valA == "ortho":
+                if valA == "ortho": #THIS IS FOR VANILLA ORTHO ONLY
                     gpus = 2 #just for ortho case
+                
+                elif valA == "ident" and ckpt_step > 9600: #THIS IS FOR VANILLA IDENT ONLY
+                    gpus = 4
 
             else:
                 last_pred_ckpt = 0
@@ -551,7 +554,7 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
     plt.show()
     return None
 
-def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step):
+def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, compute_more=False):
 
     colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
 
@@ -565,7 +568,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step):
         if ckpt_step is not None:
             quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(model_dir, experiment, valC=config.C_dist, ckpt_step=ckpt_step, valA=config.val_dataset_typ, state_dim=config.nx, datasource=config.datasource)
 
-            if quartiles is None or seg_ext_quartiles is None:
+            if quartiles is None or seg_ext_quartiles is None or compute_more:
                 #get the err_lss_examples
                 errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
                 errs_loc = errs_dir + f"/needle_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
@@ -603,7 +606,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step):
     # load quartiles_ckpt_files
     train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(haystack_len, model_dir, experiment)
 
-    if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None:
+    if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None or compute_more:
         last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
         last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
         last_ckpt = int(last_ckpt)

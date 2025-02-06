@@ -19,8 +19,9 @@ import gc
 import torch
 import shutil
 import time
-from get_last_checkpoint import get_last_checkpoint
-from haystack_plots import haystack_plots
+from get_last_checkpoint import get_last_checkpoint, split_path
+from haystack_plots import haystack_plots, load_quartiles_ckpt_files
+from gen_pred_cktps import gen_pred_ckpts
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
@@ -64,7 +65,7 @@ def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_
     # config.override("C_dist", test_C_dist)
     return None
 
-def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
+def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, ys=None, sim_objs=None, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
     # create prediction plots
     run_preds = make_preds # run the predictions evaluation
     run_deg_kf_test = False #run degenerate KF test
@@ -86,7 +87,7 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
         
         wandb_train(config_dict, model, output_dir, train_mix_dist, train_mix_state_dim)
 
-    create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, run_kf_ols=run_kf_ols)
+    create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols)
 
     return run_preds, run_deg_kf_test, excess, shade
 
@@ -555,26 +556,73 @@ def predict_all_checkpoints(config, output_dir, logscale):
         if config.num_sys_haystack == 1:
             num_haystack_examples = 25
         else:
-            num_haystack_examples = 100
+            num_haystack_examples = 50
         config.override("num_haystack_examples", num_haystack_examples)
+
+
+        if (config.datasource == "val"):
+
+            print(f"getting test data from datasource {config.datasource}")
+
+            # get the sim objs for the validation data
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                sim_objs = pickle.load(f)
+
+            #set ys to be the validation data
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                samples = pickle.load(f)
+                # for every 2000 entries in samples, get the observation values and append them to the ys list
+                ys = np.stack(
+                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+                gc.collect()  # Start the garbage collector
     else:
         if not config.zero_cut:
             config.override("num_test_traces_configs", 1)
             config.override("single_system", True)
     filecount = 0
 
+    
+    #generate specific ckpt steps to predict on
+    #params for vanilla ident model:
+
+    minval = 100
+    maxval = 17600
+    train_int = 100
+    phases = [600, 800, 9600, maxval]
+    hande_code_scale = True
+
+    #params for vanilla gauss model:
+
+    # minval = 3000
+    # maxval = 180000
+    # train_int = 3000
+
+    # phases = [3000, 90000, 135000, maxval]
+    # hande_code_scale = False
+    
+    ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
+
     run_kf_ols = True
     for filename in os.listdir(output_dir + "/checkpoints/"):
+
+        filename_step = filename.split("=")[1].split(".")[0]
+        filename_step = int(filename_step)
+
+        if config.needle_in_haystack and filename_step not in ckpt_pred_steps:
+            continue
+
+
         filecount += 1
         print("filecount:", filecount)
         ckpt_path = output_dir + "/checkpoints/" + filename
         print("ckpt_path:", ckpt_path)
-        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols)
+        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols, ys=ys, sim_objs=sim_objs)
 
         if run_kf_ols:
             # filename looks like "step=40000.ckpt" get the step number
-            kal_step = filename.split("=")[1].split(".")[0]
-            kal_step = int(kal_step)
+            kal_step = filename_step
 
         run_kf_ols = False
 
@@ -682,8 +730,8 @@ if __name__ == '__main__':
     for key in config_attributes:
         config_dict[key] = config.__getattribute__(key)
 
-    if (not train_conv) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=180000.ckpt"
+    if (not (train_conv or multi_haystack)) and (make_preds or saved_preds or resume_train):
+        ckpt_path = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=9600.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
@@ -705,12 +753,26 @@ if __name__ == '__main__':
             config.override("needle_in_haystack", True)
             
             for num_sys in num_sys_haystacks:
+                
+                if not make_preds:
+
+                    model_dir, experiment = split_path(output_dir)
+
+                    # load quartiles_ckpt_files
+                    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(num_sys, model_dir, experiment)
+
+                    if fin_quartiles_ckpt is not None and beg_quartiles_ckpt is not None and x_values is not None:
+                        print(f"quartiles already exist for haystack length {num_sys}")
+                        continue
+
                 print("\n\n\nstarting predictions for haystack len:", num_sys)
                 start = time.time()
 
                 config.override("needle_final_seg_extended", False)
                 config.override("num_sys_haystack", num_sys)
                 config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys+1))
+
+                print(f"output dir: {output_dir}")
 
                 #run train_conv
                 kal_step = predict_all_checkpoints(config, output_dir, logscale)
@@ -742,7 +804,7 @@ if __name__ == '__main__':
                 print(f"time elapsed for haystack len {num_sys} predictions (min): {(end - start)/60}")
                 
                 
-                haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step)
+                haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
         else:
             if make_preds:
                 predict_all_checkpoints(config, output_dir, logscale)
@@ -808,4 +870,4 @@ if __name__ == '__main__':
         shade = True
 
         print("ckpt_path", config.ckpt_path)
-        create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf)
+        create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs)

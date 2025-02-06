@@ -26,7 +26,7 @@ class Config(object, metaclass=Singleton):
     nx = 5
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 2000}
+    num_traces = {"train": 1, "val": 1000}
     changing = False #used only for plotting
 
     #experiment settings
@@ -34,7 +34,7 @@ class Config(object, metaclass=Singleton):
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
     zero_cut = False #no cuts in the trace interleaving
-    needle_in_haystack = True #run needle in haystack tests
+    needle_in_haystack = False #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 1 #1 #2 #3 #4 #9 #14 #19 #number of systems in the haystack

@@ -31,13 +31,13 @@ def delete_files_spec_interval(directory):
         match = pattern.match(filename)
         if match:
             step = int(match.group(1))
-            if step <= 20000:
+            if step <= 5000:
                 if step % 100 == 0:
                     files_to_keep.add(filename)
                 else:
                     files_to_delete.add(filename)
             else:
-                if step % 1000 == 0:
+                if step % 400 == 0:
                     files_to_keep.add(filename)
                 else:
                     files_to_delete.add(filename)
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     directory = "/home/sultand/TFs_do_KF_ICL/outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints"  # Replace with the path to your directory
     suffix = f"50.ckpt"  # The suffix of the files you want to delete
 
-    delete_files(directory, suffix)
+    # delete_files(directory, suffix)
 
     delete_files_spec_interval(directory)
 
