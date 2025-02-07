@@ -61,7 +61,7 @@ def load_quartiles(model_dir, experiment, valC, ckpt_step, valA, state_dim, data
 
     return quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles
  
-def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, valC, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors):
+def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, valC, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, nope):
 
     real_steps = [x + open_paren_ind for x in steps_in]
     real_steps_ext = [x + open_paren_ind-2 for x in steps_in]
@@ -229,13 +229,13 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-    os.makedirs(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/error_ratios_{valA}_state_dim_{state_dim}{valC}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
+    os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/error_ratios_{valA}_state_dim_{state_dim}{valC}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
 
     return None
 
 
-def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack):
+def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope):
 
     if valA == "gaussA":
         quartilez_npz = quartiles
@@ -321,12 +321,16 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     # fig.text(0.5, 0.1, f"Median of {num_examples} haystack configuration examples. step=" + str(ckpt_step) + "_" + timestamp, ha='center', fontsize=30)
     plt.tight_layout()
 
-    os.makedirs(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/last_seg_context_{valA}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
+    os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/last_seg_context_{valA}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
     return None
 
 
-def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt, haystack_len, datasource, state_dim, ckpt_steps, gpus, batch_size, nope, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file):
+def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file):
+
+    nope = not config.use_pos_emb
+    batch_size = config.batch_size
+    gpus = len(config.devices)
 
     kal_err = None
 
@@ -338,10 +342,10 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
     fin_quartiles_ckpt = {}
     beg_quartiles_ckpt = {}
 
-    if valA == "gaussA":
+    if config.val_dataset_typ == "gaussA":
         rat = True
-        errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={kal_ckpt}.ckpt"
-        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{datasource}_" + f"{valA}_state_dim_{state_dim}_"
+        errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={kal_ckpt}.ckpt"
+        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
         with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
                 kal_ckpt_errs = pickle.load(f)
@@ -353,8 +357,8 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
 
     for ckpt_step in ckpt_steps:
 
-        errs_dir = model_dir + experiment + f"/prediction_errors{valC}_step={ckpt_step}.ckpt"
-        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{datasource}_{valA}_state_dim_{state_dim}_" 
+        errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
+        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" 
 
         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
             print(f"loading errors for ckpt_step: {ckpt_step}")
@@ -362,15 +366,16 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
             if len(pred_ckpts) > 0:
                 last_pred_ckpt = pred_ckpts[-1]
                 
-                if valA == "ortho": #THIS IS FOR VANILLA ORTHO ONLY
-                    gpus = 2 #just for ortho case
-                
-                elif valA == "ident" and ckpt_step > 9600: #THIS IS FOR VANILLA IDENT ONLY
-                    gpus = 4
+                if config.n_embd == 128 and not nope: #Vanilla models
+                    if config.val_dataset_typ == "ortho": #THIS IS FOR VANILLA ORTHO ONLY
+                        gpus = 2 #just for ortho case
+                    
+                    elif config.val_dataset_typ == "ident" and ckpt_step > 9600: #THIS IS FOR VANILLA IDENT ONLY
+                        gpus = 4
 
             else:
                 last_pred_ckpt = 0
-                if valA == "ortho":
+                if config.val_dataset_typ == "ortho" and config.n_embd == 128 and not nope: #THIS IS FOR VANILLA ORTHO ONLY
                     gpus = 3
 
             with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
@@ -382,7 +387,7 @@ def compute_quartiles_ckpt(steps_in, valA, model_dir, experiment, valC, kal_ckpt
 
             if len(pred_ckpts) == 0:
                 #get seg_starts
-                seg_starts_per_conf = get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt_step, print_seg_starts=True, nope=nope, needle=True, haystack_len=haystack_len, train_conv=True)
+                seg_starts_per_conf = get_seg_starts_per_config(experiment, config.val_dataset_typ, config.C_dist, config.nx, ckpt_step, print_seg_starts=True, nope=nope, needle=True, haystack_len=haystack_len, train_conv=True)
 
             quartiles = comp_quartiles(err_lss_examples, ratio=rat, train_conv=True, kal_err=kal_err)
 
@@ -489,7 +494,7 @@ def load_quartiles_ckpt_files(haystack_len, model_dir, experiment):
 
     return train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values
 
-def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, valA, haystack_len, experiment, steps):
+def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, valA, haystack_len, experiment, steps, nope):
     fig, ax = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
 
     # if valA == "ortho":
@@ -549,7 +554,8 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-    fig.savefig(f"../outputs/GPT2/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True, format="pdf")
+    os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace", exist_ok=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True, format="pdf")
 
     plt.show()
     return None
@@ -591,10 +597,10 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
                 save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
 
             #plot needle position
-            plot_needle_position(experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors)
+            plot_needle_position(experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
 
             #plot steps after open token
-            plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack)
+            plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
 
             print(f"open_paren_ind: {open_paren_ind}")
 
@@ -616,11 +622,11 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
         ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
 
         #compute quartiles for train conv
-        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(steps_in, config.val_dataset_typ, model_dir, experiment, config.C_dist, kal_step, haystack_len, config.datasource, config.nx, ckpt_steps, len(config.devices), config.batch_size, not config.use_pos_emb,train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file)
+        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file)
 
 
     #plot haystack train conv
-    plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in)
+    plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb)
 
     # #delete big files
     # #delete the err_lss_examples for this test run

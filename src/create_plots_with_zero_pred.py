@@ -1240,12 +1240,11 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
         raise ValueError(f"datasource {config.datasource} not recognized")
     
     num_test_traces_configs = config.num_test_traces_configs
-    
 
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                       n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device, strict=False).eval().to(
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
         device)  # load_from_checkpoint
 
     
@@ -1586,7 +1585,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
 
-def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
+def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
@@ -1600,13 +1599,6 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
         raise ValueError(f"datasource {config.datasource} not recognized")
     
     num_test_traces_configs = config.num_test_traces_configs
-    
-
-    model = GPT2.load_from_checkpoint(config.ckpt_path,
-                                      n_dims_in=config.n_dims_in, n_positions=config.n_positions,
-                                      n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
-        device)  # load_from_checkpoint
 
     
     # get the parent directory of the ckpt_path
@@ -1616,8 +1608,6 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     parent_parent_dir = os.path.dirname(parent_dir)
 
     ckpt_steps = get_step_number(config.ckpt_path)
-    
-
 
 
     # if os.path.exists(errs_loc):
@@ -1640,6 +1630,8 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     seg_starts_per_config = []
     real_seg_lens_per_config = []
     sys_inds_per_config = []
+
+    # start = time.time()  # start the timer for transformer predictions
     for trace_config in range(num_test_traces_configs):
         #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
         if (not config.needle_in_haystack) or (trace_config == 0):
@@ -1662,8 +1654,11 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
         real_seg_lens_per_config.append(real_seg_lens)
         sys_inds_per_config.append(sys_inds)
 
+    # end = time.time()  # end the timer for transformer predictions
+    # print("time elapsed for populating test traces:", (end - start), "sec")  # print the time elapsed for populating the test traces
+
     # print("\nstart tf pred")
-    start = time.time()  # start the timer for transformer predictions
+    # start = time.time()  # start the timer for transformer predictions
     with torch.no_grad():  # no gradients
         I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
 
@@ -1685,8 +1680,8 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
         preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
                                 axis=-2)  # concatenate the predictions
         # print("preds_tf.shape:", preds_tf.shape)
-    end = time.time()  # end the timer for transformer predictions
-    # print("time elapsed for MOP Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
+    # end = time.time()  # end the timer for transformer predictions
+    # print("time elapsed for MOP Pred:", (end - start), "sec")  # print the time elapsed for transformer predictions
 
     #take the last config.ny columns of axis=-1 as the true test observations
     multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
@@ -1751,7 +1746,7 @@ def compute_errors_needle(config, ys, sim_objs, errs_dir, errs_loc):
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
 
-def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=True):
+def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=True):
 
     print(f"config.num_haystack_examples: {config.num_haystack_examples}")
 
@@ -1845,8 +1840,10 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, tr
 
     err_lss_examples = {}
     for ex in range(config.num_haystack_examples):
-        start = time.time()  # start the timer for needle predictions
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc + "err_lss.pkl")
+        # start = time.time()  # start the timer for needle predictions
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, model, ys, sim_objs, save_errs_dir, save_errs_loc + "err_lss.pkl")
+        end = time.time()  # end the timer for needle predictions
+        # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 
         if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
 
@@ -1875,7 +1872,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, tr
                 }, f)
         
         end = time.time()  # end the timer for needle predictions
-        # print(f"time elapsed for Needle Pred example {ex}:", (end - start) / 60, "min\n\n\n")  # print the time elapsed for needle predictions
+        # print(f"time elapsed for Needle Pred example {ex}:", (end - start), "sec\n\n\n")  # print the time elapsed for needle predictions
 
     for key in err_lss_examples.keys():
         # print(f"err_lss_examples[{key}] len: {len(err_lss_examples[key])}")
@@ -1887,7 +1884,7 @@ def needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, tr
 
     return None
 
-def save_preds(run_deg_kf_test, config, train_conv, tf, ys, sim_objs, run_kf_ols=True):
+def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run_kf_ols=True):
     # make the prediction errors directory
     # get the parent directory of the ckpt_path
     parent_dir = os.path.dirname(config.ckpt_path)
@@ -1928,7 +1925,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, ys, sim_objs, run_kf_ols
             return None
         else:
 
-            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=run_kf_ols)
+            needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=run_kf_ols)
             return None
 
 
@@ -2012,7 +2009,7 @@ def save_preds(run_deg_kf_test, config, train_conv, tf, ys, sim_objs, run_kf_ols
                 raise ValueError(f"datasource {config.datasource} not recognized")
             
 
-            needle_in_haystack_preds(config, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs)
+            needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs)
             return None
 
             # err_lss_all = {}
@@ -2237,7 +2234,7 @@ def setup_deg_kf_axs_arrs(num_systems):
     return cos_sims, err_ratios, zero_ratios, deg_fig, axs
 
 
-def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf, run_kf_ols=True):
+def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf, ys, sim_objs, run_kf_ols=True):
     C_dist = config.C_dist
     
     if excess:
@@ -2245,8 +2242,8 @@ def create_plots(config, run_preds, run_deg_kf_test, excess, num_systems, shade,
         ax = fig.add_subplot(111)
 
     if run_preds:
-        print("config path:", config.ckpt_path)
-        save_preds(run_deg_kf_test, config, train_conv, tf, ys, sim_objs, run_kf_ols=run_kf_ols)  # save the predictions to a file
+        # print("config path:", config.ckpt_path)
+        save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run_kf_ols=run_kf_ols)  # save the predictions to a file
 
         if train_conv:
             return None

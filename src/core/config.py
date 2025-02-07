@@ -18,10 +18,10 @@ class Config(object, metaclass=Singleton):
     # Dataset settings
     num_tasks = 40000 #number of training systems
     num_val_tasks = 25 #number of test systems
-    dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+    dataset_typ = "ortho" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
     max_cond_num = 100
     distinct_cond_nums = 10
-    val_dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+    val_dataset_typ = "ortho" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
     C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
     nx = 5
     ny = 5
@@ -43,12 +43,12 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[0,1] #which GPU
+    devices=[0] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 100 #number of steps between logging (train interval)
+    train_int = 500 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 4096 #usually 512 (~35GB) tune this to fit into GPU memory
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
@@ -57,9 +57,9 @@ class Config(object, metaclass=Singleton):
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
-    n_embd = 128
-    n_layer = 12
-    n_head = 8
+    n_embd = 96
+    n_layer = 6
+    n_head = 6
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 

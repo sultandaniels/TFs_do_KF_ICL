@@ -66,6 +66,9 @@ def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_
     return None
 
 def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, ys=None, sim_objs=None, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+
     # create prediction plots
     run_preds = make_preds # run the predictions evaluation
     run_deg_kf_test = False #run degenerate KF test
@@ -76,18 +79,25 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
     print("testing config.nx:", config.nx)
     print("\n\n")
 
+    #get the parent directory of the ckpt_path
+    parent_dir = os.path.dirname(config.ckpt_path)
+    #get the parent directory of the parent directory
+    output_dir = os.path.dirname(parent_dir)
+    # instantiate gpt2 model
+
     if resume_train:
-        #get the parent directory of the ckpt_path
-        parent_dir = os.path.dirname(config.ckpt_path)
-        #get the parent directory of the parent directory
-        output_dir = os.path.dirname(parent_dir)
-        # instantiate gpt2 model
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                 n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
         
         wandb_train(config_dict, model, output_dir, train_mix_dist, train_mix_state_dim)
 
-    create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols)
+    model = GPT2.load_from_checkpoint(config.ckpt_path,
+                                    n_dims_in=config.n_dims_in, n_positions=config.n_positions,
+                                    n_dims_out=config.n_dims_out, n_embd=config.n_embd,
+                                    n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+    device)  # load_from_checkpoint
+
+    create_plots(config=config, model=model, run_preds=run_preds, run_deg_kf_test=run_deg_kf_test, excess=excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols)
 
     return run_preds, run_deg_kf_test, excess, shade
 
@@ -586,23 +596,152 @@ def predict_all_checkpoints(config, output_dir, logscale):
     
     #generate specific ckpt steps to predict on
     #params for vanilla ident model:
+    if config.val_dataset_typ == "ident" and config.use_pos_emb and config.n_embd == 128:
+        minval = 100
+        maxval = 17600
+        train_int = 100
+        phases = [600, 800, 9600, maxval]
+        hande_code_scale = True
 
-    minval = 100
-    maxval = 17600
-    train_int = 100
-    phases = [600, 800, 9600, maxval]
-    hande_code_scale = True
+        ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
+
+    #params for vanilla ortho model
+    elif config.val_dataset_typ == "ortho" and config.use_pos_emb and config.n_embd == 128:
+
+        ckpt_pred_steps = np.arange(3000, 105000, 3000)
 
     #params for vanilla gauss model:
+    elif config.val_dataset_typ == "gaussA" and config.use_pos_emb and config.n_embd == 128:
+        minval = 3000
+        maxval = 180000
+        train_int = 3000
 
-    # minval = 3000
-    # maxval = 180000
-    # train_int = 3000
+        phases = [3000, 90000, 135000, maxval]
+        hande_code_scale = False
 
-    # phases = [3000, 90000, 135000, maxval]
-    # hande_code_scale = False
+        ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
+
+    elif config.val_dataset_typ == "ident" and not config.use_pos_emb:
+        minval = 100
+        maxval = 15600
+        train_int = 100
+
+        phases = [100, 1100, 5600, 10600, maxval]
+        hande_code_scale = False
+
+        ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
     
-    ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
+    elif config.val_dataset_typ == "ortho" and not config.use_pos_emb:
+        minval = 3000
+        maxval = 201000
+        train_int = 3000
+
+        phases = [minval, 54000, 126000, maxval]
+        hande_code_scale = False
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=hande_code_scale)
+
+    #params for gaussian nope model:
+    elif config.val_dataset_typ == "gaussA" and not config.use_pos_emb:
+
+        minval = 4000
+        maxval = 216000
+        train_int = 4000
+
+        phases = [4000, 88000, 196000, maxval]
+        hande_code_scale = False
+
+        ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
+
+    #params for gaussian tiny model:
+    elif config.val_dataset_typ == "gaussA" and config.n_embd == 72:
+
+        minval = 1000
+        maxval = 180000
+        train_int = 1000
+
+        phases = [minval, 5000, 20000, 100000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ortho tiny model:
+    elif config.val_dataset_typ == "ortho" and config.n_embd == 72: 
+        minval = 1000
+        maxval = 53000
+        train_int = 1000
+
+        phases = [minval, 24000, 48000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ident tiny model:
+    elif config.val_dataset_typ == "ident" and config.n_embd == 72:
+        minval = 1000
+        maxval = 54000
+        train_int = 1000
+
+        phases = [minval, 25000, 49000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ident big model:
+    elif config.val_dataset_typ == "ident" and config.n_embd == 192:
+        minval = 100
+        maxval = 149000
+        train_int = 100
+
+        phases = [minval, 200, 500, 5000, 10000, 20000, 50000, 68000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ortho big model:
+    elif config.val_dataset_typ == "ortho" and config.n_embd == 192:
+
+        minval = 5000
+        maxval = 150000
+        train_int = 5000
+        ckpt_pred_steps = np.arange(minval, maxval, train_int)
+
+    #params for gauss big model:
+    elif config.val_dataset_typ == "gaussA" and config.n_embd == 192:
+        minval = 100
+        maxval = 147000
+        train_int = 500
+
+        phases = [2000, 5000, 50000, 82000, 98000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=True)
+
+    #params for gauss small model:
+    elif config.val_dataset_typ == "gaussA" and config.n_embd == 96:
+        minval = 500
+        maxval = 170000
+        train_int = 500
+
+        phases = [minval, 1000, 10000, 30000, 90000, 98500, 114000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ident small model:
+    elif config.val_dataset_typ == "ident" and config.n_embd == 96:
+        minval = 50
+        maxval = 40250
+        train_int = 50
+
+        phases = [minval, 550, 1000, 2000, 5000, 8400, 17700, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ortho small model:
+    elif config.val_dataset_typ == "ortho" and config.n_embd == 96:
+
+        minval = 500
+        maxval = 172500
+        train_int = 500
+
+        phases = [minval, 4000, 10000, 22500, 66000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     run_kf_ols = True
     for filename in os.listdir(output_dir + "/checkpoints/"):
@@ -615,9 +754,9 @@ def predict_all_checkpoints(config, output_dir, logscale):
 
 
         filecount += 1
-        print("filecount:", filecount)
+        print("\nfilecount:", filecount)
         ckpt_path = output_dir + "/checkpoints/" + filename
-        print("ckpt_path:", ckpt_path)
+        # print("ckpt_path:", ckpt_path)
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols, ys=ys, sim_objs=sim_objs)
 
         if run_kf_ols:
@@ -743,7 +882,7 @@ if __name__ == '__main__':
 
         last_ckpt = None
 
-        output_dir = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000"
         
         num_sys_haystacks = list(range(1,19))
         print("num_sys_haystacks:", num_sys_haystacks)
@@ -756,14 +895,40 @@ if __name__ == '__main__':
                 
                 if not make_preds:
 
+                    print("not making predictions")
+
                     model_dir, experiment = split_path(output_dir)
 
                     # load quartiles_ckpt_files
                     train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(num_sys, model_dir, experiment)
 
-                    if fin_quartiles_ckpt is not None and beg_quartiles_ckpt is not None and x_values is not None:
+                    if fin_quartiles_ckpt is not None and beg_quartiles_ckpt is not None and x_values is not None and not saved_preds:
                         print(f"quartiles already exist for haystack length {num_sys}")
                         continue
+                    else:
+                        print(f"\n\nchecking for err_lss_examples")
+                        ckpt_step = config.train_int #minimum checkpoint
+                        errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
+                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
+
+
+                        if os.path.exists(errs_loc + "err_lss_examples.pkl"):
+                            print(f"err_lss_examples.pkl exists for haystack length {num_sys}")
+
+                            file_count = 0
+                            for filename in os.listdir(output_dir + "/checkpoints/"):
+                                file_count += 1
+                                kal_step = filename.split("=")[1].split(".")[0]
+                                kal_step = int(kal_step)
+                                if file_count > 0:
+                                    break
+
+                            print("making plots for haystack len:", num_sys)
+                            haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
+
+                            continue
+
+
 
                 print("\n\n\nstarting predictions for haystack len:", num_sys)
                 start = time.time()
@@ -869,5 +1034,20 @@ if __name__ == '__main__':
         excess = False #run the excess plots
         shade = True
 
+
+        # get the sim objs for the validation data
+        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            sim_objs = pickle.load(f)
+
+        #set ys to be the validation data
+        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            samples = pickle.load(f)
+            # for every 2000 entries in samples, get the observation values and append them to the ys list
+            ys = np.stack(
+                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+            gc.collect()  # Start the garbage collector
+
         print("ckpt_path", config.ckpt_path)
-        create_plots(config, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs)
+        create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs)
