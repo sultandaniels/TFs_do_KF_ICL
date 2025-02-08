@@ -864,7 +864,7 @@ if __name__ == '__main__':
 
         last_ckpt = None
 
-        output_dir = "../outputs/GPT2_NoPE/250125_092007.f34194_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000"
 
         if (config.datasource == "val"):
 

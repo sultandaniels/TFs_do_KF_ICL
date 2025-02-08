@@ -46,19 +46,19 @@ class Config(object, metaclass=Singleton):
     devices=[0] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 4000 #number of steps between logging (train interval)
+    train_int = 50 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
-    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
+    batch_size = 512 #2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+    train_data_workers = 64 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = False #use positional embeddings
+    use_pos_emb = True #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
-    n_embd = 128
-    n_layer = 12
+    n_embd = 192
+    n_layer = 24
     n_head = 8
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
