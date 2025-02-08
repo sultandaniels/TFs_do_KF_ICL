@@ -66,7 +66,13 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
     real_steps = [x + open_paren_ind for x in steps_in]
     real_steps_ext = [x + open_paren_ind-2 for x in steps_in]
 
-    fig, ax = plt.subplots(len(steps_in), 1, sharex=True, figsize=(5, 2.7*len(steps_in))) #
+    
+    if valA == "gaussA":
+        num_axes = len(steps_in)
+    else:
+        num_axes = 1
+        
+    fig, ax = plt.subplots(num_axes, 1, sharex=True, figsize=(5, 2.7*len(steps_in))) #
 
     print(f"real_steps: {real_steps}, real_steps_ext: {real_steps_ext}")
 
@@ -114,6 +120,11 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
                             color = colors[2]
                         elif step == 10:
                             color = colors[3]
+                        elif step == 3:
+                            color = colors[4]
+                        elif step == 5:
+                            color = colors[5]
+                            
                         ax.errorbar(
                         haystack_len - needle - 1,
                         y,
@@ -577,8 +588,8 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
             if quartiles is None or seg_ext_quartiles is None or compute_more:
                 #get the err_lss_examples
                 errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
-                errs_loc = errs_dir + f"/needle_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
-                seg_ext_errs_loc = errs_dir + f"/needle_{config.datasource}_fin_seg_ext_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+                errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+                seg_ext_errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_fin_seg_ext_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
                 with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
                     err_lss_examples = pickle.load(f)

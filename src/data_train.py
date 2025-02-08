@@ -554,7 +554,7 @@ def initialize_err_list(ts):
     return err_dict_list
 
 
-def predict_all_checkpoints(config, output_dir, logscale):
+def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
         
     kal_step = None
     
@@ -569,24 +569,6 @@ def predict_all_checkpoints(config, output_dir, logscale):
             num_haystack_examples = 50
         config.override("num_haystack_examples", num_haystack_examples)
 
-
-        if (config.datasource == "val"):
-
-            print(f"getting test data from datasource {config.datasource}")
-
-            # get the sim objs for the validation data
-            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                sim_objs = pickle.load(f)
-
-            #set ys to be the validation data
-            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                samples = pickle.load(f)
-                # for every 2000 entries in samples, get the observation values and append them to the ys list
-                ys = np.stack(
-                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-
-                gc.collect()  # Start the garbage collector
     else:
         if not config.zero_cut:
             config.override("num_test_traces_configs", 1)
@@ -882,12 +864,30 @@ if __name__ == '__main__':
 
         last_ckpt = None
 
-        output_dir = "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000"
-        
-        num_sys_haystacks = list(range(1,19))
-        print("num_sys_haystacks:", num_sys_haystacks)
+        output_dir = "../outputs/GPT2_NoPE/250125_092007.f34194_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        if (config.datasource == "val"):
+
+            print(f"getting test data from datasource {config.datasource}")
+
+            # get the sim objs for the validation data
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                sim_objs = pickle.load(f)
+
+            #set ys to be the validation data
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                samples = pickle.load(f)
+                # for every 2000 entries in samples, get the observation values and append them to the ys list
+                ys = np.stack(
+                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+                gc.collect()  # Start the garbage collector
 
         if multi_haystack:
+        
+            num_sys_haystacks = [19] #list(range(1,20))
+            print("num_sys_haystacks:", num_sys_haystacks)
 
             config.override("needle_in_haystack", True)
             
@@ -940,7 +940,7 @@ if __name__ == '__main__':
                 print(f"output dir: {output_dir}")
 
                 #run train_conv
-                kal_step = predict_all_checkpoints(config, output_dir, logscale)
+                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
 
                 if num_sys == 19:
                     #get the last checkpoint
@@ -954,13 +954,13 @@ if __name__ == '__main__':
 
                         #run none train_conv
                         config.override("num_test_traces_configs", num_sys)
-                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim)
+                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
 
 
                         #run no punctuation final segment
                         config.override("needle_final_seg_extended", True)
 
-                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim)
+                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
 
                     else:
                         raise ValueError("get_last_checkpoint returned None")
@@ -968,11 +968,12 @@ if __name__ == '__main__':
                 end = time.time()
                 print(f"time elapsed for haystack len {num_sys} predictions (min): {(end - start)/60}")
                 
+                last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
                 
-                haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
+                haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
         else:
             if make_preds:
-                predict_all_checkpoints(config, output_dir, logscale)
+                predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
         
     else:
 

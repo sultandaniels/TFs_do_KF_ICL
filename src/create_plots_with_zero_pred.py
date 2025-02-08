@@ -1258,7 +1258,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     
     #create a directory to save the prediction errors
     errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     if os.path.exists(errs_loc):
         with open(errs_loc, 'rb') as f:
@@ -1896,7 +1896,7 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run
     print("ckpt_steps:", ckpt_steps)
 
     errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+    errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
     os.makedirs(errs_dir, exist_ok=True)
 
@@ -1945,68 +1945,68 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run
             return None
         else:
 
-            save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-            save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+            # save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
+            # save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
-            if (config.datasource == "val"):
+            # if (config.datasource == "val"):
 
-                print(f"getting test data from datasource {config.datasource}")
+            #     print(f"getting test data from datasource {config.datasource}")
 
-                # get the sim objs for the validation data
-                with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                    sim_objs = pickle.load(f)
+            #     # get the sim objs for the validation data
+            #     with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            #         sim_objs = pickle.load(f)
 
-                #set ys to be the validation data
-                with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                    samples = pickle.load(f)
-                    # for every 2000 entries in samples, get the observation values and append them to the ys list
-                    ys = np.stack(
-                        [entry["obs"] for entry in samples], axis=0
-                    ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            #     #set ys to be the validation data
+            #     with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            #         samples = pickle.load(f)
+            #         # for every 2000 entries in samples, get the observation values and append them to the ys list
+            #         ys = np.stack(
+            #             [entry["obs"] for entry in samples], axis=0
+            #         ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
 
-                    gc.collect()  # Start the garbage collector
+            #         gc.collect()  # Start the garbage collector
 
 
-                #now that I have err_lss_all, I just need to interleave everything instead of computing for each example and trace configuration
+            #     #now that I have err_lss_all, I just need to interleave everything instead of computing for each example and trace configuration
 
-            elif config.datasource == "train":
+            # elif config.datasource == "train":
 
-                print(f"getting test data from datasource {config.datasource}")
+            #     print(f"getting test data from datasource {config.datasource}")
 
-                #get the sim_objs for the training data
-                with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                    sim_objs = pickle.load(f)
+            #     #get the sim_objs for the training data
+            #     with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            #         sim_objs = pickle.load(f)
 
-                #set ys to be the training data
-                with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                    #get train traces
-                    samples = pickle.load(f)
-                    ys = np.stack(
-                        [entry["obs"] for entry in samples], axis=0
-                    ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
-                    gc.collect()  # Start the garbage collector
+            #     #set ys to be the training data
+            #     with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            #         #get train traces
+            #         samples = pickle.load(f)
+            #         ys = np.stack(
+            #             [entry["obs"] for entry in samples], axis=0
+            #         ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+            #         gc.collect()  # Start the garbage collector
 
-            elif config.datasource == "train_systems":
+            # elif config.datasource == "train_systems":
 
-                print(f"getting test data from datasource {config.datasource}")
+            #     print(f"getting test data from datasource {config.datasource}")
 
-                #get the sim_objs for the training data
-                with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                    sim_objs = pickle.load(f)
+            #     #get the sim_objs for the training data
+            #     with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            #         sim_objs = pickle.load(f)
 
-                #generate traces from the training systems
-                collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs) 
+            #     #generate traces from the training systems
+            #     collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs) 
 
-                with open(parent_parent_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
-                    #get train traces
-                    samples = pickle.load(f)
-                    ys = np.stack(
-                        [entry["obs"] for entry in samples], axis=0
-                    ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-                    gc.collect()  # Start the garbage collector
+            #     with open(parent_parent_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+            #         #get train traces
+            #         samples = pickle.load(f)
+            #         ys = np.stack(
+            #             [entry["obs"] for entry in samples], axis=0
+            #         ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            #         gc.collect()  # Start the garbage collector
 
-            else:
-                raise ValueError(f"datasource {config.datasource} not recognized")
+            # else:
+            #     raise ValueError(f"datasource {config.datasource} not recognized")
             
 
             needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs)
@@ -2264,7 +2264,7 @@ def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems,
         print(f"\n\n config.val_dataset_typ: {config.val_dataset_typ} in create_plots")
 
         errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
         #load the system indices, starting indices, and token segment lengths from the pickle file
         with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if config.needle_in_haystack else "") + ".pkl", 'rb') as f:
