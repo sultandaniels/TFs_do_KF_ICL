@@ -1131,7 +1131,7 @@ def cycle_list(lst, shift):
     # a function to cycle a list to the right by shift amount
     return lst[-shift:] + lst[:-shift]
 
-def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, train_conv=False):
+def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, train_conv=False, ex=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
@@ -1145,7 +1145,7 @@ def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choic
             segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
 
         else:
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv, trace_conf=trace_conf)
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv, trace_conf=trace_conf, example=ex)
     else:
         segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
   
@@ -1585,7 +1585,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
 
-def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc):
+def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=None):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
@@ -1644,7 +1644,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc):
         for trial in range(num_trials):
 
             #generate interleaved segments
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
@@ -1841,7 +1841,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
     err_lss_examples = {}
     for ex in range(config.num_haystack_examples):
         # start = time.time()  # start the timer for needle predictions
-        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, model, ys, sim_objs, save_errs_dir, save_errs_loc + "err_lss.pkl")
+        err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, model, ys, sim_objs, save_errs_dir, save_errs_loc + "err_lss.pkl", ex=ex)
         end = time.time()  # end the timer for needle predictions
         # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 

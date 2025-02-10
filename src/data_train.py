@@ -94,7 +94,7 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                     n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                     n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                    n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+                                    n_layer=config.n_layer, n_head=config.n_head, map_location=device, strict=False).eval().to(
     device)  # load_from_checkpoint
 
     create_plots(config=config, model=model, run_preds=run_preds, run_deg_kf_test=run_deg_kf_test, excess=excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols)
@@ -557,14 +557,13 @@ def initialize_err_list(ts):
 def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
         
     kal_step = None
-    
     if config.needle_in_haystack:
         # num_sys_haystack = 4
         config.override("num_test_traces_configs", 1)
         # config.override("num_sys_haystack", num_sys_haystack)
         # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
         if config.num_sys_haystack == 1:
-            num_haystack_examples = 25
+            num_haystack_examples = 50
         else:
             num_haystack_examples = 50
         config.override("num_haystack_examples", num_haystack_examples)
@@ -752,6 +751,601 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
     return kal_step
 
 
+def set_config_params(config, model_name):
+
+    output_dir = None
+
+    if model_name == "gauss":
+        print("\n\nGAUSSIAN MEDIUM MODEL\n\n")
+
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # dataset type
+        config.override("val_dataset_typ", "gaussA")  # validation dataset type
+        config.override("C_dist", "_gauss_C")  # C distribution
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+
+        config = Config()  # create a config object
+
+        # Training settings overrides
+        config.override("devices", [2, 3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 3000)  # number of steps between logging
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 to check if it changes the speed of the training process
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings overrides
+        config.override("model_type", "GPT2")  # model type
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension
+        config.override("n_dims_out", 5)  # IMPORTANT TO KEEP THIS AT 5 FOR NOW
+
+        output_dir = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+
+    elif model_name == "ortho":
+        print("\n\nORTHOGONAL MEDIUM MODEL\n\n")
+
+        # Dataset settings overrides
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # dataset type
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # validation dataset type
+        config.override("C_dist", "_ident_C")  # C distribution
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0, 2, 3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 3000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+
+        output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+    elif model_name == "ident":
+        print("\n\nIDENTITY MEDIUM MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+    elif model_name == "gauss_small":
+        print("\n\nGAUSSIAN SMALL MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250125_103302.919337_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_3.169786384922228e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_gauss_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 500)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 4096)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 96)
+        config.override("n_layer", 6)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ortho_small":
+        print("\n\nORTHOGONAL SMALL MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 500)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 4096)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 96)
+        config.override("n_layer", 6)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ident_small":
+        print("\n\nIDENTITY SMALL MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250125_110549.80eba5_multi_sys_trace_ident_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 50)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 4096)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 96)
+        config.override("n_layer", 6)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "gauss_big":
+        print("\n\nGAUSSIAN BIG MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_gauss_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 50)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 192)
+        config.override("n_layer", 24)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ortho_big":
+        print("\n\nORTHO BIG MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250125_204545.a2cee4_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 5000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 192)
+        config.override("n_layer", 24)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ident_big":
+        print("\n\nIDENTITY BIG MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250125_210849.09203d_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 100)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 192)
+        config.override("n_layer", 24)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+
+    elif model_name == "gauss_nope":
+        print("\n\nGAUSSIAN NoPE MODEL\n\n")
+
+        output_dir = "../outputs/GPT2_NoPE/250125_092007.f34194_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+    
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_gauss_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 4000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 2048)  # 512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", False)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+    
+    elif model_name == "ortho_nope":
+
+        print("\n\nORTHOGONAL NoPE MODEL\n\n")
+    
+        output_dir = "../outputs/GPT2_NoPE/250124_190131.5710d5_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+    
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [2, 3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 3000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", False)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ident_nope":
+        
+        print("\n\nIDENTITY NoPE MODEL\n\n")
+    
+        output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [2, 3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 100)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", False)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "gauss_tiny":
+        print("\n\nGAUSSIAN TINY MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250128_022150.04b6bf_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_6.339572769844456e-05_num_train_sys_40000"
+        
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "gaussA")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_gauss_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 500)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 8192)  # 512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ortho_tiny":
+
+        print("\n\nORTHOGONAL TINY MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250128_022331.067361_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 500)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 8192)  # 512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    elif model_name == "ident_tiny":
+
+        print("\n\nIDENTITY TINY MODEL\n\n")
+
+        output_dir = "../outputs/GPT2/250128_022310.fc649a_multi_sys_trace_ident_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000"
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 500)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 8192)  # 512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+    else:
+        raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
+
+
+    return output_dir
+
+
 
 
 # main function
@@ -777,6 +1371,9 @@ if __name__ == '__main__':
     parser.add_argument('--train_mix_state_dim', help='Boolean. generate training data from a mixture of state dimensions', action='store_true')
     parser.add_argument('--train_mix_C', help='Boolean. generate training data from a mixture of C dists', action='store_true')
     parser.add_argument('--part_train_set', help='Boolean. train on a subset of a previous experiments train dataset', action='store_true')
+    parser.add_argument('--model_name', type=str, help='Name of the model to use')
+
+
 
     # Parse the arguments
     args = parser.parse_args()
@@ -812,6 +1409,11 @@ if __name__ == '__main__':
     train_mix_C = args.train_mix_C
     print("part_train_set arg", args.part_train_set)
     part_train_set = args.part_train_set
+    print("model_name arg", args.model_name)
+    model_name = args.model_name
+
+
+
 
 
     config = Config() # create a config object
@@ -864,29 +1466,11 @@ if __name__ == '__main__':
 
         last_ckpt = None
 
-        output_dir = "../outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000"
-
-        if (config.datasource == "val"):
-
-            print(f"getting test data from datasource {config.datasource}")
-
-            # get the sim objs for the validation data
-            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                sim_objs = pickle.load(f)
-
-            #set ys to be the validation data
-            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                samples = pickle.load(f)
-                # for every 2000 entries in samples, get the observation values and append them to the ys list
-                ys = np.stack(
-                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-
-                gc.collect()  # Start the garbage collector
+        output_dir = set_config_params(config, model_name)
 
         if multi_haystack:
         
-            num_sys_haystacks = [19] #list(range(1,20))
+            num_sys_haystacks = list(range(1,20))
             print("num_sys_haystacks:", num_sys_haystacks)
 
             config.override("needle_in_haystack", True)
@@ -937,8 +1521,29 @@ if __name__ == '__main__':
                 config.override("num_sys_haystack", num_sys)
                 config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys+1))
 
-                print(f"output dir: {output_dir}")
+                # load the validation data
+                if (config.datasource == "val"):
 
+                    print(f"getting test data from datasource {config.datasource}")
+
+                    # get the sim objs for the validation data
+                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                        sim_objs = pickle.load(f)
+
+                    #set ys to be the validation data
+                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                        samples = pickle.load(f)
+                        # for every 2000 entries in samples, get the observation values and append them to the ys list
+                        ys = np.stack(
+                            [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+                        ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+                        gc.collect()  # Start the garbage collector to free up memory
+
+                print(f"output dir: {output_dir}")
+                print(f"config.use_pos_emb: {config.use_pos_emb}")
+
+                print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
                 #run train_conv
                 kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
 
@@ -968,11 +1573,33 @@ if __name__ == '__main__':
                 end = time.time()
                 print(f"time elapsed for haystack len {num_sys} predictions (min): {(end - start)/60}")
                 
-                last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                if last_ckpt is not None:
+                    last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
                 
                 haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
         else:
             if make_preds:
+
+
+                # load the validation data
+                if (config.datasource == "val"):
+
+                    print(f"getting test data from datasource {config.datasource}")
+
+                    # get the sim objs for the validation data
+                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                        sim_objs = pickle.load(f)
+
+                    #set ys to be the validation data
+                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                        samples = pickle.load(f)
+                        # for every 2000 entries in samples, get the observation values and append them to the ys list
+                        ys = np.stack(
+                            [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+                        ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+                        gc.collect()  # Start the garbage collector to free up memory
+
                 predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
         
     else:

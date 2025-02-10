@@ -89,7 +89,7 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None):
+def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None, example=None):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -122,6 +122,8 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
         if config.zero_cut and test:
             sys_inds = [trace_conf] #set the system index to the trace_conf
+        elif config.needle_in_haystack and test:
+            sys_inds = np.arange(example, example + sys_in_trace) #set the system indices for the specific example
         else:
             #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
             rng = np.random.default_rng()
