@@ -854,6 +854,27 @@ def set_config_params(config, model_name):
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
 
+        # Training settings
+        config.override("devices", [0, 1])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 100)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
     elif model_name == "gauss_small":
         print("\n\nGAUSSIAN SMALL MODEL\n\n")
 
@@ -1575,6 +1596,8 @@ if __name__ == '__main__':
                 
                 if last_ckpt is not None:
                     last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                else:
+                    last_ckpt_step = None
                 
                 haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
         else:
