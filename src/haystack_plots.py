@@ -72,7 +72,7 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
     else:
         num_axes = 1
         
-    fig, ax = plt.subplots(num_axes, 1, sharex=True, figsize=(5, 2.7*len(steps_in))) #
+    fig, ax = plt.subplots(num_axes, 1, sharex=True, figsize=(5, 3.5*num_axes)) #
 
     print(f"real_steps: {real_steps}, real_steps_ext: {real_steps_ext}")
 
@@ -174,6 +174,10 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
                         color = colors[2]
                     elif step == 10:
                         color = colors[3]
+                    elif step == 3:
+                        color = colors[4]
+                    elif step == 5:
+                        color = colors[5]
                     ax.errorbar(
                         -2 + step_count*0.02,
                         y,
@@ -186,7 +190,7 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
                     )
 
                 if valA != "gaussA":
-                    ax.legend(fontsize = 8, ncol=1, columnspacing=0.25)#, loc="upper left")
+                    ax.legend(fontsize = 8, columnspacing=0.25, loc="upper left")
                     ax.set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
                     ax.set_ylabel(("(" if valA== "gaussA" else "") + "Error" + (" Ratio" if valA == "gaussA" else ""), fontsize=12)
                     ax.set_xlim(-3, haystack_len)
@@ -533,9 +537,10 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
                     qs = np.repeat(qs, len(x_values), axis=0)
                     print(f"qs shape after repeat: {qs.shape}")
                 ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
-                if not valA == "gaussA":
-                    print("plotting error bars for fin")
-                    ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+                # if not valA == "gaussA":
+                #     ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+
+                ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
                 beg_qs = np.array(beg_quartiles_ckpt[key][step])
                 beg_qs = np.transpose(beg_qs)
@@ -543,9 +548,9 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
                 color = ax.get_lines()[-1].get_color()
                 ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
 
-                if not valA == "gaussA":
-                    print("plotting error bars for beg")
-                    ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
+                # if not valA == "gaussA":
+                #     ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
+                ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
                 col_count += 1
 

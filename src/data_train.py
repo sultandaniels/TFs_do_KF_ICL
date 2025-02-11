@@ -1498,6 +1498,9 @@ if __name__ == '__main__':
             
             for num_sys in num_sys_haystacks:
                 
+                config.override("num_sys_haystack", num_sys)
+                config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys+1))
+                
                 if not make_preds:
 
                     print("not making predictions")
@@ -1507,8 +1510,28 @@ if __name__ == '__main__':
                     # load quartiles_ckpt_files
                     train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(num_sys, model_dir, experiment)
 
-                    if fin_quartiles_ckpt is not None and beg_quartiles_ckpt is not None and x_values is not None and not saved_preds:
+                    if fin_quartiles_ckpt is not None and beg_quartiles_ckpt is not None and x_values is not None:
                         print(f"quartiles already exist for haystack length {num_sys}")
+
+                        if saved_preds:
+                            file_count = 0
+                            for filename in os.listdir(output_dir + "/checkpoints/"):
+                                file_count += 1
+                                kal_step = filename.split("=")[1].split(".")[0]
+                                kal_step = int(kal_step)
+                                if file_count > 0:
+                                    break
+                            
+                            if num_sys == 19:
+                                last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                                if last_ckpt is not None:
+                                    last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                else:
+                                    raise ValueError("get_last_checkpoint returned None")
+
+                            print("making plots for haystack len:", num_sys)
+                            haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
                         continue
                     else:
                         print(f"\n\nchecking for err_lss_examples")
@@ -1533,14 +1556,10 @@ if __name__ == '__main__':
 
                             continue
 
-
-
                 print("\n\n\nstarting predictions for haystack len:", num_sys)
                 start = time.time()
 
                 config.override("needle_final_seg_extended", False)
-                config.override("num_sys_haystack", num_sys)
-                config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys+1))
 
                 # load the validation data
                 if (config.datasource == "val"):
