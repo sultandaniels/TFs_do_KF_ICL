@@ -344,6 +344,7 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
 def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file):
 
     nope = not config.use_pos_emb
+
     batch_size = config.batch_size
     gpus = len(config.devices)
 
@@ -511,6 +512,7 @@ def load_quartiles_ckpt_files(haystack_len, model_dir, experiment):
 
 def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, valA, haystack_len, experiment, steps, nope):
     fig, ax = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
+    fig_len, ax_len = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
 
     # if valA == "ortho":
     #     steps = [1,2,3,5,10]
@@ -542,6 +544,9 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
 
                 ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
+                ax_len.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
+                ax_len.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+
                 beg_qs = np.array(beg_quartiles_ckpt[key][step])
                 beg_qs = np.transpose(beg_qs)
                 #set the color to the same as the fin quartiles
@@ -551,6 +556,9 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
                 # if not valA == "gaussA":
                 #     ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
                 ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
+
+                ax_len.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
+                ax_len.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
                 col_count += 1
 
@@ -566,12 +574,25 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
     # ax.set_title(("Ortho" if valA == "ortho" else ("Gaussian" if valA == "gaussA" else "Identity")) + f" Haystack Length: {haystack_len} vs Training Examples")
     plt.tight_layout()
 
+    ax_len.set_xlabel("# of Training Examples", fontsize=14)
+    ax_len.set_ylabel(f"Error " + ("Ratio" if valA == "gaussA" else ""), fontsize=14)
+    ax_len.set_yscale('linear')
+    ax_len.set_xscale('log')
+    ax_len.grid(True, which="both")
+    ax_len.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left")
+    ax_len.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
+
     #add the date and time to the filename
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
+    fig.text(0.5, 0.1, f"valA: {valA} nope: {nope}" + "_" + f"timestamp:{timestamp}" , ha='center', fontsize=8)
+    fig_len.text(0.5, 0.1, f"valA: {valA} nope: {nope}" + "_" + f"timestamp:{timestamp}" , ha='center', fontsize=8)
+
     os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True, format="pdf")
+    print(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf")
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf", transparent=True, format="pdf")
+    fig_len.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
 
     plt.show()
     return None
@@ -591,6 +612,8 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
             quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(model_dir, experiment, valC=config.C_dist, ckpt_step=ckpt_step, valA=config.val_dataset_typ, state_dim=config.nx, datasource=config.datasource)
 
             if quartiles is None or seg_ext_quartiles is None or compute_more:
+                print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
+
                 #get the err_lss_examples
                 errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
                 errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
@@ -629,6 +652,9 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
     train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(haystack_len, model_dir, experiment)
 
     if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None or compute_more:
+
+        print(f"\ncomputing train conv quartiles for haystack_len: {haystack_len}")
+    
         last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
         last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
         last_ckpt = int(last_ckpt)

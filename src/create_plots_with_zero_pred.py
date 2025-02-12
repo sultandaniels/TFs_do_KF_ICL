@@ -690,7 +690,7 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                       n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device, use_pos_embd=config.use_pos_embd).eval().to(
         device)  # load_from_checkpoint
 
     if wentinn_data:
@@ -987,7 +987,7 @@ def compute_errors_conv(config):
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                       n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device, use_pos_embd=config.use_pos_embd).eval().to(
         device)  # load_from_checkpoint
 
     print("getting the validation data")
@@ -1244,7 +1244,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                       n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device).eval().to(
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device, use_pos_embd=config.use_pos_embd).eval().to(
         device)  # load_from_checkpoint
 
     

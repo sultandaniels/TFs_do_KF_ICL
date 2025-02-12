@@ -87,15 +87,29 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
 
     if resume_train:
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
-                n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
+                n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb)
         
         wandb_train(config_dict, model, output_dir, train_mix_dist, train_mix_state_dim)
 
+    # print(f"config.use_pos_emb: {config.use_pos_emb}")
+    # print(f"in preds_thread: config.ckpt_path: {config.ckpt_path}")
+
+    # ckpt = torch.load(config.ckpt_path, map_location=device)
+    # print("ckpt.keys():", ckpt.keys())
+    # print("ckpt['state_dict'].keys():", ckpt['state_dict'].keys())
+    # print("wpe weight in state_dict:", "_backbone.wpe.weight" in ckpt['state_dict'])
+    # print("wpe weight in state_dict value:", ckpt['state_dict']["_backbone.wpe.weight"])
+
+    # empty_model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
+    #             n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
+    # print("empty_model keys:", empty_model.state_dict().keys())
+    # print("empty_model wpe weight:", empty_model.state_dict()["_backbone.wpe.weight"])
+
     model = GPT2.load_from_checkpoint(config.ckpt_path,
-                                    n_dims_in=config.n_dims_in, n_positions=config.n_positions,
-                                    n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                    n_layer=config.n_layer, n_head=config.n_head, map_location=device, strict=False).eval().to(
-    device)  # load_from_checkpoint
+                                n_dims_in=config.n_dims_in, n_positions=config.n_positions,
+                                n_dims_out=config.n_dims_out, n_embd=config.n_embd,
+                                n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb, map_location=device, strict=True).eval().to(
+    device)
 
     create_plots(config=config, model=model, run_preds=run_preds, run_deg_kf_test=run_deg_kf_test, excess=excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols)
 
@@ -824,6 +838,7 @@ def set_config_params(config, model_name):
 
         # Model settings
         config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
         config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
         config.override("n_embd", 128)
         config.override("n_layer", 12)
@@ -1475,7 +1490,7 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not (train_conv or multi_haystack)) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=9600.ckpt"
+        ckpt_path = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=15600.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
@@ -1487,9 +1502,9 @@ if __name__ == '__main__':
 
         last_ckpt = None
 
-        output_dir = set_config_params(config, model_name)
-
         if multi_haystack:
+
+            output_dir = set_config_params(config, model_name)
         
             num_sys_haystacks = list(range(1,20))
             print("num_sys_haystacks:", num_sys_haystacks)
@@ -1497,7 +1512,7 @@ if __name__ == '__main__':
             config.override("needle_in_haystack", True)
             
             for num_sys in num_sys_haystacks:
-                
+
                 config.override("num_sys_haystack", num_sys)
                 config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys+1))
                 
@@ -1530,7 +1545,7 @@ if __name__ == '__main__':
                                 else:
                                     raise ValueError("get_last_checkpoint returned None")
 
-                            print("making plots for haystack len:", num_sys)
+                            print("\n\nmaking plots for haystack len:", num_sys)
                             haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
                         continue
                     else:
@@ -1585,6 +1600,8 @@ if __name__ == '__main__':
 
                 print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
                 #run train_conv
+
+                print(f"config.use_pos_emb: {config.use_pos_emb}")
                 kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
 
                 if num_sys == 19:
@@ -1620,6 +1637,8 @@ if __name__ == '__main__':
                 
                 haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
         else:
+
+            output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
             if make_preds:
 
 

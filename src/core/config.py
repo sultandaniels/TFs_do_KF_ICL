@@ -34,31 +34,31 @@ class Config(object, metaclass=Singleton):
     max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
     zero_cut = False #no cuts in the trace interleaving
-    needle_in_haystack = False #run needle in haystack tests
+    needle_in_haystack = True #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
-    num_sys_haystack = 1 #1 #2 #3 #4 #9 #14 #19 #number of systems in the haystack
+    num_sys_haystack = 19 #1 #2 #3 #4 #9 #14 #19 #number of systems in the haystack
     len_seg_haystack = 10 #123 #82 #61 #48 #23 #15 #10 #length of a haystack segment
     num_haystack_examples = 200 #number of haystack examples to generate
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[0] #which GPU
+    devices=[2,3] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 50 #number of steps between logging (train interval)
+    train_int = 100 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 512 #2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
-    train_data_workers = 64 #set to 1 (check if it changes the speed of the training process)
+    batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
+    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
-    use_pos_emb = True #use positional embeddings
+    use_pos_emb = False #use positional embeddings
     n_positions = 250 #500 for extended OLS #250 #context length
-    n_embd = 192
-    n_layer = 24
+    n_embd = 128
+    n_layer = 12
     n_head = 8
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
