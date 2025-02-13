@@ -1507,7 +1507,7 @@ if __name__ == '__main__':
 
             output_dir = set_config_params(config, model_name)
         
-            num_sys_haystacks = list(range(1,20))
+            num_sys_haystacks = [19] #list(range(1,20))
             print("num_sys_haystacks:", num_sys_haystacks)
 
             config.override("needle_in_haystack", True)
