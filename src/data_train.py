@@ -1501,6 +1501,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         last_ckpt = None
+        last_ckpt_step = None
 
         if multi_haystack:
 
@@ -1546,7 +1547,7 @@ if __name__ == '__main__':
                                     raise ValueError("get_last_checkpoint returned None")
 
                             print("\n\nmaking plots for haystack len:", num_sys)
-                            haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
+                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
                         continue
                     else:
                         print(f"\n\nchecking for err_lss_examples")
@@ -1575,7 +1576,7 @@ if __name__ == '__main__':
                                     raise ValueError("get_last_checkpoint returned None")
                                 
                             print("making plots for haystack len:", num_sys)
-                            haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
+                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
 
                             continue
 

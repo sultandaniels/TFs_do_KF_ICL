@@ -42,7 +42,7 @@ def save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_qu
     np.savez(seg_ext_quartiles_file, **seg_ext_quartiles)
     return None
 
-def load_quartiles(model_dir, experiment, valC, ckpt_step, valA, state_dim, datasource):
+def load_quartiles(model_dir, experiment):
     quartiles = None
     seg_ext_quartiles = None
 
@@ -609,7 +609,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
     
     if haystack_len == 19:
         if ckpt_step is not None:
-            quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(model_dir, experiment, valC=config.C_dist, ckpt_step=ckpt_step, valA=config.val_dataset_typ, state_dim=config.nx, datasource=config.datasource)
+            quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(model_dir, experiment)
 
             if quartiles is None or seg_ext_quartiles is None or compute_more:
                 print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
