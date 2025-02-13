@@ -1565,7 +1565,15 @@ if __name__ == '__main__':
                                 kal_step = int(kal_step)
                                 if file_count > 0:
                                     break
+                                
+                            if num_sys == 19:
+                                last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
 
+                                if last_ckpt is not None:
+                                    last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                else:
+                                    raise ValueError("get_last_checkpoint returned None")
+                                
                             print("making plots for haystack len:", num_sys)
                             haystack_plots(config, num_sys, output_dir, last_ckpt, kal_step, compute_more=make_preds)
 
