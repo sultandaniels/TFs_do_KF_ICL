@@ -1490,7 +1490,7 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not (train_conv or multi_haystack)) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=15600.ckpt"
+        ckpt_path = "../outputs/GPT2/250212_222339.54331c_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000/checkpoints/step=3000.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
