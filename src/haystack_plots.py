@@ -37,8 +37,6 @@ def comp_quartiles(err_lss_examples, ratio=False, train_conv=False, kal_err=None
                 # print(f"shape of quartiles[{key}]: {quartiles[key].shape}")
             else:
                 quartiles[key] = np.percentile(rat[0], [25,50,75], axis=1)
-                print(f"shape of quartiles[{key}]: {quartiles[key].shape}")
-                raise NotImplementedError(f"just checking the shape of quartiles[{key}]")
             
     return quartiles
 

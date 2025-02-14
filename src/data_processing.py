@@ -37,7 +37,6 @@ def get_val_data(valA, C_dist, exper, nx):
 
 def gen_ckpt_steps(minval, maxval, interval):
     ckpt_steps = list(range(minval, maxval + 1, interval))
-    print("ckpt_steps:", ckpt_steps)
     return ckpt_steps
 
 def move_dict_to_device(d, device):
