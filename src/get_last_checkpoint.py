@@ -57,8 +57,8 @@ if __name__ == "__main__":
         print("No checkpoint files found.")
 
     # Example usage
-base_dir = "/home/sultand/TFs_do_KF_ICL/outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000"
-smallest_step_dir = find_smallest_step_subdir(base_dir)
-print(f"The subdirectory with the smallest step number is: {smallest_step_dir}")
-smallest_step_num = split_path(smallest_step_dir)[1]
-print(f"The smallest step number is: {smallest_step_num}")
+    base_dir = "/home/sultand/TFs_do_KF_ICL/outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+    smallest_step_dir = find_smallest_step_subdir(base_dir)
+    print(f"The subdirectory with the smallest step number is: {smallest_step_dir}")
+    smallest_step_num = split_path(smallest_step_dir)[1]
+    print(f"The smallest step number is: {smallest_step_num}")
