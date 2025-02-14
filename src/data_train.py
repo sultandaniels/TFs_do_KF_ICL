@@ -568,7 +568,7 @@ def initialize_err_list(ts):
     return err_dict_list
 
 
-def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
+def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=False):
         
     kal_step = None
     if config.needle_in_haystack:
@@ -576,8 +576,11 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
         config.override("num_test_traces_configs", 1)
         # config.override("num_sys_haystack", num_sys_haystack)
         # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
-        if config.num_sys_haystack == 1:
-            num_haystack_examples = 50
+        # if config.num_sys_haystack == 1:
+        #     num_haystack_examples = 50
+        # else:
+        if abs_err:
+            num_haystack_examples = 1
         else:
             num_haystack_examples = 50
         config.override("num_haystack_examples", num_haystack_examples)
@@ -1408,6 +1411,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_mix_C', help='Boolean. generate training data from a mixture of C dists', action='store_true')
     parser.add_argument('--part_train_set', help='Boolean. train on a subset of a previous experiments train dataset', action='store_true')
     parser.add_argument('--model_name', type=str, help='Name of the model to use')
+    parser.add_argument('--abs_err', help='Boolean. Do not take the ratios of the gauss errors', action='store_true')
 
 
 
@@ -1447,6 +1451,8 @@ if __name__ == '__main__':
     part_train_set = args.part_train_set
     print("model_name arg", args.model_name)
     model_name = args.model_name
+    print("abs arg", args.abs_err)
+    abs_err = args.abs_err
 
 
 
@@ -1507,7 +1513,7 @@ if __name__ == '__main__':
 
             output_dir = set_config_params(config, model_name)
         
-            num_sys_haystacks = [19] #list(range(1,20))
+            num_sys_haystacks = list(range(1,20))
             print("num_sys_haystacks:", num_sys_haystacks)
 
             config.override("needle_in_haystack", True)
@@ -1611,9 +1617,9 @@ if __name__ == '__main__':
                 #run train_conv
 
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
-                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
+                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err)
 
-                if num_sys == 19:
+                if num_sys == 19 and not abs_err:
                     #get the last checkpoint
                     last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
 
@@ -1644,7 +1650,7 @@ if __name__ == '__main__':
                 else:
                     last_ckpt_step = None
                 
-                haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
+                haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
         else:
 
             output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
