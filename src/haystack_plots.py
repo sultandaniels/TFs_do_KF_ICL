@@ -67,7 +67,7 @@ def load_quartiles(model_dir, experiment):
 
     return quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles
  
-def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, valC, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, nope):
+def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, valA, valC, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, nope):
 
     real_steps = [x + open_paren_ind for x in steps_in]
     real_steps_ext = [x + open_paren_ind-2 for x in steps_in]
@@ -251,12 +251,12 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
     os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/error_ratios_{valA}_state_dim_{state_dim}{valC}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/error_ratios_{valA}_embd_dim_{config.n_embd}_state_dim_{state_dim}{valC}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
 
     return None
 
 
-def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope):
+def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope):
 
     if valA == "gaussA":
 
@@ -347,7 +347,7 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     plt.tight_layout()
 
     os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/last_seg_context_{valA}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/last_seg_context_{valA}_embd_dim_{config.n_embd}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
     return None
 
 
@@ -521,7 +521,7 @@ def load_quartiles_ckpt_files(haystack_len, model_dir, experiment, abs_err=False
 
     return train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values
 
-def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, valA, haystack_len, experiment, steps, nope, abs_err=False):
+def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, valA, haystack_len, experiment, steps, nope, abs_err=False):
     fig, ax = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
     fig_len, ax_len = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
 
@@ -602,8 +602,8 @@ def plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_v
 
     os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace", exist_ok=True)
     print(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf")
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + ("abs_err_" if abs_err else "") + f"{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf", transparent=True, format="pdf")
-    fig_len.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + ("abs_err_" if abs_err else "") + f"{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf", transparent=True, format="pdf")
+    fig_len.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
 
     plt.show()
     return None
@@ -647,10 +647,10 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
                 save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
 
             #plot needle position
-            plot_needle_position(experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
+            plot_needle_position(config, experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
 
             #plot steps after open token
-            plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
+            plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
 
             print(f"open_paren_ind: {open_paren_ind}")
 
@@ -679,7 +679,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
 
 
     #plot haystack train conv
-    plot_haystack_train_conv(colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
+    plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
 
     # #delete big files
     # #delete the err_lss_examples for this test run
