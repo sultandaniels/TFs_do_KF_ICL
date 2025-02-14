@@ -514,6 +514,7 @@ def load_quartiles_ckpt_files(haystack_len, model_dir, experiment, abs_err=False
             beg_quartiles_ckpt = pickle.load(f)
 
     if os.path.exists(x_values_file):
+        print(f"Loading x_values from {x_values_file}")
         x_values = np.load(x_values_file)
 
     return train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values
