@@ -1508,6 +1508,7 @@ if __name__ == '__main__':
 
         last_ckpt = None
         last_ckpt_step = None
+        kal_step = None
 
         if multi_haystack:
 
@@ -1537,12 +1538,14 @@ if __name__ == '__main__':
 
                         if saved_preds:
                             file_count = 0
-                            for filename in os.listdir(output_dir + "/checkpoints/"):
-                                file_count += 1
-                                kal_step = filename.split("=")[1].split(".")[0]
-                                kal_step = int(kal_step)
-                                if file_count > 0:
-                                    break
+
+                            if config.val_dataset_typ == "gaussA":
+                                for filename in os.listdir(output_dir + "/checkpoints/"):
+                                    file_count += 1
+                                    kal_step = filename.split("=")[1].split(".")[0]
+                                    kal_step = int(kal_step)
+                                    if file_count > 0:
+                                        break
                             
                             if num_sys == 19:
                                 last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")

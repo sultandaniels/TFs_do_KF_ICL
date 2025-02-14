@@ -10,7 +10,7 @@ self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transp
 self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transpose(0, 1) # [O_D x R x O_D]
 
 
-scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000/checkpoints sultand@sahai-desktop.eecs.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000/checkpoints
+scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250128_022331.067361_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/needles sultand@sahai-desktop.eecs.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2/250128_022331.067361_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/
 
 scp -r /home/ubuntu/gauss-NoPE-GH200/TFs_do_KF_ICL/outputs/GPT2_NoPE/250127_010709.dc88f2_multi_sys_trace_zero_cut_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints sultand@bliss1.ist.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2_NoPE/250127_010709.dc88f2_multi_sys_trace_zero_cut_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints
 
