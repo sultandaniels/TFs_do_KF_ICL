@@ -283,10 +283,18 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     for key in quartiles.keys():
         if "OLS_analytical" not in key and "Simulation" not in key and key != "OLS_ir_2":
             errs = [quartiles[key][1, needle][open_paren_ind+1:-1] - quartiles[key][0, needle][open_paren_ind+1:-1], quartiles[key][2, needle][open_paren_ind+1:-1] - quartiles[key][1, needle][open_paren_ind+1:-1]]
-            print(f"\n\n\nerrs: {errs}")
             # raise NotImplementedError("checking for negative values")
 
-            ax.errorbar(x_values + col_count*dither, quartiles[key][1, needle][open_paren_ind+1:-1], yerr=[quartiles[key][1, needle][open_paren_ind+1:-1] - quartiles[key][0, needle][open_paren_ind+1:-1], quartiles[key][2, needle][open_paren_ind+1:-1] - quartiles[key][1, needle][open_paren_ind+1:-1]], fmt='o', label="TF: Final Segment" if key == "MOP" else (key[:3] + "-" + key[7:] if "OLS" in key else f"{key}"), capsize=2, zorder=haystack_len if key == "MOP" else 0, color=colors[col_count])
+            try:
+                ax.errorbar(x_values + col_count*dither, quartiles[key][1, needle][open_paren_ind+1:-1], yerr=[quartiles[key][1, needle][open_paren_ind+1:-1] - quartiles[key][0, needle][open_paren_ind+1:-1], quartiles[key][2, needle][open_paren_ind+1:-1] - quartiles[key][1, needle][open_paren_ind+1:-1]], fmt='o', label="TF: Final Segment" if key == "MOP" else (key[:3] + "-" + key[7:] if "OLS" in key else f"{key}"), capsize=2, zorder=haystack_len if key == "MOP" else 0, color=colors[col_count])
+            except ValueError as e:
+                print(f"key: {key}")
+                print(f"quartiles[{key}].shape: {quartiles[key].shape}")
+                print(f"\n\n\nerrs: {errs}")
+                print(f"quartiles[{key}][1, needle][open_paren_ind+1:-1]: {quartiles[key][1, needle][open_paren_ind+1:-1]}")
+                print(f"quartiles[{key}][0, needle][open_paren_ind+1:-1]: {quartiles[key][0, needle][open_paren_ind+1:-1]}")
+                print(f"quartiles[{key}][2, needle][open_paren_ind+1:-1]: {quartiles[key][2, needle][open_paren_ind+1:-1]}")
+
             col_count += 1
 
     needle = 0

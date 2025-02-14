@@ -2249,7 +2249,7 @@ def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems,
             return None
 
     # load the prediction errors from the file
-    if config.multi_sys_trace:
+    if config.multi_sys_trace and False:
         # get the parent directory of the ckpt_path
         parent_dir = os.path.dirname(config.ckpt_path)
 
