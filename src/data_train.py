@@ -1412,6 +1412,7 @@ if __name__ == '__main__':
     parser.add_argument('--part_train_set', help='Boolean. train on a subset of a previous experiments train dataset', action='store_true')
     parser.add_argument('--model_name', type=str, help='Name of the model to use')
     parser.add_argument('--abs_err', help='Boolean. Do not take the ratios of the gauss errors', action='store_true')
+    parser.add_argument('--desktop', help='Boolean. Run on desktop', action='store_true')
 
 
 
@@ -1453,9 +1454,28 @@ if __name__ == '__main__':
     model_name = args.model_name
     print("abs arg", args.abs_err)
     abs_err = args.abs_err
+    print("desktop arg", args.desktop)
+    desktop = args.desktop
 
 
 
+    maxval_dict = {
+    ("ident", 128, True): 17600,
+    ("ortho", 128, True): 105000,
+    ("gaussA", 128, True): 180000,
+    ("ident", 128, False): 15600,
+    ("ortho", 128, False): 201000,
+    ("gaussA", 128, False): 216000,
+    ("gaussA", 72, True): 180000,
+    ("ortho", 72, True): 53000,
+    ("ident", 72, True): 54000,
+    ("ident", 192, True): 149000,
+    ("ortho", 192, True): 150000,
+    ("gaussA", 192, True): 147000,
+    ("gaussA", 96, True): 170000,
+    ("ident", 96, True): 40250,
+    ("ortho", 96, True): 172500
+}
 
 
     config = Config() # create a config object
@@ -1548,12 +1568,15 @@ if __name__ == '__main__':
                                         break
                             
                             if num_sys == 19:
-                                last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
-
-                                if last_ckpt is not None:
-                                    last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                if desktop:
+                                    last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
                                 else:
-                                    raise ValueError("get_last_checkpoint returned None")
+                                    last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                                    if last_ckpt is not None:
+                                        last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                    else:
+                                        raise ValueError("get_last_checkpoint returned None")
 
                             print("\n\nmaking plots for haystack len:", num_sys)
                             haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
@@ -1577,12 +1600,15 @@ if __name__ == '__main__':
                                     break
                                 
                             if num_sys == 19:
-                                last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
-
-                                if last_ckpt is not None:
-                                    last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                if desktop:
+                                    last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
                                 else:
-                                    raise ValueError("get_last_checkpoint returned None")
+                                    last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                                    if last_ckpt is not None:
+                                        last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                    else:
+                                        raise ValueError("get_last_checkpoint returned None")
                                 
                             print("making plots for haystack len:", num_sys)
                             haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)

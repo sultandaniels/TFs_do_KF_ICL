@@ -52,14 +52,15 @@ def delete_files_spec_interval(directory):
 
 if __name__ == "__main__":
     directory = "/home/sultand/TFs_do_KF_ICL/outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"  # Replace with the path to your directory
-    suffix = f"50.ckpt"  # The suffix of the files you want to delete
+    # suffix = f"50.ckpt"  # The suffix of the files you want to delete
+    prefix = f"train_conv_needle_haystack_len_"
 
     # delete_files(directory, suffix)
 
-    delete_files_spec_interval(directory)
+    # delete_files_spec_interval(directory)
 
     for ckpt in range(3000, 180000, 3000):
-        for haystack_len in range(1,19):
+        for haystack_len in range(1,20):
             delete_files(directory + f"/prediction_errors_gauss_C_step={str(ckpt)}.ckpt/", f"train_conv_needle_haystack_len_{haystack_len}_")
     
     # delete_files(directory, suffix)

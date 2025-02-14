@@ -259,7 +259,7 @@ def plot_needle_position(experiment, datasource, state_dim, ckpt_step, valA, val
 def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope):
 
     if valA == "gaussA":
-        quartilez_npz = quartiles
+
         seg_ext_quartiles_npz = seg_ext_quartiles
         quartiles = {key: quartiles[key] for key in quartiles.keys()}
         seg_ext_quartiles = {key: seg_ext_quartiles_npz[key] for key in seg_ext_quartiles_npz.keys()}
@@ -282,6 +282,10 @@ def plot_steps_after_open_token(haystack_len, quartiles, seg_ext_quartiles, colo
     needle = haystack_len - 1
     for key in quartiles.keys():
         if "OLS_analytical" not in key and "Simulation" not in key and key != "OLS_ir_2":
+            errs = [quartiles[key][1, needle][open_paren_ind+1:-1] - quartiles[key][0, needle][open_paren_ind+1:-1], quartiles[key][2, needle][open_paren_ind+1:-1] - quartiles[key][1, needle][open_paren_ind+1:-1]]
+            print(f"\n\n\nerrs: {errs}")
+            # raise NotImplementedError("checking for negative values")
+
             ax.errorbar(x_values + col_count*dither, quartiles[key][1, needle][open_paren_ind+1:-1], yerr=[quartiles[key][1, needle][open_paren_ind+1:-1] - quartiles[key][0, needle][open_paren_ind+1:-1], quartiles[key][2, needle][open_paren_ind+1:-1] - quartiles[key][1, needle][open_paren_ind+1:-1]], fmt='o', label="TF: Final Segment" if key == "MOP" else (key[:3] + "-" + key[7:] if "OLS" in key else f"{key}"), capsize=2, zorder=haystack_len if key == "MOP" else 0, color=colors[col_count])
             col_count += 1
 
