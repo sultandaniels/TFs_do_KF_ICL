@@ -1476,6 +1476,13 @@ if __name__ == '__main__':
     ("ident", 96, True): 40250,
     ("ortho", 96, True): 172500
 }
+#     kal_step_dict = { #currently inaccurate
+#     (128, True): 126000,
+#     (128, False): 15600,
+#     (72, True): 180000,
+#     (192, True): 149000,
+#     (96, True): 170000
+# }
 
 
     config = Config() # create a config object
@@ -1560,12 +1567,13 @@ if __name__ == '__main__':
                             file_count = 0
 
                             if config.val_dataset_typ == "gaussA":
-                                for filename in os.listdir(output_dir + "/checkpoints/"):
-                                    file_count += 1
-                                    kal_step = filename.split("=")[1].split(".")[0]
-                                    kal_step = int(kal_step)
-                                    if file_count > 0:
-                                        break
+                                if not desktop:
+                                    for filename in os.listdir(output_dir + "/checkpoints/"):
+                                        file_count += 1
+                                        kal_step = filename.split("=")[1].split(".")[0]
+                                        kal_step = int(kal_step)
+                                        if file_count > 0:
+                                            break
                             
                             if num_sys == 19:
                                 if desktop:
@@ -1579,7 +1587,7 @@ if __name__ == '__main__':
                                         raise ValueError("get_last_checkpoint returned None")
 
                             print("\n\nmaking plots for haystack len:", num_sys)
-                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
+                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
                         continue
                     else:
                         print(f"\n\nchecking for err_lss_examples")
@@ -1611,7 +1619,7 @@ if __name__ == '__main__':
                                         raise ValueError("get_last_checkpoint returned None")
                                 
                             print("making plots for haystack len:", num_sys)
-                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds)
+                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
 
                             continue
 

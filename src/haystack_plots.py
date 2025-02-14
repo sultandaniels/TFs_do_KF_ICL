@@ -538,7 +538,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     # else:
     #     steps = [1,2,3]
 
-    print(f"\n\n in haystack train conv plot valA: {valA}")
+    print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
         if key == "MOP":
