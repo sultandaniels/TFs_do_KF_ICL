@@ -48,13 +48,13 @@ def save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_qu
     np.savez(seg_ext_quartiles_file, **seg_ext_quartiles)
     return None
 
-def load_quartiles(model_dir, experiment):
+def load_quartiles(config, model_dir, experiment):
     quartiles = None
     seg_ext_quartiles = None
 
-    quartiles_file = model_dir + experiment + "/needles/quartiles.npz"
+    quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "quartiles.npz")
 
-    seg_ext_quartiles_file = model_dir + experiment + "/needles/seg_ext_quartiles.npz"
+    seg_ext_quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "seg_ext_quartiles.npz")
 
     if os.path.exists(quartiles_file):
         print(f"Loading quartiles from {quartiles_file}")
@@ -259,7 +259,6 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
 def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope):
 
     if valA == "gaussA":
-
         seg_ext_quartiles_npz = seg_ext_quartiles
         quartiles = {key: quartiles[key] for key in quartiles.keys()}
         seg_ext_quartiles = {key: seg_ext_quartiles_npz[key] for key in seg_ext_quartiles_npz.keys()}
@@ -343,8 +342,8 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     ax.set_xlabel("Steps after the Open Token", fontsize=14)
     ax.set_yscale('log')
     # ax.set_title(f"Prediction Error for Needle Position {needle}", fontsize=30)
-    # if valA == "gaussA":
-    #     ax.set_ylim([2e-1, 3])
+    if valA == "gaussA":
+        ax.set_ylim([2e-1, 3])
 
     #add the date and time to the filename
     now = datetime.now()
@@ -502,15 +501,14 @@ def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, ha
 
     return fin_quartiles_ckpt, beg_quartiles_ckpt, x_values
 
-def load_quartiles_ckpt_files(haystack_len, model_dir, experiment, abs_err=False):
-    train_conv_fin_quartiles_file = model_dir + experiment + f"/needles/train_conv/" + ("abs_err_" if abs_err else "") + f"train_conv_fin_quartiles_haystack_len_{haystack_len}.pkl"
-    train_conv_beg_quartiles_file = model_dir + experiment + f"/needles/train_conv/" + ("abs_err_" if abs_err else "") + f"train_conv_beg_quartiles_haystack_len_{haystack_len}.pkl"
-    x_values_file = model_dir + experiment + f"/needles/train_conv/" + ("abs_err_" if abs_err else "") + f"x_values_haystack_len_{haystack_len}.npy"
+def load_quartiles_ckpt_files(config, haystack_len, model_dir, experiment, abs_err=False):
+    train_conv_fin_quartiles_file = model_dir + experiment + f"/needles/train_conv/" + (config.datasource + "_" if config.datasource != "val" else "") + ("abs_err_" if abs_err else "") + f"train_conv_fin_quartiles_haystack_len_{haystack_len}.pkl"
+    train_conv_beg_quartiles_file = model_dir + experiment + f"/needles/train_conv/" + (config.datasource + "_" if config.datasource != "val" else "") + ("abs_err_" if abs_err else "") + f"train_conv_beg_quartiles_haystack_len_{haystack_len}.pkl"
+    x_values_file = model_dir + experiment + f"/needles/train_conv/" + (config.datasource + "_" if config.datasource != "val" else "") + ("abs_err_" if abs_err else "") + f"x_values_haystack_len_{haystack_len}.npy"
 
     fin_quartiles_ckpt = None
     beg_quartiles_ckpt = None
     x_values = None
-    
 
 
     if os.path.exists(train_conv_fin_quartiles_file):
@@ -628,7 +626,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
     
     if haystack_len == 19 and not abs_err:
         if ckpt_step is not None:
-            quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(model_dir, experiment)
+            quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(config, model_dir, experiment)
 
             if quartiles is None or seg_ext_quartiles is None or compute_more:
                 print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
@@ -668,7 +666,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
         
     
     # load quartiles_ckpt_files
-    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(haystack_len, model_dir, experiment, abs_err)
+    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(config, haystack_len, model_dir, experiment, abs_err)
 
     if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None or compute_more:
 

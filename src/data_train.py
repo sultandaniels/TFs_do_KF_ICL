@@ -567,31 +567,7 @@ def initialize_err_list(ts):
     err_dict_list = [{"lstsq": [], "loglog": [], "loglin": [], "loglogreg": [], "dumb": []} for t in range(len(ts))]
     return err_dict_list
 
-
-def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=False):
-        
-    kal_step = None
-    if config.needle_in_haystack:
-        # num_sys_haystack = 4
-        config.override("num_test_traces_configs", 1)
-        # config.override("num_sys_haystack", num_sys_haystack)
-        # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
-        # if config.num_sys_haystack == 1:
-        #     num_haystack_examples = 50
-        # else:
-        if abs_err:
-            num_haystack_examples = 1
-        else:
-            num_haystack_examples = 50
-        config.override("num_haystack_examples", num_haystack_examples)
-
-    else:
-        if not config.zero_cut:
-            config.override("num_test_traces_configs", 1)
-            config.override("single_system", True)
-    filecount = 0
-
-    
+def gen_ckpt_pred_steps(config):
     #generate specific ckpt steps to predict on
     #params for vanilla ident model:
     if config.val_dataset_typ == "ident" and config.use_pos_emb and config.n_embd == 128:
@@ -740,6 +716,35 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=
         phases = [minval, 4000, 10000, 22500, 66000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    return ckpt_pred_steps
+
+
+def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=False):
+        
+    kal_step = None
+    if config.needle_in_haystack:
+        # num_sys_haystack = 4
+        config.override("num_test_traces_configs", 1)
+        # config.override("num_sys_haystack", num_sys_haystack)
+        # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
+        # if config.num_sys_haystack == 1:
+        #     num_haystack_examples = 50
+        # else:
+        if abs_err:
+            num_haystack_examples = 1
+        else:
+            num_haystack_examples = 50
+        config.override("num_haystack_examples", num_haystack_examples)
+
+    else:
+        if not config.zero_cut:
+            config.override("num_test_traces_configs", 1)
+            config.override("single_system", True)
+    filecount = 0
+
+    
+    ckpt_pred_steps = gen_ckpt_pred_steps(config) #generate specific ckpt steps to predict on
 
     run_kf_ols = True
     for filename in os.listdir(output_dir + "/checkpoints/"):
@@ -1385,6 +1390,80 @@ def set_config_params(config, model_name):
     return output_dir
 
 
+def get_test_data(config, output_dir):
+    # load the validation data
+    if (config.datasource == "val"):
+
+        print(f"getting test data from datasource {config.datasource}")
+
+        # get the sim objs for the validation data
+        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            sim_objs = pickle.load(f)
+
+        #set ys to be the validation data
+        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            samples = pickle.load(f)
+            # for every 2000 entries in samples, get the observation values and append them to the ys list
+            ys = np.stack(
+                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+
+            gc.collect()  # Start the garbage collector to free up memory
+
+    elif config.datasource == "train":
+
+        print(f"getting test data from datasource {config.datasource}")
+
+        #get the sim_objs for the training data
+        with open (output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            sim_objs = pickle.load(f)
+
+        #set ys to be the training data
+        with open(output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            #get train traces
+            samples = pickle.load(f)
+            ys = np.stack(
+                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+            gc.collect()  # Start the garbage collector
+
+    elif config.datasource == "train_systems":
+
+        print(f"getting test data from datasource {config.datasource}")
+
+        #get the sim_objs for the training data
+        with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            sim_objs = pickle.load(f)
+
+        #generate traces from the training systems
+        collect_data(config, output_dir, "val", False, False, False, sim_objs) 
+
+        with open(output_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+            #get train traces
+            samples = pickle.load(f)
+            ys = np.stack(
+                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            gc.collect()  # Start the garbage collector
+
+    else:
+        raise ValueError("Datasource not recognized. Please choose from the following: val, train, train_systems")
+
+    return ys, sim_objs
+
+def get_kal_step(config, output_dir):
+    #get kal_step
+    ckpt_pred_steps = gen_ckpt_pred_steps(config)
+    for filename in os.listdir(output_dir + "/checkpoints/"):
+        filename_step = filename.split("=")[1].split(".")[0]
+        filename_step = int(filename_step)
+
+        if filename_step not in ckpt_pred_steps:
+            continue
+
+        kal_step = filename_step
+        return kal_step
+    
 
 
 # main function
@@ -1413,6 +1492,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str, help='Name of the model to use')
     parser.add_argument('--abs_err', help='Boolean. Do not take the ratios of the gauss errors', action='store_true')
     parser.add_argument('--desktop', help='Boolean. Run on desktop', action='store_true')
+    parser.add_argument('--datasource', type=str, help='Name of the datasource to use', default="val")
 
 
 
@@ -1456,6 +1536,8 @@ if __name__ == '__main__':
     abs_err = args.abs_err
     print("desktop arg", args.desktop)
     desktop = args.desktop
+    print("datasource arg", args.datasource)
+    datasource = args.datasource
 
 
 
@@ -1479,6 +1561,8 @@ if __name__ == '__main__':
 
 
     config = Config() # create a config object
+    config.override("datasource", datasource) # set the datasource in the config object
+
     # Get the class variables in dictionary format
     config_dict  = {
         "seed": 0,
@@ -1551,7 +1635,7 @@ if __name__ == '__main__':
                     model_dir, experiment = split_path(output_dir)
 
                     # load quartiles_ckpt_files
-                    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(num_sys, model_dir, experiment)
+                    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(config, num_sys, model_dir, experiment)
 
                     if fin_quartiles_ckpt is not None and beg_quartiles_ckpt is not None and x_values is not None:
                         print(f"quartiles already exist for haystack length {num_sys}")
@@ -1559,13 +1643,9 @@ if __name__ == '__main__':
                         if saved_preds:
                             file_count = 0
 
+                            
                             if config.val_dataset_typ == "gaussA":
-                                for filename in os.listdir(output_dir + "/checkpoints/"):
-                                    file_count += 1
-                                    kal_step = filename.split("=")[1].split(".")[0]
-                                    kal_step = int(kal_step)
-                                    if file_count > 0:
-                                        break
+                                kal_step = get_kal_step(config, output_dir)
                             
                             if num_sys == 19:
                                 if desktop:
@@ -1601,13 +1681,7 @@ if __name__ == '__main__':
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
                             print(f"err_lss_examples.pkl exists for haystack length {num_sys}")
 
-                            file_count = 0
-                            for filename in os.listdir(output_dir + "/checkpoints/"):
-                                file_count += 1
-                                kal_step = filename.split("=")[1].split(".")[0]
-                                kal_step = int(kal_step)
-                                if file_count > 0:
-                                    break
+                            kal_step = get_kal_step(config, output_dir)
                                 
                             if num_sys == 19:
                                 if desktop:
@@ -1633,26 +1707,7 @@ if __name__ == '__main__':
 
                                         ckpt_path = output_dir + "/checkpoints/" + last_ckpt
 
-                                        # load the validation data
-                                        if (config.datasource == "val"):
-
-                                            print(f"getting test data from datasource {config.datasource}")
-
-                                            config.override("num_haystack_examples", 50)
-
-                                            # get the sim objs for the validation data
-                                            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                                                sim_objs = pickle.load(f)
-
-                                            #set ys to be the validation data
-                                            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                                                samples = pickle.load(f)
-                                                # for every 2000 entries in samples, get the observation values and append them to the ys list
-                                                ys = np.stack(
-                                                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-                                                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-
-                                                gc.collect()  # Start the garbage collector to free up memory
+                                        ys, sim_objs = get_test_data(config, output_dir)
 
                                         #run none train_conv
                                         config.override("num_test_traces_configs", num_sys)
@@ -1676,24 +1731,7 @@ if __name__ == '__main__':
 
                 config.override("needle_final_seg_extended", False)
 
-                # load the validation data
-                if (config.datasource == "val"):
-
-                    print(f"getting test data from datasource {config.datasource}")
-
-                    # get the sim objs for the validation data
-                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                        sim_objs = pickle.load(f)
-
-                    #set ys to be the validation data
-                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                        samples = pickle.load(f)
-                        # for every 2000 entries in samples, get the observation values and append them to the ys list
-                        ys = np.stack(
-                            [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-                        ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-
-                        gc.collect()  # Start the garbage collector to free up memory
+                ys, sim_objs = get_test_data(config, output_dir)
 
                 print(f"output dir: {output_dir}")
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
@@ -1741,25 +1779,7 @@ if __name__ == '__main__':
             output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
             if make_preds:
 
-
-                # load the validation data
-                if (config.datasource == "val"):
-
-                    print(f"getting test data from datasource {config.datasource}")
-
-                    # get the sim objs for the validation data
-                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-                        sim_objs = pickle.load(f)
-
-                    #set ys to be the validation data
-                    with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-                        samples = pickle.load(f)
-                        # for every 2000 entries in samples, get the observation values and append them to the ys list
-                        ys = np.stack(
-                            [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-                        ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
-
-                        gc.collect()  # Start the garbage collector to free up memory
+                ys, sim_objs = get_test_data(config, output_dir)
 
                 predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
         
