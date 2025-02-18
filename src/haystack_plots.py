@@ -364,6 +364,8 @@ def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, ha
 
     batch_size = config.batch_size
     gpus = len(config.devices)
+    acc = config.acc_grad_batch if hasattr(config, "acc_grad_batch") else 1
+    print(f"gradient accumulation: {acc}")
 
     kal_err = None
 
@@ -429,11 +431,11 @@ def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, ha
             torch.cuda.empty_cache()
             gc.collect()
 
-            print(f"batch_size: {batch_size}, gpus: {gpus}, ckpt_step: {ckpt_step}, last_pred_ckpt: {last_pred_ckpt}")
+            print(f"batch_size: {batch_size}, accumulation: {acc}, gpus: {gpus}, ckpt_step: {ckpt_step}, last_pred_ckpt: {last_pred_ckpt}")
             if len(x_values) > 0:
-                x_value = batch_size*gpus*(ckpt_step - last_pred_ckpt) + x_values[-1]
+                x_value = batch_size*acc*gpus*(ckpt_step - last_pred_ckpt) + x_values[-1]
             else:
-                x_value = batch_size*gpus*(ckpt_step - last_pred_ckpt)
+                x_value = batch_size*acc*gpus*(ckpt_step - last_pred_ckpt)
 
             print(f"x_value: {x_value}")
             x_values.append(x_value)
@@ -606,10 +608,12 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
 
-    os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace", exist_ok=True)
-    print(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf")
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf", transparent=True, format="pdf")
-    fig_len.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
+    figure_dir = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + (f"{config.datasource}/" if config.datasource != "val" else "")
+    os.makedirs(figure_dir, exist_ok=True)
+    print(figure_dir + ("abs_err_" if abs_err else "") + f"{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf")
+
+    fig.savefig(figure_dir + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf", transparent=True, format="pdf")
+    fig_len.savefig(figure_dir + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
 
     plt.show()
     return None
