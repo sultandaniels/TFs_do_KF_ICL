@@ -656,18 +656,57 @@ def haystack_plots_train_conv_full(config, haystack_len, output_dir, pred_ckpt_s
 
     return ckpt_step
 
+def haystack_plots_needle_full(config, haystack_len, output_dir, ckpt_step, steps_in, colors, compute_more=False):
+
+    open_paren_ind = (config.len_seg_haystack + 2)*haystack_len + 1 #compute the open paren index
+
+    model_dir, experiment = split_path(output_dir)
+    if ckpt_step is not None:
+        quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(config, model_dir, experiment)
+
+        if quartiles is None or seg_ext_quartiles is None or compute_more:
+            print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
+
+            #get the err_lss_examples
+            errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
+            errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+            seg_ext_errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_fin_seg_ext_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+
+            with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
+                err_lss_examples = pickle.load(f)
+
+            with open(seg_ext_errs_loc + "err_lss_examples.pkl", "rb") as f:
+                seg_ext_err_lss_examples = pickle.load(f)
+
+            
+            if config.val_dataset_typ == "gaussA":
+                rat = True
+            else:
+                rat = False
+            quartiles = comp_quartiles(err_lss_examples, ratio=rat)
+            seg_ext_quartiles = comp_quartiles(seg_ext_err_lss_examples, ratio=rat)
+
+            save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
+
+        #plot needle position
+        plot_needle_position(config, experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
+
+        #plot steps after open token
+        plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
+
+        print(f"open_paren_ind: {open_paren_ind}")
+
+            
+    else:
+        raise ValueError("last ckpt_step is none for haystack_len 19")
+    
+    return None
+
    
 
 
-def haystack_plots(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, compute_more=False, abs_err=False):
+def haystack_plots(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in=[1,2,3,5,10], colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6'], compute_more=False, abs_err=False):
 
-    colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
-
-    open_paren_ind = (config.len_seg_haystack + 2)*haystack_len + 1 #compute teh open paren index
-
-    steps_in = [1,2,3,5,10]
-
-    model_dir, experiment = split_path(output_dir)
        
     
     # # load quartiles_ckpt_files
@@ -698,44 +737,45 @@ def haystack_plots(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, 
 
     
     if haystack_len == 19 and not abs_err:
-        if ckpt_step is not None:
-            quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(config, model_dir, experiment)
+        haystack_plots_needle_full(config, haystack_len, output_dir, ckpt_step, steps_in, colors, compute_more)
+        # if ckpt_step is not None:
+        #     quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(config, model_dir, experiment)
 
-            if quartiles is None or seg_ext_quartiles is None or compute_more:
-                print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
+        #     if quartiles is None or seg_ext_quartiles is None or compute_more:
+        #         print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
 
-                #get the err_lss_examples
-                errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
-                errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
-                seg_ext_errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_fin_seg_ext_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+        #         #get the err_lss_examples
+        #         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
+        #         errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+        #         seg_ext_errs_loc = errs_dir + f"/needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_fin_seg_ext_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
 
-                with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
-                    err_lss_examples = pickle.load(f)
+        #         with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
+        #             err_lss_examples = pickle.load(f)
 
-                with open(seg_ext_errs_loc + "err_lss_examples.pkl", "rb") as f:
-                    seg_ext_err_lss_examples = pickle.load(f)
-
-                
-                if config.val_dataset_typ == "gaussA":
-                    rat = True
-                else:
-                    rat = False
-                quartiles = comp_quartiles(err_lss_examples, ratio=rat)
-                seg_ext_quartiles = comp_quartiles(seg_ext_err_lss_examples, ratio=rat)
-
-                save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
-
-            #plot needle position
-            plot_needle_position(config, experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
-
-            #plot steps after open token
-            plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
-
-            print(f"open_paren_ind: {open_paren_ind}")
+        #         with open(seg_ext_errs_loc + "err_lss_examples.pkl", "rb") as f:
+        #             seg_ext_err_lss_examples = pickle.load(f)
 
                 
-        else:
-            raise ValueError("last ckpt_step is none for haystack_len 19")
+        #         if config.val_dataset_typ == "gaussA":
+        #             rat = True
+        #         else:
+        #             rat = False
+        #         quartiles = comp_quartiles(err_lss_examples, ratio=rat)
+        #         seg_ext_quartiles = comp_quartiles(seg_ext_err_lss_examples, ratio=rat)
+
+        #         save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_quartiles)
+
+        #     #plot needle position
+        #     plot_needle_position(config, experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
+
+        #     #plot steps after open token
+        #     plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
+
+        #     print(f"open_paren_ind: {open_paren_ind}")
+
+                
+        # else:
+        #     raise ValueError("last ckpt_step is none for haystack_len 19")
 
 
 

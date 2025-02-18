@@ -20,7 +20,7 @@ import torch
 import shutil
 import time
 from get_last_checkpoint import get_last_checkpoint, split_path, find_smallest_step_subdir
-from haystack_plots import haystack_plots, load_quartiles_ckpt_files, haystack_plots_train_conv_full
+from haystack_plots import haystack_plots, load_quartiles_ckpt_files, haystack_plots_train_conv_full, haystack_plots_needle_full
 from gen_pred_cktps import gen_pred_ckpts
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
@@ -1733,6 +1733,8 @@ if __name__ == '__main__':
         if multi_haystack:
 
             ckpt_pred_steps = gen_ckpt_pred_steps(config)
+            steps_in = [1,2,3,5,10]
+            colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
 
             output_dir = set_config_params(config, model_name)
         
@@ -1800,38 +1802,40 @@ if __name__ == '__main__':
                             print(f"err_lss_examples.pkl exists for haystack length {num_sys}")
 
                             kal_step = get_kal_step(config, output_dir)
+
+                            print("making train_conv plots for haystack len:", num_sys)
+                            pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                            print(f"pred_ckpt_step: {pred_ckpt_step}")
                                 
                             if num_sys == 19:
-                                if desktop:
-                                    last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
-                                else:
-                                    last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+                                # if desktop:
+                                #     last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
+                                # else:
+                                #     last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
 
-                                    if last_ckpt is not None:
-                                        last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
-                                    else:
-                                        raise ValueError("get_last_checkpoint returned None")
+                                #     if last_ckpt is not None:
+                                #         last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                                #     else:
+                                #         raise ValueError("get_last_checkpoint returned None")
                                     
-                                    print(f"last_ckpt_step: {last_ckpt_step}")
+                                #     print(f"last_ckpt_step: {last_ckpt_step}")
 
                                     #check for err_lss_examples at the last ckpt
-                                    errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={last_ckpt_step}.ckpt"
+                                    errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
                                     errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
-
 
                                     if not os.path.exists(errs_loc + "err_lss_examples.pkl"):
                                         print(f"err_lss_examples.pkl does not exist for non train conv at last ckpt")
                                         make_preds = True
 
-                                        ckpt_path = output_dir + "/checkpoints/" + last_ckpt
+                                        ckpt_path = output_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
 
                                         ys, sim_objs = get_test_data(config, output_dir)
 
                                         #run none train_conv
                                         config.override("num_test_traces_configs", num_sys)
                                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
-                                        print("finished making predictions for non train conv at last ckpt")
-
+                                        print("finished making predictions for non train conv at early stop ckpt")
 
                                         #run no punctuation final segment
                                         config.override("needle_final_seg_extended", True)
@@ -1839,9 +1843,9 @@ if __name__ == '__main__':
                                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
                                         make_preds = False
                                 
-                            print("making plots for haystack len:", num_sys)
-                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
-
+                                print("making needle plots for haystack len:", num_sys)
+                                haystack_plots_needle_full(config, num_sys, output_dir, pred_ckpt_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                            
                             continue
 
                 print("\n\n\nstarting predictions for haystack len:", num_sys)
@@ -1860,11 +1864,14 @@ if __name__ == '__main__':
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
                 kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err)
 
-                if num_sys == 19 and not abs_err:
-                    #get the last checkpoint
-                    last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+                print(f"plotting train_conv convergence plots for haystack len {num_sys}")
+                pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
 
-                    if last_ckpt is not None:
+                if num_sys == 19 and not abs_err:
+                    # #get the last checkpoint
+                    # last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                    if pred_ckpt_step is not None:
 
                         ckpt_path = output_dir + "/checkpoints/" + last_ckpt
 
@@ -1881,17 +1888,20 @@ if __name__ == '__main__':
                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
 
                     else:
-                        raise ValueError("get_last_checkpoint returned None")
+                        raise ValueError("pred_ckpt_step returned None")
                 
                 end = time.time()
                 print(f"time elapsed for haystack len {num_sys} predictions (min): {(end - start)/60}")
                 
-                if last_ckpt is not None:
-                    last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
-                else:
-                    last_ckpt_step = None
+                # if last_ckpt is not None:
+                #     last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                # else:
+                #     last_ckpt_step = None
+
+                print("making needle plots for haystack len:", num_sys)
+                haystack_plots_needle_full(config, num_sys, output_dir, pred_ckpt_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                 
-                haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
+                # haystack_plots(config, num_sys, output_dir, pred_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
         else:
 
             output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
