@@ -20,7 +20,7 @@ import torch
 import shutil
 import time
 from get_last_checkpoint import get_last_checkpoint, split_path, find_smallest_step_subdir
-from haystack_plots import haystack_plots, load_quartiles_ckpt_files
+from haystack_plots import haystack_plots, load_quartiles_ckpt_files, haystack_plots_train_conv_full
 from gen_pred_cktps import gen_pred_ckpts
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
@@ -1732,6 +1732,8 @@ if __name__ == '__main__':
 
         if multi_haystack:
 
+            ckpt_pred_steps = gen_ckpt_pred_steps(config)
+
             output_dir = set_config_params(config, model_name)
         
             num_sys_haystacks = list(range(1,20))
@@ -1763,19 +1765,19 @@ if __name__ == '__main__':
                             if config.val_dataset_typ == "gaussA" and not desktop:
                                 kal_step = get_kal_step(config, output_dir)
                             
-                            if num_sys == 19:
-                                if desktop:
-                                    last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
-                                else:
-                                    last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+                            # if num_sys == 19:
+                            #     # if desktop:
+                            #     #     last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
+                            #     # else:
+                            #     #     last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
 
-                                    if last_ckpt is not None:
-                                        last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
-                                    else:
-                                        raise ValueError("get_last_checkpoint returned None")
+                            #     #     if last_ckpt is not None:
+                            #     #         last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                            #     #     else:
+                            #     #         raise ValueError("get_last_checkpoint returned None")
 
                             print("\n\nmaking plots for haystack len:", num_sys)
-                            haystack_plots(config, num_sys, output_dir, last_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
+                            haystack_plots(config, num_sys, output_dir, ckpt_pred_steps, kal_step, compute_more=make_preds, abs_err=abs_err)
                         continue
                     else:
                         print(f"\n\nchecking for err_lss_examples")

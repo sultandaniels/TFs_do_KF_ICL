@@ -533,6 +533,8 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     fig, ax = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
     fig_len, ax_len = plt.subplots(1, 1, sharex=True, figsize=(6, 4.7))
 
+    early_stop_ind = None
+
     # if valA == "ortho":
     #     steps = [1,2,3,5,10]
     # else:
@@ -553,11 +555,16 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
                     if not abs_err:
                         qs -= 1
 
-                #if key contains OLS then repeat the values in qs to be the length of x_values
-                if "OLS" in key:
-                    print(f"key: {key} qs shape: {qs.shape}")
-                    qs = np.repeat(qs, len(x_values), axis=0)
-                    print(f"qs shape after repeat: {qs.shape}")
+                # #if key contains OLS then repeat the values in qs to be the length of x_values
+                # if "OLS" in key:
+                #     print(f"key: {key} qs shape: {qs.shape}")
+                #     qs = np.repeat(qs, len(x_values), axis=0)
+                #     print(f"qs shape after repeat: {qs.shape}")
+
+                if step == 2:
+                    #find the index of the minimum of qs[1]
+                    early_stop_ind = np.argmin(qs[1])
+                    print(f"early_stop_ind: {early_stop_ind}, x_values[early_stop_ind]: {x_values[early_stop_ind]}")
                 
                 ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
                 # if not valA == "gaussA":
@@ -616,9 +623,43 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     fig_len.savefig(figure_dir + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
 
     plt.show()
-    return None
+    return early_stop_ind
 
-def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, compute_more=False, abs_err=False):
+
+def haystack_plots_train_conv_full(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more=False, abs_err=False):
+
+    model_dir, experiment = split_path(output_dir)
+       
+    # load quartiles_ckpt_files
+    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(config, haystack_len, model_dir, experiment, abs_err)
+
+    if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None or compute_more:
+
+        print(f"\ncomputing train conv quartiles for haystack_len: {haystack_len}")
+    
+        last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
+        last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
+        last_ckpt = int(last_ckpt)
+
+        print(f"config.train_int: {config.train_int}, last_ckpt: {last_ckpt}")
+
+        ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
+
+        #compute quartiles for train conv
+        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err)
+
+
+    #plot haystack train conv
+    early_stop_ind = plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
+
+    ckpt_step = pred_ckpt_steps[early_stop_ind] #get the ckpt_step for the early stopping index
+
+    return ckpt_step
+
+   
+
+
+def haystack_plots(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, compute_more=False, abs_err=False):
 
     colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
 
@@ -627,6 +668,34 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
     steps_in = [1,2,3,5,10]
 
     model_dir, experiment = split_path(output_dir)
+       
+    
+    # # load quartiles_ckpt_files
+    # train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(config, haystack_len, model_dir, experiment, abs_err)
+
+    # if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None or compute_more:
+
+    #     print(f"\ncomputing train conv quartiles for haystack_len: {haystack_len}")
+    
+    #     last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
+    #     last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
+    #     last_ckpt = int(last_ckpt)
+
+    #     print(f"config.train_int: {config.train_int}, last_ckpt: {last_ckpt}")
+
+    #     ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
+
+    #     #compute quartiles for train conv
+    #     fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err)
+
+
+    # #plot haystack train conv
+    # early_stop_ind = plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
+
+    # ckpt_step = pred_ckpt_steps[early_stop_ind] #get the ckpt_step for the early stopping index
+    
+    ckpt_step = haystack_plots_train_conv_full(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more, abs_err)
+
     
     if haystack_len == 19 and not abs_err:
         if ckpt_step is not None:
@@ -667,37 +736,7 @@ def haystack_plots(config, haystack_len, output_dir, ckpt_step, kal_step, comput
                 
         else:
             raise ValueError("last ckpt_step is none for haystack_len 19")
-        
-    
-    # load quartiles_ckpt_files
-    train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(config, haystack_len, model_dir, experiment, abs_err)
 
-    if fin_quartiles_ckpt is None or beg_quartiles_ckpt is None or x_values is None or compute_more:
-
-        print(f"\ncomputing train conv quartiles for haystack_len: {haystack_len}")
-    
-        last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
-        last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
-        last_ckpt = int(last_ckpt)
-
-        print(f"config.train_int: {config.train_int}, last_ckpt: {last_ckpt}")
-
-        ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
-
-        #compute quartiles for train conv
-        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err)
-
-
-    #plot haystack train conv
-    plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
-
-    # #delete big files
-    # #delete the err_lss_examples for this test run
-    # if os.path.exists(errs_loc + "err_lss_examples.pkl"):
-    #     os.remove(errs_loc + "err_lss_examples.pkl")
-    # #delete the seg_ext_err_lss_examples for this test run
-    # if os.path.exists(seg_ext_errs_loc + "err_lss_examples.pkl"):
-    #     os.remove(seg_ext_errs_loc + "err_lss_examples.pkl")
 
 
     return None

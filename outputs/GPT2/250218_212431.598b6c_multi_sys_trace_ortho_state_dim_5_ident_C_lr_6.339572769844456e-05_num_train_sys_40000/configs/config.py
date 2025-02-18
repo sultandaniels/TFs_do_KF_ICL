@@ -75,7 +75,7 @@ class Config(object, metaclass=Singleton):
     # clamp_len = 1000
 
     # Optimizer parameters
-    learning_rate = 0.833333*1.584893192461114e-05 #1.9054607179632464e-05
+    learning_rate = 4*1.584893192461114e-05 #1.9054607179632464e-05
     weight_decay = 1e-2
 
     # Gradient Clipping
