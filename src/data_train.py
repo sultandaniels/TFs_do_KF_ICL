@@ -568,6 +568,7 @@ def initialize_err_list(ts):
     return err_dict_list
 
 def gen_ckpt_pred_steps(config):
+
     #generate specific ckpt steps to predict on
     #params for vanilla ident model:
     if config.val_dataset_typ == "ident" and config.use_pos_emb and config.n_embd == 128:
@@ -595,6 +596,7 @@ def gen_ckpt_pred_steps(config):
 
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
 
+    #params for ident nope model:
     elif config.val_dataset_typ == "ident" and not config.use_pos_emb:
         minval = 100
         maxval = 15600
@@ -605,6 +607,7 @@ def gen_ckpt_pred_steps(config):
 
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
     
+    #params for ortho nope model
     elif config.val_dataset_typ == "ortho" and not config.use_pos_emb:
         minval = 3000
         maxval = 201000
@@ -740,7 +743,7 @@ def gen_ckpt_pred_steps(config):
     return ckpt_pred_steps
 
 
-def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=False):
+def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=False, num_haystack_examples=50):
         
     kal_step = None
     if config.needle_in_haystack:
@@ -751,10 +754,10 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err=
         # if config.num_sys_haystack == 1:
         #     num_haystack_examples = 50
         # else:
-        if abs_err:
-            num_haystack_examples = 1
-        else:
-            num_haystack_examples = 50
+        # if abs_err:
+        #     num_haystack_examples = 1
+        # else:
+        #     num_haystack_examples = 50
         config.override("num_haystack_examples", num_haystack_examples)
 
     else:
@@ -1498,8 +1501,27 @@ def set_config_params(config, model_name):
 
     return output_dir
 
+def get_entries(config, f):
+    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+        num_traces = config.num_traces["val"]
+    elif config.datasource == "train":
+        num_traces = config.num_traces["train"]
+    else:
+        raise ValueError(f"datasource {config.datasource} not recognized")
+    samples = pickle.load(f)
+    if config.late_start:
+        ys = np.stack(
+            [entry["obs"] for entry in samples], axis=0
+        ).reshape((config.num_tasks, num_traces, 251, config.ny)).astype(np.float32)
+    else:
+        ys = np.stack(
+            [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+        ).reshape((config.num_tasks, num_traces, config.n_positions + 1, config.ny)).astype(np.float32)
+    gc.collect()  # Start the garbage collector
+    return ys
 
-def get_test_data(config, output_dir):
+    
+def get_test_data(config, output_dir, num_haystack_ex=50):
     # load the validation data
     if (config.datasource == "val"):
 
@@ -1511,17 +1533,20 @@ def get_test_data(config, output_dir):
 
         #set ys to be the validation data
         with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-            samples = pickle.load(f)
-            # for every 2000 entries in samples, get the observation values and append them to the ys list
-            ys = np.stack(
-                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-            ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            # samples = pickle.load(f)
+            # # for every 2000 entries in samples, get the observation values and append them to the ys list
+            # ys = np.stack(
+            #     [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            # ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            ys = get_entries(config, f)
 
             gc.collect()  # Start the garbage collector to free up memory
 
     elif config.datasource == "train":
 
         print(f"getting test data from datasource {config.datasource}")
+
+        max_num_sys = num_haystack_ex + config.max_sys_trace #max number of systems to use for testing
 
         #get the sim_objs for the training data
         with open (output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
@@ -1530,11 +1555,21 @@ def get_test_data(config, output_dir):
         #set ys to be the training data
         with open(output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
             #get train traces
-            samples = pickle.load(f)
-            ys = np.stack(
-                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-            ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+            # samples = pickle.load(f)
+            # ys = np.stack(
+            #     [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            # ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+            ys = get_entries(config, f)
             gc.collect()  # Start the garbage collector
+        
+        print(f"len of sim_objs {len(sim_objs)}")
+        sim_objs = sim_objs[:max_num_sys]
+        print(f"len of sim_objs {len(sim_objs)}")
+
+        print(f"shape of ys: {ys.shape}")
+        ys = ys[:max_num_sys]
+        print(f"shape of ys: {ys.shape}")
+    
 
     elif config.datasource == "train_systems":
 
@@ -1549,10 +1584,11 @@ def get_test_data(config, output_dir):
 
         with open(output_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
             #get train traces
-            samples = pickle.load(f)
-            ys = np.stack(
-                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-            ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            # samples = pickle.load(f)
+            # ys = np.stack(
+            #     [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+            # ).reshape((config.num_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            ys = get_entries(config, f)
             gc.collect()  # Start the garbage collector
 
     else:
@@ -1602,6 +1638,7 @@ if __name__ == '__main__':
     parser.add_argument('--abs_err', help='Boolean. Do not take the ratios of the gauss errors', action='store_true')
     parser.add_argument('--desktop', help='Boolean. Run on desktop', action='store_true')
     parser.add_argument('--datasource', type=str, help='Name of the datasource to use', default="val")
+    parser.add_argument('--late_start', help="Boolean. Start traces from a later index for interleaving at test time", action='store_true')
 
 
 
@@ -1647,6 +1684,8 @@ if __name__ == '__main__':
     desktop = args.desktop
     print("datasource arg", args.datasource)
     datasource = args.datasource
+    print("late_start arg", args.late_start)
+    late_start = args.late_start
 
 
 
@@ -1678,6 +1717,9 @@ if __name__ == '__main__':
 
     config = Config() # create a config object
     config.override("datasource", datasource) # set the datasource in the config object
+
+    # config.override("late_start", late_start) # set the late_start in the config object
+    config.override("late_start", late_start)
 
     # Get the class variables in dictionary format
     config_dict  = {
@@ -1730,13 +1772,18 @@ if __name__ == '__main__':
         last_ckpt_step = None
         kal_step = None
 
+        if abs_err: #if we are not taking the ratios of the gauss errors
+            num_haystack_examples = 1
+        else:
+            num_haystack_examples = 50 #number of haystack examples to use for testing
+
         if multi_haystack:
+
+            output_dir = set_config_params(config, model_name)
 
             ckpt_pred_steps = gen_ckpt_pred_steps(config)
             steps_in = [1,2,3,5,10]
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
-
-            output_dir = set_config_params(config, model_name)
         
             num_sys_haystacks = list(range(1,20))
             print("num_sys_haystacks:", num_sys_haystacks)
@@ -1820,28 +1867,28 @@ if __name__ == '__main__':
                                     
                                 #     print(f"last_ckpt_step: {last_ckpt_step}")
 
-                                    #check for err_lss_examples at the last ckpt
-                                    errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
-                                    errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
+                                #check for err_lss_examples at the last ckpt
+                                errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
+                                errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
 
-                                    if not os.path.exists(errs_loc + "err_lss_examples.pkl"):
-                                        print(f"err_lss_examples.pkl does not exist for non train conv at last ckpt")
-                                        make_preds = True
+                                if not os.path.exists(errs_loc + "err_lss_examples.pkl"):
+                                    print(f"err_lss_examples.pkl does not exist for non train conv at last ckpt")
+                                    make_preds = True
 
-                                        ckpt_path = output_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
+                                    ckpt_path = output_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
 
-                                        ys, sim_objs = get_test_data(config, output_dir)
+                                    ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
-                                        #run none train_conv
-                                        config.override("num_test_traces_configs", num_sys)
-                                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
-                                        print("finished making predictions for non train conv at early stop ckpt")
+                                    #run none train_conv
+                                    config.override("num_test_traces_configs", num_sys)
+                                    run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+                                    print("finished making predictions for non train conv at early stop ckpt")
 
-                                        #run no punctuation final segment
-                                        config.override("needle_final_seg_extended", True)
+                                    #run no punctuation final segment
+                                    config.override("needle_final_seg_extended", True)
 
-                                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
-                                        make_preds = False
+                                    run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+                                    make_preds = False
                                 
                                 print("making needle plots for haystack len:", num_sys)
                                 haystack_plots_needle_full(config, num_sys, output_dir, pred_ckpt_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -1853,7 +1900,7 @@ if __name__ == '__main__':
 
                 config.override("needle_final_seg_extended", False)
 
-                ys, sim_objs = get_test_data(config, output_dir)
+                ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
                 print(f"output dir: {output_dir}")
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
@@ -1862,7 +1909,7 @@ if __name__ == '__main__':
                 #run train_conv
 
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
-                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err)
+                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err, num_haystack_examples)
 
                 print(f"plotting train_conv convergence plots for haystack len {num_sys}")
                 pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -1886,6 +1933,14 @@ if __name__ == '__main__':
                         config.override("needle_final_seg_extended", True)
 
                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+                
+                        # if last_ckpt is not None:
+                        #     last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
+                        # else:
+                        #     last_ckpt_step = None
+
+                        print("making needle plots for haystack len:", num_sys)
+                        haystack_plots_needle_full(config, num_sys, output_dir, pred_ckpt_step, steps_in, colors, compute_more=make_preds)
 
                     else:
                         raise ValueError("pred_ckpt_step returned None")
@@ -1893,21 +1948,13 @@ if __name__ == '__main__':
                 end = time.time()
                 print(f"time elapsed for haystack len {num_sys} predictions (min): {(end - start)/60}")
                 
-                # if last_ckpt is not None:
-                #     last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
-                # else:
-                #     last_ckpt_step = None
-
-                print("making needle plots for haystack len:", num_sys)
-                haystack_plots_needle_full(config, num_sys, output_dir, pred_ckpt_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
-                
                 # haystack_plots(config, num_sys, output_dir, pred_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
         else:
 
             output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
             if make_preds:
 
-                ys, sim_objs = get_test_data(config, output_dir)
+                ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
                 predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
         

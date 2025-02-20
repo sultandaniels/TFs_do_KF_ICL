@@ -104,7 +104,8 @@ class Config(object, metaclass=Singleton):
     def override(self, key, value):
         self.__class__.__immutable = False
         if not hasattr(self, key):
-            raise Exception("Tried to override non-existing key: " + key)
+            # raise Exception("Tried to override non-existing key: " + key)
+            print("Creating new key: " + key)
         setattr(self, key, value)
         self.__class__.__immutable = True
 
