@@ -30,3 +30,6 @@ colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
 find /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000/checkpoints -name 'step=*.ckpt' | grep -v 'step=[0-9]*[05]00.ckpt' | xargs rm
 
 find /home/ubuntu/gauss-NoPE-GH200/TFs_do_KF_ICL/outputs/GPT2/250125_210849.09203d_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000/checkpoints -name 'step=*.ckpt' | grep -v 'step=[0-9]*000.ckpt' | xargs -r rm
+
+
+for i in {1,2,3,4,5,6,200}; do CUDA_VISIBLE_DEVICES=0 python data_train.py --make_preds --multi_haystack --model_name gauss --datasource train --late_start $i; done

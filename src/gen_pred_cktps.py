@@ -47,14 +47,14 @@ def gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False):
 
 if __name__ == "__main__":
     minval = 1000
-    maxval = 92000
+    maxval = 89000
     train_int = 1000
 
-    phases = [minval, 10000, 21000, maxval]
+    phases = [minval, 10000, 19000, maxval]
 
-    ckpts = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
-    print(ckpts)
-    print(len(ckpts))
+    ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+    print(ckpt_pred_steps)
+    print(len(ckpt_pred_steps))
     
 
 

@@ -721,7 +721,7 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny model single lr:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 0.5*1.584893192461114e-05  and config.learning_rate < 1.5*1.584893192461114e-05:
+    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 0.95*1.584893192461114e-05  and config.learning_rate < 1.05*1.584893192461114e-05:
         minval = 1000
         maxval = 97000
         train_int = 1000
@@ -731,12 +731,23 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny model double lr:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 1.5*1.584893192461114e-05  and config.learning_rate < 2.5*1.584893192461114e-05:
+    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 1.95*1.584893192461114e-05  and config.learning_rate < 2.05*1.584893192461114e-05:
         minval = 1000
         maxval = 92000
         train_int = 1000
 
         phases = [minval, 10000, 21000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    #params for ortho tiny model smaller lr
+    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate < 1.584893192461114e-05:
+
+        minval = 1000
+        maxval = 89000
+        train_int = 1000
+
+        phases = [minval, 10000, 19000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
@@ -1493,6 +1504,48 @@ def set_config_params(config, model_name):
 
         config.override("learning_rate", 1.584893192461114e-05) 
 
+    elif model_name == "ortho_tiny_smaller_lr":
+
+        output_dir = "../outputs/GPT2/250215_185541.3091e0_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+
+        print("\n\nORTHOGONAL TINY SMALLER LR MODEL\n\n")
+
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        config.override("devices", [1, 3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 2048)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+        config.override("learning_rate", 0.833333*1.584893192461114e-05) 
+
+
+
     # elif model_name == "ortho_tiny_acc":
 
     else:
@@ -1504,19 +1557,24 @@ def set_config_params(config, model_name):
 def get_entries(config, f):
     if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
         num_traces = config.num_traces["val"]
+        if config.datasource == "val":
+            num_tasks = config.num_val_tasks
+        else:
+            num_tasks = config.num_tasks
     elif config.datasource == "train":
         num_traces = config.num_traces["train"]
+        num_tasks = config.num_tasks
     else:
         raise ValueError(f"datasource {config.datasource} not recognized")
     samples = pickle.load(f)
-    if config.late_start:
+    if config.late_start is not None:
         ys = np.stack(
             [entry["obs"] for entry in samples], axis=0
-        ).reshape((config.num_tasks, num_traces, 251, config.ny)).astype(np.float32)
+        ).reshape((num_tasks, num_traces, 251, config.ny)).astype(np.float32)
     else:
         ys = np.stack(
             [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-        ).reshape((config.num_tasks, num_traces, config.n_positions + 1, config.ny)).astype(np.float32)
+        ).reshape((num_tasks, num_traces, config.n_positions + 1, config.ny)).astype(np.float32)
     gc.collect()  # Start the garbage collector
     return ys
 
@@ -1638,7 +1696,7 @@ if __name__ == '__main__':
     parser.add_argument('--abs_err', help='Boolean. Do not take the ratios of the gauss errors', action='store_true')
     parser.add_argument('--desktop', help='Boolean. Run on desktop', action='store_true')
     parser.add_argument('--datasource', type=str, help='Name of the datasource to use', default="val")
-    parser.add_argument('--late_start', help="Boolean. Start traces from a later index for interleaving at test time", action='store_true')
+    parser.add_argument('--late_start', type=int, help="Integer. Start traces from a later index for interleaving at test time", default=None)
 
 
 
@@ -1782,7 +1840,7 @@ if __name__ == '__main__':
             output_dir = set_config_params(config, model_name)
 
             ckpt_pred_steps = gen_ckpt_pred_steps(config)
-            steps_in = [1,2,3,5,10]
+            steps_in = [1,2,3,5,6,10]
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
             num_sys_haystacks = list(range(1,20))

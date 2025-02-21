@@ -1071,8 +1071,8 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
         segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
         #initialize a dictionary to hold the next starting index for each system trace
-        if config.late_start:
-            next_start_ind = 200
+        if config.late_start is not None:
+            next_start_ind = config.late_start
         else:
             next_start_ind = 0
 
@@ -1211,8 +1211,8 @@ def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choi
 
     for trace_conf in range(num_trace_configs):
 
-            if config.late_start:
-                sys_start_ind = 200
+            if config.late_start is not None:
+                sys_start_ind = config.late_start
             else:
                 sys_start_ind = 0
 
