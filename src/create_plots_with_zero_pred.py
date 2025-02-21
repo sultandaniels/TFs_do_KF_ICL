@@ -441,6 +441,7 @@ def compute_OLS_needle(num_trace_configs, next_start_per_config, seg_lens_per_co
 def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
+    n_positions = ys.shape[-2] - 1
     torch.set_default_device(device)
     preds_rls_wentinn = torch.zeros(np.expand_dims(ys[0],axis=0).shape)
     preds_rls_wentinn_analytical = torch.zeros(np.expand_dims(ys[0,:,:,0], axis=0).shape)
@@ -459,7 +460,7 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
                 torch.zeros((*torch_ys.shape[:2], ir_length - 1, config.ny)).to(device), torch_ys.to(device)
             ], dim=-2)
 
-            Y_indices = torch.arange(ir_length, (config.n_positions - 1) + ir_length)[:, None]  # [(n_positions - 1) x 1]
+            Y_indices = torch.arange(ir_length, (n_positions - 1) + ir_length)[:, None]  # [(n_positions - 1) x 1]
             X_indices = Y_indices - 1 - torch.arange(ir_length)
 
             del torch_ys
@@ -512,7 +513,7 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             preds_rls_wentinn_sys = torch.vmap(Fn.conv2d)(
                 flattened_observation_IRs,                                              # [B x O_D x ir_length x O_D]
                 flattened_shifted_X.transpose(dim0=-2, dim1=-1)[..., None, :, :, None]  # [B x 1 x O_D x ir_length x 1]
-            ).reshape(*torch_ys.shape[:2], config.n_positions - 1, config.ny) # [n_systems x n_traces x (n_positions - 1)]
+            ).reshape(*torch_ys.shape[:2], n_positions - 1, config.ny) # [n_systems x n_traces x (n_positions - 1)]
 
             preds_rls_wentinn_sys = torch.cat([
                 torch.zeros_like(torch_ys[..., :2, :]),
