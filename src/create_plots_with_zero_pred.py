@@ -664,14 +664,17 @@ def compute_kf(ys, sim_objs):
         return errs_kf
 
 def compute_analytical_kf_simulation(config, ys, sim_objs, num_trials):
+
+    n_positions = ys.shape[-2] - 1
+
     # Analytical Kalman Predictions
     analytical_kf = np.array([np.trace(sim_obj.S_observation_inf) for sim_obj in sim_objs])
-    analytical_kf = analytical_kf.reshape((len(sim_objs), 1)) @ np.ones((1, config.n_positions))
+    analytical_kf = analytical_kf.reshape((len(sim_objs), 1)) @ np.ones((1, n_positions))
     
 
     #Analytical simulation predictions
-    #generate config.n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
-    an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (num_trials, config.n_positions+1)) for sim_obj in sim_objs])
+    #generate n_positions multivariate normal random variables with mean zero and covariance sim_obj.S_observation_inf and do this config.num_traces["val"] times for each sim_obj
+    an_sims = np.array([np.random.multivariate_normal(np.zeros(config.ny), sim_obj.S_observation_inf, (num_trials, n_positions+1)) for sim_obj in sim_objs])
     an_sims = np.linalg.norm(an_sims, axis=-1) ** 2
 
     return analytical_kf, an_sims
