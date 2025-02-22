@@ -258,7 +258,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
     return None
 
 
-def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope):
+def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, valA, experiment, datasource, open_paren_ind, n_positions, len_seg_haystack, nope, ckpt_step):
 
     if valA == "gaussA":
         seg_ext_quartiles_npz = seg_ext_quartiles
@@ -356,7 +356,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     plt.tight_layout()
 
     os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + f"last_seg_context_{valA}_embd_dim_{config.n_embd}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + f"last_seg_context_{valA}_embd_dim_{config.n_embd}__step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
     return None
 
 
@@ -700,7 +700,7 @@ def haystack_plots_needle_full(config, haystack_len, output_dir, ckpt_step, step
         plot_needle_position(config, experiment, config.datasource, config.nx, ckpt_step, config.val_dataset_typ, config.C_dist, haystack_len, steps_in, open_paren_ind, quartiles, seg_ext_quartiles, colors, not config.use_pos_emb)
 
         #plot steps after open token
-        plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb)
+        plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartiles, colors, config.val_dataset_typ, experiment, config.datasource, open_paren_ind, config.n_positions, config.len_seg_haystack, not config.use_pos_emb, ckpt_step)
 
         print(f"open_paren_ind: {open_paren_ind}")
 
