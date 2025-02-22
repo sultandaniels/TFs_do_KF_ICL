@@ -1964,7 +1964,8 @@ if __name__ == '__main__':
                             pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
-                            make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len) 
+                            if config.datasource == "val":
+                                make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len) 
 
                             # print("\n\nmaking plots for haystack len:", num_sys)
                             # haystack_plots(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -1995,7 +1996,8 @@ if __name__ == '__main__':
                             pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
-                            make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len)   
+                            if config.datasource == "val":
+                                make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len)   
                             # if num_sys == 19:
                             #     # if desktop:
                             #     #     last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
