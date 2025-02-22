@@ -50,13 +50,13 @@ def save_quartiles(quartiles_file, quartiles, seg_ext_quartiles_file, seg_ext_qu
     np.savez(seg_ext_quartiles_file, **seg_ext_quartiles)
     return None
 
-def load_quartiles(config, model_dir, experiment):
+def load_quartiles(config, model_dir, experiment, ckpt_step):
     quartiles = None
     seg_ext_quartiles = None
 
-    quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") + "quartiles.npz"
+    quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") + f"quartiles_step_{ckpt_step}.npz"
 
-    seg_ext_quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") +  "seg_ext_quartiles.npz"
+    seg_ext_quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") +  f"seg_ext_quartiles_step_{ckpt_step}.npz"
 
     if os.path.exists(quartiles_file):
         print(f"Loading quartiles from {quartiles_file}")
@@ -670,7 +670,7 @@ def haystack_plots_needle_full(config, haystack_len, output_dir, ckpt_step, step
 
     model_dir, experiment = split_path(output_dir)
     if ckpt_step is not None:
-        quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(config, model_dir, experiment)
+        quartiles_file, seg_ext_quartiles_file, quartiles, seg_ext_quartiles = load_quartiles(config, model_dir, experiment, ckpt_step)
 
         if quartiles is None or seg_ext_quartiles is None or compute_more:
             print(f"\ncomputing quartiles for haystack_len: {haystack_len}")
