@@ -23,6 +23,8 @@ def comp_quartiles(err_lss_examples, ratio=False, train_conv=False, kal_err=None
 
     for key in err_lss_examples.keys():
         if not (key == "Analytical_Kalman" or key == "Kalman_rem" or key == "Kalman"):
+            kal_err = kal_err[:,:,:,:err_lss_examples[key].shape[-1]]
+            print(f"kal_err shape: {kal_err.shape}")
             if ratio:
                 rat = err_lss_examples[key] / kal_err
             else:
