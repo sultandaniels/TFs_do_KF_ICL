@@ -1885,7 +1885,7 @@ if __name__ == '__main__':
             output_dir = set_config_params(config, model_name)
 
             ckpt_pred_steps = gen_ckpt_pred_steps(config)
-            steps_in = [1,2,3,5,6,10]
+            steps_in = [1,2,3,5,10]
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
             num_sys_haystacks = list(range(1,20))
