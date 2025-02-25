@@ -2070,7 +2070,7 @@ if __name__ == '__main__':
 
                     if pred_ckpt_step is not None:
 
-                        ckpt_path = output_dir + "/checkpoints/step=" + pred_ckpt_step + ".ckpt"
+                        ckpt_path = output_dir + "/checkpoints/step=" + str(pred_ckpt_step) + ".ckpt"
 
                         print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 
