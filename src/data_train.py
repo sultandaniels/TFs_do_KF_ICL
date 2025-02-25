@@ -2053,7 +2053,7 @@ if __name__ == '__main__':
                 #run train_conv
 
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
-                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, abs_err)
+                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
 
                 print(f"plotting train_conv convergence plots for haystack len {num_sys}")
                 pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -2070,7 +2070,7 @@ if __name__ == '__main__':
 
                     if pred_ckpt_step is not None:
 
-                        ckpt_path = output_dir + "/checkpoints/" + last_ckpt
+                        ckpt_path = output_dir + "/checkpoints/step=" + pred_ckpt_step + ".ckpt"
 
                         print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 

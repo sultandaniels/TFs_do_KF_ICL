@@ -356,7 +356,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     plt.tight_layout()
 
     os.makedirs(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}", exist_ok=True)
-    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + f"last_seg_context_{valA}_embd_dim_{config.n_embd}__step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
+    fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + f"last_seg_context_{valA}_embd_dim_{config.n_embd}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
     return None
 
 

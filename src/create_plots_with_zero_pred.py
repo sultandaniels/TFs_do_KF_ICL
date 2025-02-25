@@ -1204,14 +1204,14 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
 def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choices_per_config, next_start_per_config, sys_inds_per_config, max_ir_length, err_lss):
 
     num_trace_configs = config.num_test_traces_configs
-    err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
-    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, ys.shape[2]), np.inf)
-    err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+    err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
+    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, config.n_positions + 1), np.inf)
+    err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
 
     for ir_length in range(1, max_ir_length + 1):
         # Initialize the err_lss ols and ols analytical values to infinity shaped like the multi_sys_ys
-        err_lss[f"OLS_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
-        err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], ys.shape[2]), np.inf)
+        err_lss[f"OLS_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
+        err_lss[f"OLS_analytical_ir_{ir_length}"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
 
     for trace_conf in range(num_trace_configs):
 
