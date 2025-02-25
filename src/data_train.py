@@ -1712,7 +1712,7 @@ def get_kal_step(config, output_dir):
         kal_step = filename_step
         return kal_step
     
-def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len=19):
+def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, desktop, last_haystack_len=19):
     if num_sys == last_haystack_len:
         # if desktop:
         #     last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]
@@ -1730,7 +1730,7 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
         errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
 
-        if not os.path.exists(errs_loc + "err_lss_examples.pkl"):
+        if not os.path.exists(errs_loc + "err_lss_examples.pkl") and not desktop:
             print(f"err_lss_examples.pkl does not exist for non train conv at early stop ckpt")
             make_preds = True
 
@@ -1965,7 +1965,7 @@ if __name__ == '__main__':
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
                             if config.datasource == "val":
-                                make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len) 
+                                make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, desktop, last_haystack_len) 
 
                             # print("\n\nmaking plots for haystack len:", num_sys)
                             # haystack_plots(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -1997,7 +1997,7 @@ if __name__ == '__main__':
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
                             if config.datasource == "val":
-                                make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, abs_err, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, last_haystack_len)   
+                                make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, desktop, last_haystack_len)   
                             # if num_sys == 19:
                             #     # if desktop:
                             #     #     last_ckpt_step = maxval_dict[(config.val_dataset_typ, config.n_embd, config.use_pos_emb)]

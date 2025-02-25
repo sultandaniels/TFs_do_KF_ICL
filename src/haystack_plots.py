@@ -227,7 +227,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
                     ax[step_count].axhline(y[0], label=key[:3] + "-" + key[7:], color=colors[key_count], linewidth=2, linestyle='-')
 
 
-                    ax[step_count].legend(fontsize = 10, ncol=5, columnspacing=0.4, handletextpad=0.25)#, loc="upper left")
+                    ax[step_count].legend(fontsize = 10, ncol=5, columnspacing=0.4, handletextpad=0.25, loc="lower left") #, loc="upper left")
                     ax[step_count].set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
                     ax[step_count].set_ylabel("Error" + (" Ratio" if valA == "gaussA" else "") + f": {step} After Open", fontsize=12)
                     ax[step_count].set_xlim(-3, haystack_len)
