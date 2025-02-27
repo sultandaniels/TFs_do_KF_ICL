@@ -1,0 +1,9 @@
+# ChatGPT answered correctly on 1 after
+what word would come directly after the last delimiter?
+<\0> sat sat sat sat <0\> <\2> bat bat <2\> <\2> bat bat bat bat bat <2\> <\1> fat fat fat <1\> <\0> sat sat sat sat sat sat sat sat <0\> <\1> fat fat fat fat fat fat fat fat <1\> <\2>
+
+
+# ChatGPT answered correctly on 1 after
+what word would come directly after the last delimiter?
+<\0> sat bat fat sat <0\> <\1> bat sat <1\> <\1> fat bat sat fat bat <1\> <\1> sat fat bat <1\> <\0> bat fat sat bat fat sat bat fat <0\> <\1> sat fat bat sat fat bat sat fat bat <1\> <\1>
+

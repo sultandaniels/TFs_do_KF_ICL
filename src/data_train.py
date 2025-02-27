@@ -754,9 +754,12 @@ def gen_ckpt_pred_steps(config):
     #params for ortho tiny acc model:
     elif config.val_dataset_typ == "ortho" and config.acc_grad_batch > 1:
         minval = 1000
-        maxval = 8000
+        maxval = 53000
         train_int = 1000
-        ckpt_pred_steps = np.arange(minval, maxval, train_int)
+
+        phases = [minval, 24000, 48000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     return ckpt_pred_steps
 
@@ -1555,7 +1558,7 @@ def set_config_params(config, model_name):
 
     elif model_name == "ortho_tiny_acc":
 
-        output_dir = "../outputs/GPT2/250218_212431.598b6c_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000"
+        output_dir = "../outputs/GPT2/250221_215216.337051_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000"
 
         print("\n\nORTHOGONAL TINY ACC MODEL\n\n")
 
@@ -1903,7 +1906,10 @@ if __name__ == '__main__':
         config_dict[key] = config.__getattribute__(key)
 
     if (not (train_conv or multi_haystack)) and (make_preds or saved_preds or resume_train):
-        ckpt_path = "../outputs/GPT2/250212_222339.54331c_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000/checkpoints/step=3000.ckpt"
+
+        set_config_params(config, model_name)
+        
+        ckpt_path = "../outputs/GPT2/250221_215216.337051_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/checkpoints/step=49000.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         

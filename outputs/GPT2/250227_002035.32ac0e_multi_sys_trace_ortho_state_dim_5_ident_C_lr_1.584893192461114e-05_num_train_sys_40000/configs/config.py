@@ -43,12 +43,13 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[1,3] #which GPU
+    devices=[0,2] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
     batch_size = 2048 #usually 512 (~35GB) tune this to fit into GPU memory
+    acc_grad_batch = 1 #number of batches to accumulate gradients over
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
@@ -74,7 +75,7 @@ class Config(object, metaclass=Singleton):
     # clamp_len = 1000
 
     # Optimizer parameters
-    learning_rate = 0.833333*1.584893192461114e-05 #1.9054607179632464e-05
+    learning_rate = 1.584893192461114e-05 #1.9054607179632464e-05
     weight_decay = 1e-2
 
     # Gradient Clipping
@@ -103,7 +104,8 @@ class Config(object, metaclass=Singleton):
     def override(self, key, value):
         self.__class__.__immutable = False
         if not hasattr(self, key):
-            raise Exception("Tried to override non-existing key: " + key)
+            # raise Exception("Tried to override non-existing key: " + key)
+            print("Creating new key: " + key)
         setattr(self, key, value)
         self.__class__.__immutable = True
 

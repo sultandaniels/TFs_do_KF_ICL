@@ -594,6 +594,8 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
 
                 col_count += 1
 
+    # plt.tight_layout()
+    # plt.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.15)  # Adjust margins as needed
 
     ax.set_xlabel("# of Training Examples", fontsize=14)
     ax.set_ylabel(f"Error " + ("Ratio" if valA == "gaussA" and not abs_err else ""), fontsize=14)
@@ -604,7 +606,6 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     ax.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
     # ax.set_ylim([5e-2, 3e0])
     # ax.set_title(("Ortho" if valA == "ortho" else ("Gaussian" if valA == "gaussA" else "Identity")) + f" Haystack Length: {haystack_len} vs Training Examples")
-    plt.tight_layout()
 
     ax_len.set_xlabel("# of Training Examples", fontsize=14)
     ax_len.set_ylabel(f"Error " + ("Ratio" if valA == "gaussA" and not abs_err else ""), fontsize=14)
@@ -623,6 +624,9 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     os.makedirs(figure_dir, exist_ok=True)
     print(figure_dir + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + ("abs_err_" if abs_err else "") + f"{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf")
 
+    fig.tight_layout()
+    fig_len.tight_layout()
+    
     fig.savefig(figure_dir + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf", transparent=True, format="pdf")
     fig_len.savefig(figure_dir + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + ("abs_err_" if abs_err else "") + f"{valA}_embd_dim_{config.n_embd}_train_conv_haystack_len_{haystack_len}_{timestamp}_linearscale.pdf", transparent=True, format="pdf")
 
