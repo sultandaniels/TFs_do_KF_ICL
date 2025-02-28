@@ -1787,6 +1787,7 @@ if __name__ == '__main__':
     parser.add_argument('--desktop', help='Boolean. Run on desktop', action='store_true')
     parser.add_argument('--datasource', type=str, help='Name of the datasource to use', default="val")
     parser.add_argument('--late_start', type=int, help="Integer. Start traces from a later index for interleaving at test time", default=None)
+    parser.add_argument('--last_ckpt', help='Boolean. Take last checkpoint for needle plots', action='store_true')
 
 
 
@@ -1834,6 +1835,8 @@ if __name__ == '__main__':
     datasource = args.datasource
     print("late_start arg", args.late_start)
     late_start = args.late_start
+    print("last_ckpt arg", args.last_ckpt)
+    last_ckpt = args.last_ckpt
 
 
 
@@ -1919,8 +1922,6 @@ if __name__ == '__main__':
         
     elif train_conv or multi_haystack:
 
-        last_ckpt = None
-        last_ckpt_step = None
         kal_step = None
         last_haystack_len = 19
 
@@ -1970,7 +1971,7 @@ if __name__ == '__main__':
                             pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
-                            if config.val_dataset_typ == "ident": #choose last ckpt for identity system because overfitting phenomenon is not observed
+                            if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
                                 if desktop:
                                     pred_ckpt_step = maxval_dict[model_name]
                                 else:
@@ -2007,6 +2008,12 @@ if __name__ == '__main__':
                             print("making train_conv plots for haystack len:", num_sys)
                             pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
+
+                            if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
+                                if desktop:
+                                    pred_ckpt_step = maxval_dict[model_name]
+                                else:
+                                    pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0]) 
 
                             if config.datasource == "val":
                                 make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, desktop, last_haystack_len)   
@@ -2070,7 +2077,7 @@ if __name__ == '__main__':
                 print(f"plotting train_conv convergence plots for haystack len {num_sys}")
                 pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
 
-                if config.val_dataset_typ == "ident": #choose last ckpt for identity system because overfitting phenomenon is not observed
+                if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
                     if desktop:
                         pred_ckpt_step = maxval_dict[model_name]
                     else:

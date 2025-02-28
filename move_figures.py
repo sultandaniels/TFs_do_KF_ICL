@@ -30,6 +30,9 @@ def move_files_and_directories(directories, model_names, destination_base):
             except Exception as e:
                 print(f"Error moving directory {train_src} to {train_dest}: {e}")
 
+def list_dirs(path):
+    return sorted([os.path.join(path, name) for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))])
+
 # Example usage
 directories = [
     '/path/to/dir1',
@@ -45,4 +48,8 @@ model_names = [
 
 destination_base = '/Users/sultandaniels/Documents/Transformer_Kalman/67b648fddceb6a3b3812dd6c/Arxiv_Interleaved Time-series show the Emergence of Associative Recall is no Mirage/needle/train_conv/seg_len_10'
 
-move_files_and_directories(directories, model_names, destination_base)
+# move_files_and_directories(directories, model_names, destination_base)
+
+# List all directories in a path
+ls = list_dirs("/home/sultand/TFs_do_KF_ICL/outputs/GPT2")
+print(ls)
