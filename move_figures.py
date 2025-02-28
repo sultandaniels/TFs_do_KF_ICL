@@ -12,6 +12,7 @@ def move_files_and_directories(directories, model_names, destination_base):
         for dirpath, dirnames, filenames in os.walk(directory):
             for filename in filenames:
                 if filename.endswith('.pdf'):
+                    print(f"Found PDF: {os.path.join(dirpath, filename)}")
                     src_file = os.path.join(dirpath, filename)
                     dest_file = os.path.join(destination_dir, filename)
                     try:
@@ -24,6 +25,7 @@ def move_files_and_directories(directories, model_names, destination_base):
         train_src = os.path.join(directory, 'train')
         train_dest = os.path.join(destination_dir, 'train')
         if os.path.exists(train_src):
+            print(f"Found directory: {train_src}")
             try:
                 # shutil.move(train_src, train_dest)
                 print(f"Moved directory: {train_src} to {train_dest}")
