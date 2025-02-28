@@ -15,7 +15,7 @@ def move_files_and_directories(directories, model_names, destination_base):
                     src_file = os.path.join(dirpath, filename)
                     dest_file = os.path.join(destination_dir, filename)
                     try:
-                        shutil.move(src_file, dest_file)
+                        # shutil.move(src_file, dest_file)
                         print(f"Moved: {src_file} to {dest_file}")
                     except Exception as e:
                         print(f"Error moving {src_file} to {dest_file}: {e}")
@@ -25,7 +25,7 @@ def move_files_and_directories(directories, model_names, destination_base):
         train_dest = os.path.join(destination_dir, 'train')
         if os.path.exists(train_src):
             try:
-                shutil.move(train_src, train_dest)
+                # shutil.move(train_src, train_dest)
                 print(f"Moved directory: {train_src} to {train_dest}")
             except Exception as e:
                 print(f"Error moving directory {train_src} to {train_dest}: {e}")
