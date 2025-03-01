@@ -1844,7 +1844,7 @@ if __name__ == '__main__':
     "ident": 17600,
     "ortho": 105000,
     "gauss": 180000,
-    "ident_nop": 15600,
+    "ident_nope": 15600,
     "ortho_nope": 201000,
     "gauss_nope": 216000,
     "gauss_tiny": 180000,
