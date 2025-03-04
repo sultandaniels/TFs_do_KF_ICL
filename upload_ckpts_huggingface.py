@@ -1,12 +1,14 @@
 import os
 from huggingface_hub import HfApi, HfFolder
 
-# Set the token as an environment variable
-os.environ["HUGGINGFACE_HUB_TOKEN"] = "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"
+# Read the token from an environment variable
+hf_token = os.getenv("HUGGINGFACE_HUB_TOKEN")
 
-from huggingface_hub import HfApi, HfFolder
+if hf_token is None:
+    raise ValueError("HUGGINGFACE_HUB_TOKEN environment variable is not set")
 
-HfFolder.save_token("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")
+# Save the token
+HfFolder.save_token(hf_token)
 api = HfApi()
 
 api.upload_large_folder(
