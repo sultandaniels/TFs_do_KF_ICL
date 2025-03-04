@@ -1,0 +1,3 @@
+big model
+
+batch size: 512

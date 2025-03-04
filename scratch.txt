@@ -1,0 +1,35 @@
+rsync -avz --include 'prediction_errors_gauss_C*/' --exclude '*' sultand@bliss1.ist.berkeley.edu:mop_modifications/streamlined_mop/outputs/GPT2/240619_070456.1e49ad_upperTriA_gauss_C/ /Users/sultandaniels/Documents/Transformer_Kalman/outputs/GPT2/240619_070456.1e49ad_upperTriA_gauss_C/
+
+line 31
+Q = to_complex(self.observation_IR.to(torch.float32))                                   # [B... x O_D x R x O_D]
+Q = to_complex(self.observation_IR)                                   # [B... x O_D x R x O_D]
+
+
+line 124
+self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transpose(0, 1).to(torch.float32) # [O_D x R x O_D]
+self.observation_IR.data = flattened_w.unflatten(0, (self.ir_length, -1)).transpose(0, 1) # [O_D x R x O_D]
+
+
+scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250128_022331.067361_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/needles sultand@sahai-desktop.eecs.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2/250128_022331.067361_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/
+
+scp -r /home/ubuntu/gauss-NoPE-GH200/TFs_do_KF_ICL/outputs/GPT2_NoPE/250127_010709.dc88f2_multi_sys_trace_zero_cut_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints sultand@bliss1.ist.berkeley.edu:TFs_do_KF_ICL/outputs/GPT2_NoPE/250127_010709.dc88f2_multi_sys_trace_zero_cut_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints
+
+
+scp -r /home/sultand/TFs_do_KF_ICL/outputs/GPT2 sultandaniels@hpc.brc.berkeley.edu:/global/scratch/users/sultandaniels/
+
+git config --global user.email "sultan_daniels@berkeley.edu"
+
+git config --global user.name "sultandaniels"
+
+
+
+colors = ['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
+
+
+
+find /home/sultand/TFs_do_KF_ICL/outputs/GPT2/250125_202437.caf35b_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.3207437987531975e-05_num_train_sys_40000/checkpoints -name 'step=*.ckpt' | grep -v 'step=[0-9]*[05]00.ckpt' | xargs rm
+
+find /home/ubuntu/gauss-NoPE-GH200/TFs_do_KF_ICL/outputs/GPT2/250125_210849.09203d_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000/checkpoints -name 'step=*.ckpt' | grep -v 'step=[0-9]*000.ckpt' | xargs -r rm
+
+
+for i in {1,2,200}; do CUDA_VISIBLE_DEVICES=0 python data_train.py --make_preds --multi_haystack --model_name gauss --datasource train --late_start $i; done

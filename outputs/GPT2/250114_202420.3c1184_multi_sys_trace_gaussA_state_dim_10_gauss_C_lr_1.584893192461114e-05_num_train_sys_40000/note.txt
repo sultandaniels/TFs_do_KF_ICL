@@ -1,0 +1,6 @@
+trained on 2 GPUs
+
+batch size = 512
+
+
+needle train conv kf ckpt: 126000

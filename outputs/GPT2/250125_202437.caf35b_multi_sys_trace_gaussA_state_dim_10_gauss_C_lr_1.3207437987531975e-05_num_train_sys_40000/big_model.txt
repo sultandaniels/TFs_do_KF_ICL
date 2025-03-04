@@ -1,0 +1,5 @@
+big model
+
+batch size: 512
+
+40650 is kf pred ckpt

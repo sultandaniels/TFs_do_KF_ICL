@@ -1,0 +1,21 @@
+#ignore all checkpoint files
+*.ckpt
+
+#ignore all pkl files
+*.pkl
+
+#remove pycache directories and pyc files
+__pycache__/
+*.pyc
+
+#remove wandb directory
+streamlined_mop/src/wandb
+wandb
+
+*.json
+*.xml
+*.yaml
+*.gz
+*.zip
+*.dat
+*.sh
