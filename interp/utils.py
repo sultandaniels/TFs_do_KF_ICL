@@ -360,8 +360,6 @@ def generate_substitute_layer_single_logits(
 
     return logits
 
-
-
 def generate_substitute_layer_single(
     model,
     tokenizer,
@@ -638,6 +636,7 @@ def cache_activations(
 ##############################
 
 
+
 def load_model(args):
     model_name_or_path = args.model
     model = AutoModelForCausalLM.from_pretrained(
@@ -666,7 +665,7 @@ def load_model(args):
             "attn": "model.model.layers[{layer_idx}].self_attn.o_proj",
         }
         n_layers = len(model.model.layers)
-    elif "gpt-j" in model_name_or_path:
+    elif "gpt-j" or "GPT" in model_name_or_path:
         module_str_dict = {
             "layer": "model.transformer.h[{layer_idx}]",
             "attn": "model.transformer.h[{layer_idx}].attn.o_proj",

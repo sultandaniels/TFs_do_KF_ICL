@@ -5,9 +5,12 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import datetime
+import pickle
+from transformers import GPT2Model, GPT2LMHeadModel, AutoTokenizer
+import sys
 
 timestamp = datetime.datetime.now().strftime("%d%H%M")
-from utils import load_model, cache_activations, generate_substitute_layer_single_logits
+from utils import cache_activations, generate_substitute_layer_single_logits
 
 device = torch.device("cuda")
 
@@ -113,6 +116,7 @@ def get_args():
     parser.add_argument("--model", type=str, default="/data/dhruv_gautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71")
     parser.add_argument("--layer-skip", type=int, default=3)
     parser.add_argument("--batch-size", "-bs", type=int, default=10)
+    parser.add_argument("--checkpoint", type=str, default="post_emerge.ckpt")
     return parser.parse_args()
 
 def plot_results(log_prob_a_changes, log_prob_b_changes, token_a, token_b):
@@ -136,10 +140,80 @@ def plot_results(log_prob_a_changes, log_prob_b_changes, token_a, token_b):
     plt.show()
 
 
+def setup_model(args):
+    model_name_or_path = args.model
+    checkpoint_path = f"{model_name_or_path}/{args.checkpoint}"
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name_or_path, trust_remote_code=True, use_fast=False
+    )
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+    tokenizer.padding_side = "left"
+    tokenizer.mask_token_id = tokenizer.eos_token_id
+    tokenizer.sep_token_id = tokenizer.eos_token_id
+    tokenizer.cls_token_id = tokenizer.eos_token_id
+
+    # Load model architecture
+    if "gpt" in model_name_or_path.lower():
+        model = GPT2LMHeadModel.from_pretrained("gpt2")
+
+    checkpoint = torch.load(checkpoint_path, map_location="cuda")
+    model.load_state_dict(
+        {k.replace("model.", ""): v for k, v in checkpoint["state_dict"].items()},
+        strict=False
+    )
+
+    if "gpt-j" in model_name_or_path.lower() or "GPT" in model_name_or_path:
+        module_str_dict = {
+            "layer": "model.transformer.h[{layer_idx}]",
+            "attn": "model.transformer.h[{layer_idx}].attn.o_proj",
+        }
+        n_layers = len(model.transformer.h)
+    else:
+        raise ValueError(f"Unknown model architecture for {model_name_or_path}")
+
+    args.module_str_dict = module_str_dict
+    args.n_layers = n_layers
+
+    return model, tokenizer
+
 if __name__ == "__main__":
+    # model_path = "/data/dhruv_gautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71/post_emerge.ckpt"
+    # checkpoint = torch.load(model_path, map_location="cuda")
+    # print(checkpoint.keys())
+    # model = GPT2LMHeadModel.from_pretrained("gpt2")
+    # model.load_state_dict({k.replace("model.", ""): v for k, v in checkpoint["state_dict"].items()}, strict=False)
+    # # model = GPT2LMHeadModel.from_pretrained("gpt2")  
+    # # model.load_state_dict(torch.load(model_path, map_location="cuda"))
+    # tokenizer_path = "/data/dhruv_gautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71/"
+    # tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     args = get_args()
-    model, tokenizer = load_model(args)
+    model, tokenizer = setup_model(args)
     model.to(device)
+
+    dataset_path = "/data/dhruv_gautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_experiment/snapshots/6255a948d411c6e3b0182ce3f308ce25c9c5d725/data/val_ortho_ident_C_state_dim_5.pkl"
+    with open(dataset_path, "rb") as f:
+        dataset = pickle.load(f)
+    print(f"Dataset loaded. Type: {type(dataset)}")
+    if isinstance(dataset, dict):  # If it's a dictionary
+        print(f"Keys: {list(dataset.keys())}")
+        sequence_prompts = dataset.get("input_sequences", [])  # Use .get to avoid KeyError
+    elif isinstance(dataset, list) and dataset:  # If it's a non-empty list
+        print(f"Sample Entry: {dataset[0]}")
+        if isinstance(dataset[0], dict):  # Check if list elements are dictionaries
+            possible_keys = dataset[0].keys()
+            print(f"Possible keys in entries: {possible_keys}")
+            sequence_prompts = [entry.get("obs", None) for entry in dataset]
+        else:
+            sequence_prompts = dataset  # If not a dictionary, treat as raw sequence data
+    else:
+        sequence_prompts = []
+
+    # Extract the sequence prompts
+    print(f"Extracted {len(sequence_prompts)} sequence prompts (first few shown):")
+    print(sequence_prompts[:5]) 
+
+    # If sequence_prompts is a list, ensure it's in the right format
+    print(f"Loaded {len(sequence_prompts)} sequences for processing.")
     
     sequence_prompts = [
         "", #icl haystack 1
