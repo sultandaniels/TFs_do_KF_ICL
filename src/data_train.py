@@ -1977,6 +1977,7 @@ if __name__ == '__main__':
                                 else:
                                     pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])                            
 
+                            print(f"pred_ckpt_step: {pred_ckpt_step}")
                             if config.datasource == "val":
                                 make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, desktop, last_haystack_len) 
 

@@ -209,7 +209,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
                     #set the grid to be on integer values for x-axis
                     ax.set_xticks(np.arange(-2, haystack_len, 1))
                     ax.set_yscale('log')
-                    # ax[step_count].set_ylim(0.3, 3)
+                    ax.set_ylim(4e-6, 2)
                     ax.tick_params(axis='x', which='both', labelbottom=True, labelsize=12)
 
                 step_count += 1
@@ -323,7 +323,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     ax.legend(ncol=3 if valA == "gaussA" else 1, fontsize=8)
     ax.grid(which="both")
     # ax.set_xlim(left=230, right=seg_ext_quartiles[key].shape[-1] - 1)  # set the x axis limits haystack_len*12 + 2
-    # ax.set_ylim(bottom=0, top=5.5)  # set the y axis limits
+    ax.set_ylim(bottom=3e-6, top=2)  # set the y axis limits
 
     # Optionally, customize major and minor ticks
     ax.minorticks_on()
