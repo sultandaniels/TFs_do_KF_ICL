@@ -198,7 +198,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
                     )
 
                 if valA != "gaussA":
-                    ax.legend(fontsize = 8, columnspacing=0.25, loc="lower right", ncol=3) #loc="upper left")
+                    ax.legend(fontsize = 8, columnspacing=0.25, loc="center right", ncol=3) #loc="upper left")
                     ax.set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
                     ax.set_ylabel(("(" if valA== "gaussA" else "") + "Error" + (" Ratio" if valA == "gaussA" else ""), fontsize=12)
                     ax.set_xlim(-3, haystack_len)
