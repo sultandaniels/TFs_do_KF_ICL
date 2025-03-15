@@ -567,11 +567,12 @@ def initialize_err_list(ts):
     err_dict_list = [{"lstsq": [], "loglog": [], "loglin": [], "loglogreg": [], "dumb": []} for t in range(len(ts))]
     return err_dict_list
 
-def gen_ckpt_pred_steps(config):
+def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     #generate specific ckpt steps to predict on
     #params for vanilla ident model:
-    if config.val_dataset_typ == "ident" and config.use_pos_emb and config.n_embd == 128:
+    # if config.val_dataset_typ == "ident" and config.use_pos_emb and config.n_embd == 128:
+    if model_name == "ident":
         minval = 100
         maxval = 17600
         train_int = 100
@@ -581,12 +582,14 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
 
     #params for vanilla ortho model
-    elif config.val_dataset_typ == "ortho" and config.use_pos_emb and config.n_embd == 128:
+    # elif config.val_dataset_typ == "ortho" and config.use_pos_emb and config.n_embd == 128:
+    elif model_name == "ortho":
 
         ckpt_pred_steps = np.arange(3000, 105000, 3000)
 
     #params for vanilla gauss model:
-    elif config.val_dataset_typ == "gaussA" and config.use_pos_emb and config.n_embd == 128:
+    # elif config.val_dataset_typ == "gaussA" and config.use_pos_emb and config.n_embd == 128:
+    elif model_name == "gauss":
         minval = 3000
         maxval = 180000
         train_int = 3000
@@ -597,7 +600,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
 
     #params for ident nope model:
-    elif config.val_dataset_typ == "ident" and not config.use_pos_emb:
+    # elif config.val_dataset_typ == "ident" and not config.use_pos_emb:
+    elif model_name == "ident_nope":
         minval = 100
         maxval = 15600
         train_int = 100
@@ -608,7 +612,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
     
     #params for ortho nope model
-    elif config.val_dataset_typ == "ortho" and not config.use_pos_emb:
+    # elif config.val_dataset_typ == "ortho" and not config.use_pos_emb:
+    elif model_name == "ortho_nope":
         minval = 3000
         maxval = 201000
         train_int = 3000
@@ -619,7 +624,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=hande_code_scale)
 
     #params for gaussian nope model:
-    elif config.val_dataset_typ == "gaussA" and not config.use_pos_emb:
+    # elif config.val_dataset_typ == "gaussA" and not config.use_pos_emb:
+    elif model_name == "gauss_nope":
 
         minval = 4000
         maxval = 216000
@@ -631,7 +637,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
 
     #params for gaussian tiny model:
-    elif config.val_dataset_typ == "gaussA" and config.n_embd == 72:
+    # elif config.val_dataset_typ == "gaussA" and config.n_embd == 72:
+    elif model_name == "gauss_tiny":
 
         minval = 1000
         maxval = 180000
@@ -642,7 +649,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny model:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 3*1.584893192461114e-05 and config.acc_grad_batch == 1: 
+    # elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 3*1.584893192461114e-05 and config.acc_grad_batch == 1: 
+    elif model_name == "ortho_tiny":
         minval = 1000
         maxval = 53000
         train_int = 1000
@@ -652,7 +660,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ident tiny model:
-    elif config.val_dataset_typ == "ident" and config.n_embd == 72:
+    # elif config.val_dataset_typ == "ident" and config.n_embd == 72:
+    elif model_name == "ident_tiny":
         minval = 1000
         maxval = 54000
         train_int = 1000
@@ -662,7 +671,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ident big model:
-    elif config.val_dataset_typ == "ident" and config.n_embd == 192:
+    # elif config.val_dataset_typ == "ident" and config.n_embd == 192:
+    elif model_name == "ident_big":
         minval = 100
         maxval = 149000
         train_int = 100
@@ -672,7 +682,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho big model:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 192:
+    # elif config.val_dataset_typ == "ortho" and config.n_embd == 192:
+    elif model_name == "ortho_big":
 
         minval = 5000
         maxval = 150000
@@ -680,7 +691,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = np.arange(minval, maxval, train_int)
 
     #params for gauss big model:
-    elif config.val_dataset_typ == "gaussA" and config.n_embd == 192:
+    # elif config.val_dataset_typ == "gaussA" and config.n_embd == 192:
+    elif model_name == "gauss_big":
         minval = 100
         maxval = 147000
         train_int = 500
@@ -690,7 +702,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=True)
 
     #params for gauss small model:
-    elif config.val_dataset_typ == "gaussA" and config.n_embd == 96:
+    # elif config.val_dataset_typ == "gaussA" and config.n_embd == 96:
+    elif model_name == "gauss_small":
         minval = 500
         maxval = 170000
         train_int = 500
@@ -700,7 +713,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ident small model:
-    elif config.val_dataset_typ == "ident" and config.n_embd == 96:
+    # elif config.val_dataset_typ == "ident" and config.n_embd == 96:
+    elif model_name == "ident_small":
         minval = 50
         maxval = 40250
         train_int = 50
@@ -710,7 +724,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho small model:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 96:
+    # elif config.val_dataset_typ == "ortho" and config.n_embd == 96:
+    elif model_name == "ortho_small":
 
         minval = 500
         maxval = 172500
@@ -721,7 +736,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny model single lr:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 0.95*1.584893192461114e-05  and config.learning_rate < 1.05*1.584893192461114e-05:
+    # elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 0.95*1.584893192461114e-05  and config.learning_rate < 1.05*1.584893192461114e-05:
+    elif model_name == "ortho_tiny_single_lr" or model_name == "ortho_tiny_single_lr_2" or model_name == "ortho_tiny_single_lr_3":
         minval = 1000
         maxval = 97000
         train_int = 1000
@@ -731,7 +747,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny model double lr:
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 1.95*1.584893192461114e-05  and config.learning_rate < 2.05*1.584893192461114e-05:
+    # elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate > 1.95*1.584893192461114e-05  and config.learning_rate < 2.05*1.584893192461114e-05:
+    elif model_name == "ortho_tiny_double_lr":
         minval = 1000
         maxval = 92000
         train_int = 1000
@@ -741,7 +758,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny model smaller lr
-    elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate < 1.584893192461114e-05:
+    # elif config.val_dataset_typ == "ortho" and config.n_embd == 72 and config.learning_rate < 1.584893192461114e-05:
+    elif model_name == "ortho_tiny_smaller_lr":
 
         minval = 1000
         maxval = 89000
@@ -752,7 +770,8 @@ def gen_ckpt_pred_steps(config):
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ortho tiny acc model:
-    elif config.val_dataset_typ == "ortho" and config.acc_grad_batch > 1:
+    # elif config.val_dataset_typ == "ortho" and config.acc_grad_batch > 1:
+    elif model_name == "ortho_tiny_acc":
         minval = 1000
         maxval = 53000
         train_int = 1000
@@ -760,11 +779,22 @@ def gen_ckpt_pred_steps(config):
         phases = [minval, 24000, 48000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+    
+    #
+    #
+    elif model_name == "ortho_big_20k":
+        minval = 1000
+        maxval = 262000
+        train_int = 1000
+
+        phases = [minval, 3000, 27000, 50000, 100000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     return ckpt_pred_steps
 
 
-def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
+def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name):
         
     kal_step = None
     if config.needle_in_haystack:
@@ -788,7 +818,7 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs):
     filecount = 0
 
     
-    ckpt_pred_steps = gen_ckpt_pred_steps(config) #generate specific ckpt steps to predict on
+    ckpt_pred_steps = gen_ckpt_pred_steps(model_name) #generate specific ckpt steps to predict on
 
     run_kf_ols = True
     for filename in os.listdir(output_dir + "/checkpoints/"):
@@ -1514,6 +1544,84 @@ def set_config_params(config, model_name):
 
         config.override("learning_rate", 1.584893192461114e-05) 
 
+    elif model_name == "ortho_tiny_single_lr_2":
+        output_dir = "../outputs/GPT2/250227_002035.32ac0e_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        print("\n\nORTHOGONAL TINY SINGLE LR 2 MODEL\n\n")
+
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        config.override("devices", [0, 2])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 2048)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+        config.override("learning_rate", 1.584893192461114e-05) 
+
+    elif model_name == "ortho_tiny_single_lr_3":
+        output_dir = "../outputs/GPT2/250227_223751.3324b0_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        print("\n\nORTHOGONAL TINY SINGLE LR 3 MODEL\n\n")
+
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        config.override("devices", [0,1,2,3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 1024)  # usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+
+        config.override("learning_rate", 1.584893192461114e-05)
+
     elif model_name == "ortho_tiny_smaller_lr":
 
         output_dir = "../outputs/GPT2/250215_185541.3091e0_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000"
@@ -1595,6 +1703,48 @@ def set_config_params(config, model_name):
         config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
         config.override("learning_rate", 4*1.584893192461114e-05) 
+    
+    elif model_name == "ortho_big_20k":
+        print("\n\nORTHO BIG MODEL 20K TRACES\n\n")
+
+        output_dir = "../outputs/GPT2/250308_025624.b6f29d_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_20000"
+
+        # Dataset settings
+        config.override("num_tasks", 20000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0,1])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 128)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 192)
+        config.override("n_layer", 24)
+        config.override("n_head", 12)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", 0.833333*1.584893192461114e-05) 
 
     else:
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
@@ -1702,9 +1852,9 @@ def get_test_data(config, output_dir, num_haystack_ex=50):
 
     return ys, sim_objs
 
-def get_kal_step(config, output_dir):
+def get_kal_step(output_dir, model_name):
     #get kal_step
-    ckpt_pred_steps = gen_ckpt_pred_steps(config)
+    ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
     for filename in os.listdir(output_dir + "/checkpoints/"):
         filename_step = filename.split("=")[1].split(".")[0]
         filename_step = int(filename_step)
@@ -1936,7 +2086,7 @@ if __name__ == '__main__':
 
             output_dir = set_config_params(config, model_name)
 
-            ckpt_pred_steps = gen_ckpt_pred_steps(config)
+            ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
             steps_in = [1,2,3,5,10]
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
@@ -1965,7 +2115,7 @@ if __name__ == '__main__':
                         if saved_preds:
                             
                             if config.val_dataset_typ == "gaussA" and not desktop:
-                                kal_step = get_kal_step(config, output_dir)
+                                kal_step = get_kal_step(output_dir, model_name)
                             
                             print("making train_conv plots for haystack len:", num_sys)
                             pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -1977,6 +2127,7 @@ if __name__ == '__main__':
                                 else:
                                     pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])                            
 
+                            print(f"pred_ckpt_step: {pred_ckpt_step}")
                             if config.datasource == "val":
                                 make_preds = plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystack_examples, steps_in, colors, pred_ckpt_step, make_preds, resume_train, logscale, tf, train_mix_dist, train_mix_state_dim, desktop, last_haystack_len) 
 
@@ -2003,7 +2154,7 @@ if __name__ == '__main__':
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
                             print(f"err_lss_examples.pkl exists for haystack length {num_sys}")
 
-                            kal_step = get_kal_step(config, output_dir)
+                            kal_step = get_kal_step(output_dir, model_name)
 
                             print("making train_conv plots for haystack len:", num_sys)
                             pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -2072,7 +2223,7 @@ if __name__ == '__main__':
                 #run train_conv
 
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
-                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
+                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
 
                 print(f"plotting train_conv convergence plots for haystack len {num_sys}")
                 pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
@@ -2125,7 +2276,7 @@ if __name__ == '__main__':
 
                 ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
-                predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs)
+                predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
         
     else:
 
@@ -2204,3 +2355,22 @@ if __name__ == '__main__':
 
         print("ckpt_path", config.ckpt_path)
         create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
