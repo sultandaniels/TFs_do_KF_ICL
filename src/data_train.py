@@ -850,7 +850,7 @@ def set_config_params(config, model_name):
         print("\n\nGAUSSIAN MEDIUM MODEL\n\n")
 
         config.override("num_tasks", 40000)  # number of training systems
-        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("num_val_tasks", 50)  # number of test systems
         config.override("dataset_typ", "gaussA")  # dataset type
         config.override("val_dataset_typ", "gaussA")  # validation dataset type
         config.override("C_dist", "_gauss_C")  # C distribution
@@ -1885,6 +1885,7 @@ if __name__ == '__main__':
     parser.add_argument('--datasource', type=str, help='Name of the datasource to use', default="val")
     parser.add_argument('--late_start', type=int, help="Integer. Start traces from a later index for interleaving at test time", default=None)
     parser.add_argument('--last_ckpt', help='Boolean. Take last checkpoint for needle plots', action='store_true')
+    parser.add_argument('--zero_cut', help='Boolean. Run zero cut trace interleaving', action='store_true')
 
 
 
@@ -1934,6 +1935,8 @@ if __name__ == '__main__':
     late_start = args.late_start
     print("last_ckpt arg", args.last_ckpt)
     last_ckpt = args.last_ckpt
+    print("zero_cut arg", args.zero_cut)
+    zero_cut = args.zero_cut
 
 
 
@@ -1968,6 +1971,11 @@ if __name__ == '__main__':
 
     # config.override("late_start", late_start) # set the late_start in the config object
     config.override("late_start", late_start)
+
+    if zero_cut:
+        config.override("multi_sys_trace", True)
+        config.override("zero_cut", zero_cut)
+        config.override("needle_in_haystack", False)
 
     # Get the class variables in dictionary format
     config_dict  = {
