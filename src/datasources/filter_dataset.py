@@ -90,6 +90,7 @@ def special_tokens(segment, sys_name, style):
     return start_token, end_token
 
 def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None, example=None):
+
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -123,7 +124,12 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
         if config.zero_cut and test:
             sys_inds = [trace_conf] #set the system index to the trace_conf
         elif config.needle_in_haystack and test:
-            sys_inds = np.arange(example, example + sys_in_trace) #set the system indices for the specific example
+            if config.fix_needle and config.num_sys_haystack == 2:
+                start_sys = 0
+                sys_inds = [start_sys, start_sys + example + 1] #Fix the needle to be the same system for each example
+                # sys_inds = [start_sys + example + 1, start_sys] #Fix the other system to be the same system for each example
+            else:
+                sys_inds = np.arange(example, example + sys_in_trace) #set the system indices for the specific example
         else:
             #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
             rng = np.random.default_rng()
@@ -256,7 +262,15 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             zeros = np.zeros((segment.shape[0], 2*config.max_sys_trace + 1))
             segment = np.concatenate((zeros, segment), axis=1)
 
-            start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
+            if test and config.needle_in_haystack and config.paren_swap and len(seg_starts) == config.num_sys_haystack + 1: #swap open token for query experiment
+
+                swap_sys_ind = sys_inds[int((seg_count + 1) % config.num_sys_haystack)] #swap the system index for the query to the next system index in a cycle
+                # print("sys_dict: ", sys_dict) 
+                # print(f"sys_ind: {sys_ind}, sys_dict[sys_ind]: {sys_dict[sys_ind]}, swap_sys_ind: {swap_sys_ind}, sys_dict[swap_sys_ind]: {sys_dict[swap_sys_ind]}")
+
+                start_paren, end_paren = special_tokens(segment, sys_dict[swap_sys_ind], style="zeros") #get the special tokens for the segment
+            else:
+                start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 
             segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
 

@@ -812,24 +812,27 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_na
     run_kf_ols = True
     for filename in os.listdir(output_dir + "/checkpoints/"):
 
-        filename_step = filename.split("=")[1].split(".")[0]
-        filename_step = int(filename_step)
-
-        if config.needle_in_haystack and filename_step not in ckpt_pred_steps:
+        if filename.endswith(".ckpt") == False:
             continue
+        else:
+            filename_step = filename.split("=")[1].split(".")[0]
+            filename_step = int(filename_step)
+
+            if config.needle_in_haystack and filename_step not in ckpt_pred_steps:
+                continue
 
 
-        filecount += 1
-        print("\nfilecount:", filecount)
-        ckpt_path = output_dir + "/checkpoints/" + filename
-        # print("ckpt_path:", ckpt_path)
-        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols, ys=ys, sim_objs=sim_objs)
+            filecount += 1
+            print("\nfilecount:", filecount)
+            ckpt_path = output_dir + "/checkpoints/" + filename
+            # print("ckpt_path:", ckpt_path)
+            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols, ys=ys, sim_objs=sim_objs)
 
-        if run_kf_ols:
-            # filename looks like "step=40000.ckpt" get the step number
-            kal_step = filename_step
+            if run_kf_ols:
+                # filename looks like "step=40000.ckpt" get the step number
+                kal_step = filename_step
 
-        run_kf_ols = False
+            run_kf_ols = False
 
     print(f"kal_step: {kal_step}")
 
@@ -850,7 +853,7 @@ def set_config_params(config, model_name):
         print("\n\nGAUSSIAN MEDIUM MODEL\n\n")
 
         config.override("num_tasks", 40000)  # number of training systems
-        config.override("num_val_tasks", 50)  # number of test systems
+        config.override("num_val_tasks", 100)  # number of test systems
         config.override("dataset_typ", "gaussA")  # dataset type
         config.override("val_dataset_typ", "gaussA")  # validation dataset type
         config.override("C_dist", "_gauss_C")  # C distribution
@@ -1731,11 +1734,12 @@ def get_test_data(config, output_dir, num_haystack_ex=50):
         print(f"getting test data from datasource {config.datasource}")
 
         # get the sim objs for the validation data
-        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(output_dir + f"/data/" + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the validation data
-        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        print(f"/data/" + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl")
+        with open(output_dir + f"/data/" + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
             # samples = pickle.load(f)
             # # for every 2000 entries in samples, get the observation values and append them to the ys list
             # ys = np.stack(
@@ -1828,7 +1832,7 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
 
         #check for err_lss_examples at the last ckpt
         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
-        errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
+        errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("paren_swap_" if config.paren_swap else "")
 
         if not os.path.exists(errs_loc + "err_lss_examples.pkl") and not desktop:
             print(f"err_lss_examples.pkl does not exist for non train conv at early stop ckpt")
@@ -1886,6 +1890,10 @@ if __name__ == '__main__':
     parser.add_argument('--late_start', type=int, help="Integer. Start traces from a later index for interleaving at test time", default=None)
     parser.add_argument('--last_ckpt', help='Boolean. Take last checkpoint for needle plots', action='store_true')
     parser.add_argument('--zero_cut', help='Boolean. Run zero cut trace interleaving', action='store_true')
+    parser.add_argument('--paren_swap', help='Boolean. Run experiment that swaps the open paren for the query in needle in a haystack tests', action='store_true')  
+    parser.add_argument('--fix_needle', help='Boolean. Fix the needle in the haystack to be the same system for every example', action='store_true')
+    parser.add_argument('--opposite_ortho', help='Boolean. generate training data from opposite orthogonal systems', action='store_true')
+    parser.add_argument('--only_needle_pos', help='Boolean. only run the needle position evals', action='store_true')
 
 
 
@@ -1937,6 +1945,14 @@ if __name__ == '__main__':
     last_ckpt = args.last_ckpt
     print("zero_cut arg", args.zero_cut)
     zero_cut = args.zero_cut
+    print("paren_swap arg", args.paren_swap)
+    paren_swap = args.paren_swap
+    print("fix_needle arg", args.fix_needle)
+    fix_needle = args.fix_needle
+    print("opposite_ortho arg", args.opposite_ortho)
+    opposite_ortho = args.opposite_ortho
+    print("only_needle_pos arg", args.only_needle_pos)
+    only_needle_pos = args.only_needle_pos
 
 
 
@@ -1971,6 +1987,18 @@ if __name__ == '__main__':
 
     # config.override("late_start", late_start) # set the late_start in the config object
     config.override("late_start", late_start)
+
+    config.override("paren_swap", paren_swap) # set the paren_swap in the config object
+    if config.paren_swap:
+        print("Running paren swap experiment\n\n\n")
+
+    config.override("fix_needle", fix_needle) # set the fix_needle in the config object
+    if config.fix_needle:
+        print("Running fix needle experiment\n\n\n")
+
+    config.override("opposite_ortho", opposite_ortho) # set the opposite_ortho in the config object
+    if config.opposite_ortho:
+        config.override("val_dataset_typ", "ortho")
 
     if zero_cut:
         config.override("multi_sys_trace", True)
@@ -2032,6 +2060,8 @@ if __name__ == '__main__':
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
+        elif config.opposite_ortho:
+            num_haystack_examples = 1
         else:
             num_haystack_examples = 50 #number of haystack examples to use for testing
 
@@ -2045,7 +2075,16 @@ if __name__ == '__main__':
             steps_in = [1,2,3,5,10]
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
-            num_sys_haystacks = list(range(1,last_haystack_len+1))
+            if config.paren_swap:
+                if fix_needle or opposite_ortho:
+                    num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
+                else:
+                    # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
+                    num_sys_haystacks = list(range(2,last_haystack_len+1))
+                
+            else:
+                num_sys_haystacks = list(range(1,last_haystack_len+1))
+
             print("num_sys_haystacks:", num_sys_haystacks)
 
             config.override("needle_in_haystack", True)
@@ -2068,6 +2107,7 @@ if __name__ == '__main__':
                         print(f"quartiles already exist for haystack length {num_sys}")
 
                         if saved_preds:
+                            print("saved preds")
                             
                             if config.val_dataset_typ == "gaussA" and not desktop:
                                 kal_step = get_kal_step(output_dir, model_name)
@@ -2103,7 +2143,7 @@ if __name__ == '__main__':
 
 
                         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
-                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
+                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("paren_swap_" if config.paren_swap else "")
 
 
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
@@ -2169,29 +2209,37 @@ if __name__ == '__main__':
 
                 config.override("needle_final_seg_extended", False)
 
+                if opposite_ortho:
+                    config.override("num_val_tasks", 2)
+
                 ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
                 print(f"output dir: {output_dir}")
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
 
                 print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
-                #run train_conv
 
-                print(f"config.use_pos_emb: {config.use_pos_emb}")
-                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
+                if not only_needle_pos:
+                    #run train_conv
 
-                print(f"plotting train_conv convergence plots for haystack len {num_sys}")
-                pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                    print(f"config.use_pos_emb: {config.use_pos_emb}")
+                    kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
 
-                if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
-                    if desktop:
-                        pred_ckpt_step = maxval_dict[model_name]
-                    else:
-                        pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])
+                    print(f"plotting train_conv convergence plots for haystack len {num_sys}")
+                    pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
 
-                if num_sys == 19 and not abs_err:
+                    if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
+                        if desktop:
+                            pred_ckpt_step = maxval_dict[model_name]
+                        else:
+                            pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])
+
+                if (num_sys == 19 and not abs_err) or paren_swap:
                     # #get the last checkpoint
                     # last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                    if paren_swap:
+                        pred_ckpt_step = 27000
 
                     if pred_ckpt_step is not None:
 
@@ -2199,7 +2247,7 @@ if __name__ == '__main__':
 
                         print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 
-                        #run none train_conv
+                        #run non train_conv
                         config.override("num_test_traces_configs", num_sys)
                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
 
