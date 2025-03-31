@@ -599,6 +599,15 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
 
+    elif model_name == "gauss_zero_cut":
+        minval = 1000
+        maxval = 99000
+        train_int = 1000
+
+        phases = [minval, 10000, 19000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
     #params for ident nope model:
     # elif config.val_dataset_typ == "ident" and not config.use_pos_emb:
     elif model_name == "ident_nope":
@@ -850,7 +859,7 @@ def set_config_params(config, model_name):
         print("\n\nGAUSSIAN MEDIUM MODEL\n\n")
 
         config.override("num_tasks", 40000)  # number of training systems
-        config.override("num_val_tasks", 50)  # number of test systems
+        config.override("num_val_tasks", 100)  # number of test systems
         config.override("dataset_typ", "gaussA")  # dataset type
         config.override("val_dataset_typ", "gaussA")  # validation dataset type
         config.override("C_dist", "_gauss_C")  # C distribution
@@ -883,6 +892,44 @@ def set_config_params(config, model_name):
         config.override("n_dims_out", 5)  # IMPORTANT TO KEEP THIS AT 5 FOR NOW
 
         output_dir = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+    if model_name == "gauss_zero_cut":
+        print("\n\nGAUSSIAN MEDIUM ZERO CUT MODEL\n\n")
+
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # dataset type
+        config.override("val_dataset_typ", "gaussA")  # validation dataset type
+        config.override("C_dist", "_gauss_C")  # C distribution
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+
+        config = Config()  # create a config object
+
+        # Training settings overrides
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 3000)  # number of steps between logging
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 2048)  # tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 to check if it changes the speed of the training process
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings overrides
+        config.override("model_type", "GPT2")  # model type
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension
+        config.override("n_dims_out", 5)  # IMPORTANT TO KEEP THIS AT 5 FOR NOW
+
+        output_dir = "../outputs/GPT2/250127_001511.3ac954_multi_sys_trace_zero_cut_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
 
     elif model_name == "ortho":
