@@ -910,9 +910,9 @@ def set_config_params(config, model_name):
 
         # Training settings overrides
         config.override("devices", [0])  # which GPU
-        config.override("train_steps", 1008000)  # number of training steps
+        config.override("train_steps", 99000)  # number of training steps
         config.override("num_epochs", 1)  # minimum number of epochs to train for
-        config.override("train_int", 3000)  # number of steps between logging
+        config.override("train_int", 1000)  # number of steps between logging
         config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
         config.override("batch_size", 2048)  # tune this to fit into GPU memory
         config.override("train_data_workers", 64)  # set to 1 to check if it changes the speed of the training process
