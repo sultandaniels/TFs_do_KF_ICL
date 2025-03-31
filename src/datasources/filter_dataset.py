@@ -141,8 +141,19 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
         #create a tuple that matches the system names to the system indices
         sys_dict = {}
-        for i in range(len(sys_inds)):
-            sys_dict[sys_inds[i]] = sys_names[i]
+        if config.irrelevant_tokens:
+            for i in range(len(sys_inds) + 1):
+                if i < len(sys_inds):
+                    sys_dict[sys_inds[i]] = sys_names[i]
+                else:
+                    sys_dict[sys_inds[-1] + 1] = sys_names[i] #add the irrelevant token to the dictionary
+
+        else:
+            for i in range(len(sys_inds)):
+                if config.same_tokens: #use the same tokens for all systems
+                    sys_dict[sys_inds[i]] = sys_names[0]
+                else:
+                    sys_dict[sys_inds[i]] = sys_names[i]
         
 
         #set the segment lengths for the context
@@ -265,6 +276,18 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
                 # print(f"sys_ind: {sys_ind}, sys_dict[sys_ind]: {sys_dict[sys_ind]}, swap_sys_ind: {swap_sys_ind}, sys_dict[swap_sys_ind]: {sys_dict[swap_sys_ind]}")
 
                 start_paren, end_paren = special_tokens(segment, sys_dict[swap_sys_ind], style="zeros") #get the special tokens for the segment
+
+            elif test and config.needle_in_haystack and config.irrelevant_tokens and len(seg_starts) == config.num_sys_haystack + 1: #give irrelevant open token for query experiment
+
+                irr_sys_ind = sys_inds[-1] + 1
+
+                # print("in populate_traces")
+
+                # print("sys_dict: ", sys_dict) 
+                # print(f"sys_ind: {sys_ind}, sys_dict[sys_ind]: {sys_dict[sys_ind]}, irr_sys_ind: {irr_sys_ind}, sys_dict[irr_sys_ind]: {sys_dict[irr_sys_ind]}\n\n")
+
+                start_paren, end_paren = special_tokens(segment, sys_dict[irr_sys_ind], style="zeros") #get the special tokens for the segment
+
             else:
                 start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 

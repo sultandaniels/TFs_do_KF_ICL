@@ -1103,6 +1103,19 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
 
                 start_paren, end_paren = special_tokens(segment, sys_dict[swap_sys], style="zeros") #get the special tokens for the segment
 
+            elif config.needle_in_haystack and config.irrelevant_tokens and count == config.num_sys_haystack: #swap open token for query experiment
+
+                #find the index in sys_dict.keys() where sys is located
+                # index_of_sys = list(sys_dict.keys()).index(sys) #get the index of the system in the sys_dict
+                #swap the system index with the next system index
+                irr_sys = list(sys_dict.keys())[-1] #get the next system index
+
+                # print("populate_val_traces_helper")
+                # print(f"orig sys: {sys}, irr_sys: {irr_sys}, sys_dict[sys]: {sys_dict[sys]}, sys_dict[irr_sys]: {sys_dict[irr_sys]}")
+
+                start_paren, end_paren = special_tokens(segment, sys_dict[irr_sys], style="zeros") #get the special tokens for the segment
+
+
             else:
                 start_paren, end_paren = special_tokens(segments, sys_dict[sys], style="zeros")
 
@@ -1815,7 +1828,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
     print(f"config.num_haystack_examples: {config.num_haystack_examples}")
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"+ ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("paren_swap_" if config.paren_swap else "")
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"+ ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
     # if (config.datasource == "val"):
 
     #     print(f"getting test data from datasource {config.datasource}")

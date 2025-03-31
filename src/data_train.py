@@ -1879,7 +1879,7 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
 
         #check for err_lss_examples at the last ckpt
         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
-        errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("paren_swap_" if config.paren_swap else "")
+        errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
 
         if not os.path.exists(errs_loc + "err_lss_examples.pkl") and not desktop:
             print(f"err_lss_examples.pkl does not exist for non train conv at early stop ckpt")
@@ -1941,6 +1941,8 @@ if __name__ == '__main__':
     parser.add_argument('--fix_needle', help='Boolean. Fix the needle in the haystack to be the same system for every example', action='store_true')
     parser.add_argument('--opposite_ortho', help='Boolean. generate training data from opposite orthogonal systems', action='store_true')
     parser.add_argument('--only_needle_pos', help='Boolean. only run the needle position evals', action='store_true')
+    parser.add_argument('--same_tokens', help='Boolean. use the same special tokens for all systems in the haystack', action='store_true')
+    parser.add_argument('--irrelevant_tokens', help='Boolean. use an irrelevant special token for query system in the haystack', action='store_true')
 
 
 
@@ -2000,6 +2002,10 @@ if __name__ == '__main__':
     opposite_ortho = args.opposite_ortho
     print("only_needle_pos arg", args.only_needle_pos)
     only_needle_pos = args.only_needle_pos
+    print("same_tokens arg", args.same_tokens)
+    same_tokens = args.same_tokens
+    print("irrelevant_tokens arg", args.irrelevant_tokens)
+    irrelevant_tokens = args.irrelevant_tokens
 
 
 
@@ -2038,6 +2044,14 @@ if __name__ == '__main__':
     config.override("paren_swap", paren_swap) # set the paren_swap in the config object
     if config.paren_swap:
         print("Running paren swap experiment\n\n\n")
+
+    config.override("same_tokens", same_tokens) # set the same_tokens in the config object
+    if config.same_tokens:
+        print("Running same tokens experiment\n\n\n")
+
+    config.override("irrelevant_tokens", irrelevant_tokens) # set the irrelevant_tokens in the config object
+    if config.irrelevant_tokens:
+        print("Running irrelevant tokens experiment\n\n\n")
 
     config.override("fix_needle", fix_needle) # set the fix_needle in the config object
     if config.fix_needle:
@@ -2128,6 +2142,8 @@ if __name__ == '__main__':
                 else:
                     # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
                     num_sys_haystacks = list(range(2,last_haystack_len+1))
+            elif config.same_tokens or config.irrelevant_tokens:
+                num_sys_haystacks = list(range(2,5))
                 
             else:
                 num_sys_haystacks = list(range(1,last_haystack_len+1))
@@ -2190,7 +2206,7 @@ if __name__ == '__main__':
 
 
                         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
-                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("paren_swap_" if config.paren_swap else "")
+                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
 
 
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
