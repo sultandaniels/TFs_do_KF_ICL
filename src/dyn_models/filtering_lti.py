@@ -118,6 +118,27 @@ def generate_random_mat_cond_number(n, cond_number):
     # print("cond number = ", np.linalg.cond(random_matrix))
     return random_matrix
 
+def gen_rand_ortho_haar_real(n):
+    """
+    Generate a random orthogonal matrix 'uniformly' distributed over real orthogonal matrices using QR decomposition.
+    :param n: Size of the matrix
+    :return: Random orthogonal matrix of size n x n
+    """
+    # Generate a random matrix
+    A = np.random.randn(n, n)
+    
+    # Perform QR decomposition
+    Q, R = np.linalg.qr(A)
+
+    d = np.diag(R)
+    d = d/np.abs(d)
+
+    # Construct the diagonal matrix D
+    D = np.diag(d)
+    Q = Q @ D
+    
+    return Q
+
 ####################################################################################################
 
 
@@ -228,6 +249,9 @@ class FilterSim:
                 random_matrix = np.random.randn(nx, nx) #generate a Gaussian random square matrix
                 Q, R = np.linalg.qr(random_matrix) #get the QR decomposition
                 self.A = Q #set A to be the orthogonal matrix
+
+            elif tri == "ortho_haar":
+                self.A = gen_rand_ortho_haar_real(nx)
 
             else:
                 if new_eig:
