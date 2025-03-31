@@ -208,4 +208,4 @@ if __name__ == "__main__":
 
     config = Config()
     
-    collect_data(config, "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000", only, train_mix_dist, opposite_ortho=opposite_ortho)
+    collect_data(config, "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000", only, train_mix_dist, opposite_ortho=opposite_ortho)

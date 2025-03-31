@@ -1539,7 +1539,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
 
 
                     # la.print_matrix(ys_seg, "ys_seg")
-                    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+                    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar"):
                         # Apply the Kalman filter and append the result to the inner list
                         result = apply_kf(sim_obj, ys_seg, sigma_w=sim_obj.sigma_w, sigma_v=sim_obj.sigma_v)
 
@@ -1561,7 +1561,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
             preds_kf[conf_count] = inner_result
             conf_count += 1
 
-        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar"):
             # Convert the preds_kf list to a numpy array
             preds_kf = np.array(preds_kf)
             errs_kf = np.linalg.norm((multi_sys_ys_true - preds_kf), axis=-1) ** 2
@@ -1592,7 +1592,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     with open(errs_loc, 'wb') as f:
             pickle.dump(err_lss, f)
 
-    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar"):
         print("kf multi sys with remembering")
         start = time.time()  # start the timer for kalman filter predictions
         err_lss = compute_kf_multi_sys(num_test_traces_configs, ys, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, sim_objs_per_config, err_lss)
@@ -1605,7 +1605,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
 
 
     # Think about having a sys_choices to prediction error dictionary to implement the remembering
-    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_OLS:
+    if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar") and run_OLS:
     # if not ("OLS" in err_lss.keys()):
         # Original OLS
         # Clear the PyTorch cache
@@ -1892,7 +1892,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     err_lss_all = {}
 
-    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho")) and run_kf_ols:
+    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar")) and run_kf_ols:
 
         if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
             num_trials = config.num_traces["val"]
@@ -1932,7 +1932,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         end = time.time()  # end the timer for needle predictions
         # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 
-        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar") and run_kf_ols:
 
             print("interleaving kf and OLS errors")
             err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
@@ -2101,7 +2101,7 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run
 
             # err_lss_all = {}
 
-            # if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+            # if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar"):
             
             #     start = time.time()  # start the timer for kf predictions
             #     errs_kf = compute_kf(config, ys, sim_objs)
@@ -2128,7 +2128,7 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run
             #     start = time.time()  # start the timer for needle predictions
             #     err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config  = compute_errors_needle(config, ys, sim_objs, save_errs_dir, save_errs_loc)
 
-            #     if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho"):
+            #     if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar"):
             #         err_lss = interleave_kf_OLS_needle(config.num_test_traces_configs, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
             #     os.makedirs(save_errs_dir, exist_ok=True)
@@ -2386,7 +2386,7 @@ def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems,
                 ax.set_yscale('log')
                 ax.set_xscale('log')
 
-            ax.set_title(("NoPE " if not config.use_pos_emb else "") + ("Gaussian Systems " if config.val_dataset_typ == "gaussA" else ("Orthogonal Systems " if config.val_dataset_typ == "ortho" else ("Identity Systems " if config.val_dataset_typ == "ident" else "")))   + f"MSE vs Context. Trace Configuration: {trace_conf}")
+            ax.set_title(("NoPE " if not config.use_pos_emb else "") + ("Gaussian Systems " if config.val_dataset_typ == "gaussA" else ("Orthogonal Systems " if config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar" else ("Identity Systems " if config.val_dataset_typ == "ident" else "")))   + f"MSE vs Context. Trace Configuration: {trace_conf}")
             # ax.set_ylim([0,2])
             # Set major and minor gridlines
 

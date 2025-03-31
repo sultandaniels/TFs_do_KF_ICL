@@ -1943,6 +1943,7 @@ if __name__ == '__main__':
     parser.add_argument('--only_needle_pos', help='Boolean. only run the needle position evals', action='store_true')
     parser.add_argument('--same_tokens', help='Boolean. use the same special tokens for all systems in the haystack', action='store_true')
     parser.add_argument('--irrelevant_tokens', help='Boolean. use an irrelevant special token for query system in the haystack', action='store_true')
+    parser.add_argument('--ortho_haar', help='Boolean. use orthogonal haar systems', action='store_true')
 
 
 
@@ -2006,6 +2007,8 @@ if __name__ == '__main__':
     same_tokens = args.same_tokens
     print("irrelevant_tokens arg", args.irrelevant_tokens)
     irrelevant_tokens = args.irrelevant_tokens
+    print("ortho_haar arg", args.ortho_haar)
+    ortho_haar = args.ortho_haar
 
 
 
@@ -2066,6 +2069,7 @@ if __name__ == '__main__':
         config.override("zero_cut", zero_cut)
         config.override("needle_in_haystack", False)
 
+    
     # Get the class variables in dictionary format
     config_dict  = {
         "seed": 0,
@@ -2131,6 +2135,9 @@ if __name__ == '__main__':
         if multi_haystack:
 
             output_dir = set_config_params(config, model_name)
+        
+            if ortho_haar:
+                config.override("val_dataset_typ", "ortho_haar")
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
             steps_in = [1,2,3,5,10]
