@@ -976,6 +976,68 @@ def set_config_params(config, model_name):
 
         output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
+    elif model_name == "ortho_haar":
+        print("\n\nORTHOGONAL HAAR MEDIUM MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)
+        config.override("num_val_tasks", 100)
+        config.override("dataset_typ", "ortho_haar")
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")
+        config.override("C_dist", "_ident_C")
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)
+
+        # Experiment settings
+        config.override("multi_sys_trace", True)
+        config.override("max_sys_trace", min(25, config.num_tasks))
+        config.override("single_system", False)
+        config.override("zero_cut", False)
+        config.override("needle_in_haystack", False)
+        config.override("needle_final_seg_extended", False)
+        config.override("datasource", "val")
+        config.override("num_sys_haystack", 19)
+        config.override("len_seg_haystack", 10)
+        config.override("num_haystack_examples", 200)
+        config.override(
+            "num_test_traces_configs",
+            config.num_sys_haystack if config.needle_in_haystack and not config.needle_final_seg_extended
+            else (1 if config.needle_in_haystack and config.needle_final_seg_extended
+                else (config.num_val_tasks if config.zero_cut else 1))
+        )
+
+        # Training settings
+        config.override("devices", [0, 1, 2])
+        config.override("train_steps", 1008000)
+        config.override("num_epochs", 1)
+        config.override("train_int", 1000)
+        config.override("use_true_len", False)
+        config.override("batch_size", 512)
+        config.override("acc_grad_batch", 1)
+        config.override("train_data_workers", 128)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)
+
+        # Model settings
+        config.override("model_type", "GPT2")
+        config.override("use_pos_emb", True)
+        config.override("n_positions", 250)
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override(
+            "n_dims_in",
+            int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny
+        )
+        config.override("n_dims_out", 5)
+
+        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")
 
@@ -2110,7 +2172,7 @@ if __name__ == '__main__':
 
         set_config_params(config, model_name)
         
-        ckpt_path = "../outputs/GPT2/250221_215216.337051_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/checkpoints/step=49000.ckpt"
+        ckpt_path = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=16000.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         

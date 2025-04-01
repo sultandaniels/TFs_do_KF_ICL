@@ -1,0 +1,1 @@
+4 GPUs until 16000 iterations. 3 GPUs for the rest
