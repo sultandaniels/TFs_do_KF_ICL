@@ -1760,6 +1760,41 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
 
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
+def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None):
+    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+        
+
+    sys_choices_per_config = []
+    sys_dict_per_config = []
+    tok_seg_lens_per_config = []
+    seg_starts_per_config = []
+    real_seg_lens_per_config = []
+    sys_inds_per_config = []
+
+    # start = time.time()  # start the timer for transformer predictions
+    for trace_config in range(num_test_traces_configs):
+        #ys are of dim: (num_systems, num_trials, config.n_positions + 1, config.ny)
+        if (not config.needle_in_haystack) or (trace_config == 0):
+            tok_seg_lens = None
+            sys_dict = None
+            sys_choices = None
+            seg_starts= None
+            real_seg_lens=None
+            sys_inds = None
+        for trial in range(num_trials):
+
+            #generate interleaved segments
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex) # get the first trace  which will set the testing structure
+            multi_sys_ys[trace_config, trial] = segments
+        
+        sys_choices_per_config.append(sys_choices)
+        sys_dict_per_config.append(sys_dict)
+        tok_seg_lens_per_config.append(tok_seg_lens)
+        seg_starts_per_config.append(seg_starts)
+        real_seg_lens_per_config.append(real_seg_lens)
+        sys_inds_per_config.append(sys_inds)
+
+    return multi_sys_ys, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config
 
 def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=True):
 

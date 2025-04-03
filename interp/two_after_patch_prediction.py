@@ -8,64 +8,52 @@ import datetime
 import pickle
 from transformers import GPT2Model, GPT2LMHeadModel, AutoTokenizer
 import sys
+import numpy as np
+from src.models import GPT2
+from src.core import Config
 
 timestamp = datetime.datetime.now().strftime("%d%H%M")
-from utils import cache_activations, generate_substitute_layer_single_logits
+from interp.utils_gpt2 import cache_activations, generate_substitute_layer_single_logits
 
 device = torch.device("cuda")
 
-def swap_token_activations_logits(model, tokenizer, input_strings, args_b, token_a, token_b):
-    input_formatted_list = []
+def swap_token_activations_logits(model, input_strings, args_b, token_a, token_b):
     prefix = "" # setup to see if 2 after can be predicted so this should just contain: special open token, first token
-    for input_string in input_strings:
-        formatted_input = f"{input_string}{prefix}"
-        tokenized_input = tokenizer(formatted_input, return_tensors="pt")            
-        input_formatted_list.append(formatted_input)
-        
-    inputs = tokenizer(input_formatted_list[0], return_tensors="pt")
-    input_ids = inputs["input_ids"][0] 
     
-    tokens = tokenizer.convert_ids_to_tokens(input_ids)
-    token_text_pairs = zip(tokens, input_ids)
-    
-    for idx, (token, token_id) in enumerate(token_text_pairs):
-        print(f"Token {idx}: {token}, Token ID: {token_id}")
-    
-    final_list = input_formatted_list
+    final_list = input_strings
     swap_seq = [6, 7, 8, 9, 10]
-    token = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] #full frozen sequence
+    full_seq = len(input_strings[0]) #full frozen sequence
 
+    seq = list(range(0, len(input_strings[0])))
     if not final_list:
         print("No valid inputs to process.")
         return
     print(f"Length of final_list: {len(final_list)}")
 
     layers = list(range(args_b.n_layers))
-    module_list_a = [model.model.layers[i] for i in layers]
+    module_list_a = [model.transformer.h[i] for i in layers]
 
     activation_cache_a_out = []
     activation_cache_b_out = []
     
     for idx in layers:
-        module_str = f"model.model.layers[{idx}]"
+        module_str = f"model.transformer.h[{idx}]"
         try:
             cached_out_a = cache_activations(
                 model=model,
-                tokenizer=tokenizer,
                 module_list_or_str=[module_str],
                 cache_input_output='output',
                 inputs=[final_list[0]],
                 batch_size=args_b.batch_size,
-                token_idx=token,
+                token_idx=seq,
             )[0]
             cached_out_b = cache_activations(
                 model=model,
-                tokenizer=tokenizer,
                 module_list_or_str=[module_str],
                 cache_input_output='output',
                 inputs=[final_list[1]],
                 batch_size=args_b.batch_size,
-                token_idx=token,
+                token_idx=seq,
             )[0]
             activation_cache_a_out.append(cached_out_a)
             activation_cache_b_out.append(cached_out_b)
@@ -92,12 +80,11 @@ def swap_token_activations_logits(model, tokenizer, input_strings, args_b, token
         try:
             sub_out_logits = generate_substitute_layer_single_logits(
                 model,
-                tokenizer,
                 final_list[0],
                 module_list_a,
                 activation_cache_swapped_out,
                 'output',
-                token_idx=token,
+                token_idx=seq,
                 max_new_tokens=30
             )
             sub_out_log_probs = F.log_softmax(sub_out_logits, dim=-1)
@@ -153,8 +140,12 @@ def setup_model(args):
     tokenizer.cls_token_id = tokenizer.eos_token_id
 
     # Load model architecture
+    # n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+    config = Config()
     if "gpt" in model_name_or_path.lower():
-        model = GPT2LMHeadModel.from_pretrained("gpt2")
+        model = GPT2.load_from_checkpoint(model_name_or_path + "/post_emerge.ckpt", n_dims_in=config.n_dims_in, n_positions=250, n_embd=72,
+                                use_pos_emb=True, map_location=device, strict=True).eval().to(device)
+        #model = GPT2LMHeadModel.from_pretrained("gpt2")
 
     checkpoint = torch.load(checkpoint_path, map_location="cuda")
     model.load_state_dict(
@@ -208,23 +199,47 @@ if __name__ == "__main__":
     else:
         sequence_prompts = []
 
-    # Extract the sequence prompts
-    print(f"Extracted {len(sequence_prompts)} sequence prompts (first few shown):")
-    print(sequence_prompts[:5]) 
 
-    # If sequence_prompts is a list, ensure it's in the right format
-    print(f"Loaded {len(sequence_prompts)} sequences for processing.")
+    filename = "/data/dhruv_gautam/TFs_do_KF_ICL/outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/data/interleaved_traces_ortho_ident_C_state_dim_5_num_sys_haystack_1.pkl"
+
+    with open(filename, 'rb') as f:
+        file_dict = pickle.load(f)
+
+    multi_sys_ys = file_dict["multi_sys_ys"]
+    tok_seg_lens_per_config = file_dict["tok_seg_lens_per_config"]
+    sys_choices_per_config = file_dict["sys_choices_per_config"]
+
+    np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+
+    print("First row of multi_sys_ys[0,0,:,:]:\n")
+    print(len(multi_sys_ys[0, 0, :, :][0])) # 57
+
+    print(len(multi_sys_ys[0, 0, :, :])) # 25
+
+    for config_idx, (seg_lengths, sys_choices) in enumerate(zip(tok_seg_lens_per_config, sys_choices_per_config)):
+        print(f"\nConfiguration {config_idx}:")
+        # Print details for each segment
+        for seg_idx, (length, sys_choice) in enumerate(zip(seg_lengths, sys_choices)):
+            print(f"  Segment {seg_idx}: Length = {length}, System = {sys_choice}")
+        
+        # Determine if this configuration is interleaved
+        unique_systems = set(sys_choices)
+        if len(unique_systems) > 1:
+            print("-> This trace is interleaved with systems:", unique_systems)
+        else:
+            print("-> This trace is not interleaved; it contains only system:", unique_systems.pop())
+
     
-    sequence_prompts = [
-        "", #icl haystack 1
-        "", #icl haystack 2
+    haystack_prompts = [
+        multi_sys_ys[0, 0, :, :],
+        multi_sys_ys[0, 1, :, :]
     ]
     
     token_a = tokenizer.convert_tokens_to_ids("") # what it should predict
     token_b = tokenizer.convert_tokens_to_ids("") # what it should predict if swap interferes properly (all encodings on the same token)
     
     log_prob_a_changes, log_prob_b_changes = swap_token_activations_logits(
-        model, tokenizer, sequence_prompts, args, token_a, token_b
+        model, haystack_prompts, args, token_a, token_b
     )
     
     plot_results(log_prob_a_changes, log_prob_b_changes, token_a, token_b)

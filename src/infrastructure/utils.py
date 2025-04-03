@@ -205,16 +205,16 @@ def hadamard_conjugation_diff_order2(
 NumPy Array Comprehension Operations
 """
 
-def multi_iter(arr: np.ndarray | DimArray) -> Iterable[Any]:
+def multi_iter(arr: Union[np.ndarray, DimArray]) -> Iterable[Any]:
     for x in np.nditer(arr, flags=["refs_ok"]):
         yield x[()]
 
-def multi_enumerate(arr: np.ndarray | DimArray) -> Iterable[Tuple[Sequence[int], Any]]:
+def multi_enumerate(arr: Union[np.ndarray, DimArray]) -> Iterable[Tuple[Sequence[int], Any]]:
     it = np.nditer(arr, flags=["multi_index", "refs_ok"])
     for x in it:
         yield it.multi_index, x[()]
 
-def multi_map(func: Callable[[Any], Any], arr: np.ndarray | DimArray, dtype: type = None):
+def multi_map(func: Callable[[Any], Any], arr: Union[np.ndarray, DimArray], dtype: type = None):
     if dtype is None:
         dtype = type(func(arr.ravel()[0]))
     result = np.empty_like(arr, dtype=dtype)
@@ -268,7 +268,7 @@ def broadcast_arrays_preserve_ndims(*arrs: np.ndarray) -> Iterator[np.ndarray]:
     shape = np.broadcast_shapes(*(arr.shape for arr in arrs))
     return (np.broadcast_to(arr, shape[-arr.ndim:]) for arr in arrs)
 
-def take_from_dim_array(dim_arr: DimArray | Dataset, idx: Dict[str, Any]):
+def take_from_dim_array(dim_arr: Union[DimArray, Dataset], idx: Dict[str, Any]):
     dims = set(dim_arr.dims)
     return dim_arr.take(indices={k: v for k, v in idx.items() if k in dims})
 
@@ -396,7 +396,7 @@ def array_of(o: T) -> np.ndarray[T]:
     M[()] = o
     return M
 
-def complex(t: torch.Tensor | TensorDict[str, torch.Tensor]) -> Union[torch.Tensor, TensorDict[str, torch.Tensor]]:
+def complex(t: Union[torch.Tensor, TensorDict[str, torch.Tensor]]) -> Union[torch.Tensor, TensorDict[str, torch.Tensor]]:
     fn = lambda t_: torch.complex(t_, torch.zeros_like(t_))
     return fn(t) if isinstance(t, torch.Tensor) else t.apply(fn)
 

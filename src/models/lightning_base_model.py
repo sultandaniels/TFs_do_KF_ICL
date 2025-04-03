@@ -1,6 +1,6 @@
 import torch
 import pytorch_lightning as pl
-from core import Config
+from src.core import Config
 
 config = Config()
 

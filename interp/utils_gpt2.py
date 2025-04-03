@@ -51,38 +51,39 @@ def tokenize_for_ppl(model, tokenizer, prompts, completions):
     return input_ids, attention_mask, labels, label_mask
 
 
-def _forward(model, tokenizer, inputs, generate, no_grad, max_new_tokens=20, **kwargs):
-    """needs to be changed to not have tokenization and just use the direct inputs"""
+def _forward(model, inputs, generate, no_grad, max_new_tokens=20, **kwargs):
+    """
+    Forward pass that bypasses tokenization.
+    `inputs` should be a pre-prepared dict of inputs as expected by the model.
+    """
+    # Optionally preprocess inputs
     if "prepare_inputs" in kwargs:
-        tokenized = kwargs["prepare_inputs"](model, tokenizer, inputs)
-    else:
-        tokenized = tokenizer(inputs, padding=True, return_tensors="pt").to(
-            model.device
-        )
+        inputs = kwargs["prepare_inputs"](model, inputs)
+        
     if no_grad:
         with torch.no_grad():
             if generate:
                 out = model.generate(
-                    **tokenized,
+                    **inputs,
                     max_new_tokens=max_new_tokens,
-                    pad_token_id=tokenizer.eos_token_id,
+                    # If applicable, you may add a pad_token_id here
                     do_sample=False,
                     num_beams=1,
                 )
             else:
-                out = model.forward(**tokenized)
+                out = model.forward(**inputs)
     else:
         if generate:
             out = model.generate(
-                **tokenized,
+                **inputs,
                 max_new_tokens=max_new_tokens,
-                pad_token_id=tokenizer.eos_token_id,
                 do_sample=False,
                 num_beams=1,
             )
         else:
-            out = model.forward(**tokenized)
+            out = model.forward(**inputs)
     return out
+
 
 
 def _generate_single(model, tokenizer, tokenized, no_grad):
@@ -257,7 +258,6 @@ def generate_add_layer_single(
 
 def generate_substitute_layer_single_logits(
     model,
-    tokenizer,
     inputs,
     hooked_modules,
     module_activations,
@@ -267,6 +267,10 @@ def generate_substitute_layer_single_logits(
     max_new_tokens=20,
     **kwargs,
 ):
+    """
+    Run a forward pass while substituting activations (for a single layer) and returns logits.
+    This version assumes that `inputs` is already prepared and bypasses any tokenization.
+    """
     assert len(hooked_modules) == len(module_activations)
     if isinstance(token_idx, int):
         token_idx = [token_idx]
@@ -276,16 +280,17 @@ def generate_substitute_layer_single_logits(
         def forward_pre_hook(module, input):
             if hook_triggered[idx]:
                 return None
-            if isinstance(input, tuple):
-                new_input = input[0]
-            else:
-                new_input = input
+            new_input = input[0] if isinstance(input, tuple) else input
             if "substitute_by_mask" in kwargs:
                 _, read_seq_len, _ = module_activations[idx].shape
                 _, write_seq_len, _ = new_input.shape
                 for i in range(len(new_input)):
                     read_mask = kwargs["substitute_by_mask"][i].item()
-                    write_mask = inputs.attention_mask[i].sum().item()
+                    # If an attention mask is provided, use it; otherwise use the sequence length.
+                    if "attention_mask" in inputs:
+                        write_mask = inputs["attention_mask"][i].sum().item()
+                    else:
+                        write_mask = new_input.shape[1]
                     new_input[i] = torch.cat(
                         [
                             new_input[i][: write_seq_len - write_mask, :],
@@ -299,23 +304,21 @@ def generate_substitute_layer_single_logits(
                 assert new_input[:, token_idx, :].shape == new_activations.shape
                 new_input[:, token_idx, :] = new_activations
             hook_triggered[idx] = True
-            if isinstance(input, tuple):
-                return (new_input,) + input[1:]
-            return new_input
+            return (new_input,) + input[1:] if isinstance(input, tuple) else new_input
 
         def forward_hook(module, input, output):
             if hook_triggered[idx]:
                 return None
-            if isinstance(output, tuple):
-                new_output = output[0]
-            else:
-                new_output = output
+            new_output = output[0] if isinstance(output, tuple) else output
             if "substitute_by_mask" in kwargs:
                 _, read_seq_len, _ = module_activations[idx].shape
                 _, write_seq_len, _ = new_output.shape
                 for i in range(len(new_output)):
                     read_mask = kwargs["substitute_by_mask"][i].item()
-                    write_mask = inputs.attention_mask[i].sum().item()
+                    if "attention_mask" in inputs:
+                        write_mask = inputs["attention_mask"][i].sum().item()
+                    else:
+                        write_mask = new_output.shape[1]
                     new_output[i] = torch.cat(
                         [
                             new_output[i][: write_seq_len - write_mask, :],
@@ -330,9 +333,7 @@ def generate_substitute_layer_single_logits(
                 new_output[:, token_idx, :] = new_activations
 
             hook_triggered[idx] = True
-            if isinstance(output, tuple):
-                return (new_output,) + output[1:]
-            return new_output
+            return (new_output,) + output[1:] if isinstance(output, tuple) else new_output
 
         return forward_pre_hook if sub_input_output == "input" else forward_hook
 
@@ -348,12 +349,14 @@ def generate_substitute_layer_single_logits(
         ]
     else:
         raise ValueError("sub_input_output must be 'input' or 'output'.")
-    device = torch.device("cuda")
-    if isinstance(inputs, str):
-        inputs = tokenizer(inputs, return_tensors="pt", padding=True, truncation=True).to(device)
 
-    with torch.no_grad() if no_grad else torch.enable_grad():
-        out = model(**inputs, output_hidden_states=False, return_dict=True)
+    # Ensure inputs are not raw strings.
+    if isinstance(inputs, str):
+        raise ValueError("Raw string input provided but tokenization is disabled. Provide pre-processed inputs instead.")
+    
+    with (torch.no_grad() if no_grad else torch.enable_grad()):
+        # Call the updated _forward function (which no longer takes a tokenizer)
+        out = _forward(model, inputs, generate=False, no_grad=no_grad, **kwargs)
         logits = out.logits
 
     for hook_handle in hook_handles:
@@ -361,9 +364,9 @@ def generate_substitute_layer_single_logits(
 
     return logits
 
+
 def generate_substitute_layer_single(
     model,
-    tokenizer,
     inputs,
     hooked_modules,
     module_activations,
@@ -373,6 +376,10 @@ def generate_substitute_layer_single(
     max_new_tokens=20,
     **kwargs,
 ):
+    """
+    Run a forward pass with substituted activations (for a single layer) and return the model output.
+    This version bypasses tokenization, assuming that inputs are already formatted appropriately.
+    """
     assert len(hooked_modules) == len(module_activations)
     if isinstance(token_idx, int):
         token_idx = [token_idx]
@@ -382,16 +389,16 @@ def generate_substitute_layer_single(
         def forward_pre_hook(module, input):
             if hook_triggered[idx]:
                 return None
-            if isinstance(input, tuple):
-                new_input = input[0]
-            else:
-                new_input = input
+            new_input = input[0] if isinstance(input, tuple) else input
             if "substitute_by_mask" in kwargs:
                 _, read_seq_len, _ = module_activations[idx].shape
                 _, write_seq_len, _ = new_input.shape
                 for i in range(len(new_input)):
                     read_mask = kwargs["substitute_by_mask"][i].item()
-                    write_mask = inputs.attention_mask[i].sum().item()
+                    if "attention_mask" in inputs:
+                        write_mask = inputs["attention_mask"][i].sum().item()
+                    else:
+                        write_mask = new_input.shape[1]
                     new_input[i] = torch.cat(
                         [
                             new_input[i][: write_seq_len - write_mask, :],
@@ -405,23 +412,21 @@ def generate_substitute_layer_single(
                 assert new_input[:, token_idx, :].shape == new_activations.shape
                 new_input[:, token_idx, :] = new_activations
             hook_triggered[idx] = True
-            if isinstance(input, tuple):
-                return (new_input,) + input[1:]
-            return new_input
+            return (new_input,) + input[1:] if isinstance(input, tuple) else new_input
 
         def forward_hook(module, input, output):
             if hook_triggered[idx]:
                 return None
-            if isinstance(output, tuple):
-                new_output = output[0]
-            else:
-                new_output = output
+            new_output = output[0] if isinstance(output, tuple) else output
             if "substitute_by_mask" in kwargs:
                 _, read_seq_len, _ = module_activations[idx].shape
                 _, write_seq_len, _ = new_output.shape
                 for i in range(len(new_output)):
                     read_mask = kwargs["substitute_by_mask"][i].item()
-                    write_mask = inputs.attention_mask[i].sum().item()
+                    if "attention_mask" in inputs:
+                        write_mask = inputs["attention_mask"][i].sum().item()
+                    else:
+                        write_mask = new_output.shape[1]
                     new_output[i] = torch.cat(
                         [
                             new_output[i][: write_seq_len - write_mask, :],
@@ -436,9 +441,7 @@ def generate_substitute_layer_single(
                 new_output[:, token_idx, :] = new_activations
 
             hook_triggered[idx] = True
-            if isinstance(output, tuple):
-                return (new_output,) + output[1:]
-            return new_output
+            return (new_output,) + output[1:] if isinstance(output, tuple) else new_output
 
         return forward_pre_hook if sub_input_output == "input" else forward_hook
 
@@ -453,31 +456,21 @@ def generate_substitute_layer_single(
             for i in range(len(hooked_modules))
         ]
     else:
-        assert ValueError
+        raise ValueError("sub_input_output must be 'input' or 'output'.")
+
+    # Decide whether to generate or calculate loss.
     if "get_loss" in kwargs:
-        assert "labels" in inputs
-        out = _forward(
-            model,
-            tokenizer,
-            inputs,
-            generate=False,
-            no_grad=(not kwargs["get_loss"]),
-            **kwargs,
-        )
+        if "labels" not in inputs:
+            raise ValueError("Expected 'labels' in inputs when 'get_loss' is specified.")
+        out = _forward(model, inputs, generate=False, no_grad=(not kwargs["get_loss"]), **kwargs)
     else:
-        out = _forward(
-            model,
-            tokenizer,
-            inputs,
-            generate=True,
-            no_grad=no_grad,
-            max_new_tokens=max_new_tokens,
-            **kwargs,
-        )
+        out = _forward(model, inputs, generate=True, no_grad=no_grad, max_new_tokens=max_new_tokens, **kwargs)
+
     for hook_handle in hook_handles:
         hook_handle.remove()
 
     return out
+
 
 
 def generate_add_attn_single(
@@ -523,14 +516,17 @@ def generate_add_attn_single(
 #############################
 
 
-def _forward_cache_outputs(
-    model, tokenizer, inputs, hooked_modules, token_idx, no_grad=True, **kwargs
-):
+def _forward_cache_outputs(model, inputs, hooked_modules, token_idx, no_grad=True, **kwargs):
+    """
+    Executes a forward pass while caching the outputs of the given hooked modules.
+    """
     cache = []
 
     def forward_hook(module, input, output):
+        # If output is a tuple, grab the first element.
         if isinstance(output, tuple):
             output = output[0]
+        # If token_idx is specified, grab that slice; otherwise, cache full output.
         if token_idx is None:
             cache.append(output)
         else:
@@ -541,7 +537,7 @@ def _forward_cache_outputs(
         hooked_module.register_forward_hook(forward_hook)
         for hooked_module in hooked_modules
     ]
-    _ = _forward(model, tokenizer, inputs, generate=False, no_grad=no_grad, **kwargs)
+    _ = _forward(model, inputs, generate=False, no_grad=no_grad, **kwargs)
     for hook_handle in hook_handles:
         hook_handle.remove()
     return cache
@@ -586,7 +582,6 @@ def _forward_cache_inputs(
 
 def cache_activations(
     model,
-    tokenizer,
     module_list_or_str,
     cache_input_output,
     inputs,
@@ -595,41 +590,40 @@ def cache_activations(
     split_attn_by_head=True,
     **kwargs,
 ):
+    # Ensure token_idx is a list for consistency.
     if isinstance(token_idx, int):
         token_idx = [token_idx]
+    # Allow module specification via a string or a list of strings.
     if isinstance(module_list_or_str, str):
         module_strs = [module_list_or_str]
     else:
         module_strs = module_list_or_str
+        
     if split_attn_by_head and cache_input_output == "input":
         split = [True if "attn" in m else False for m in module_strs]
     else:
         split = [False for _ in module_strs]
 
     all_activations = [None for _ in module_strs]
-    modules = []
-    for m in module_strs:
-        modules.append(eval(m))
+    modules = [eval(m) for m in module_strs]
 
+    # Process inputs in batches
     for i in range(0, len(inputs), batch_size):
         batch = inputs[i : i + batch_size]
         if cache_input_output == "input":
-            activations = _forward_cache_inputs(
-                model, tokenizer, batch, modules, split, token_idx, **kwargs
-            )
+            activations = _forward_cache_inputs(model, batch, modules, split, token_idx, **kwargs)
         elif cache_input_output == "output":
-            activations = _forward_cache_outputs(
-                model, tokenizer, batch, modules, token_idx, **kwargs
-            )
+            activations = _forward_cache_outputs(model, batch, modules, token_idx, **kwargs)
         else:
             raise ValueError("cache_input_output must be 'input' or 'output'")
+        # Concatenate activations batch by batch.
         for j, activation in enumerate(activations):
             if i == 0:
                 all_activations[j] = activation
             else:
                 all_activations[j] = torch.cat([all_activations[j], activation], dim=0)
-    # (num_modules, num_batches, [token_idx], activation_size)
     return all_activations
+
 
 
 ##############################

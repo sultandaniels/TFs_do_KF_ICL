@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 from transformers import GPT2Model, GPT2Config, TransfoXLConfig, TransfoXLModel
-from models import BaseModel
-from core import Config
-from linalg_helpers import print_matrix
+from src.models import BaseModel
+from src.core import Config
+from src.linalg_helpers import print_matrix
 
 config = Config()
 
