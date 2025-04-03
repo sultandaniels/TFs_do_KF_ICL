@@ -208,7 +208,13 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
         #get obs from the system trace corresponding to sys_trace_ind
         if test:
-            sys_trace_obs = entries[sys_ind]
+            #catch exception if the system index is not in the entries
+            try:
+                sys_trace_obs = entries[sys_ind]
+            except IndexError as e:
+                print(f"System index {sys_ind} is out of bounds from sys_inds: {sys_inds}")
+                raise IndexError(e)
+            
 
         else:
             sys_trace_obs = entries[sys_ind]["obs"]

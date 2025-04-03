@@ -587,6 +587,15 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = np.arange(3000, 105000, 3000)
 
+    elif model_name == "ortho_haar":
+        minval = 1000
+        maxval = 99000
+        train_int = 1000
+
+        phases = [minval, 10000, 19000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
     #params for vanilla gauss model:
     # elif config.val_dataset_typ == "gaussA" and config.use_pos_emb and config.n_embd == 128:
     elif model_name == "gauss":
@@ -992,24 +1001,6 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)
-
-        # Experiment settings
-        config.override("multi_sys_trace", True)
-        config.override("max_sys_trace", min(25, config.num_tasks))
-        config.override("single_system", False)
-        config.override("zero_cut", False)
-        config.override("needle_in_haystack", False)
-        config.override("needle_final_seg_extended", False)
-        config.override("datasource", "val")
-        config.override("num_sys_haystack", 19)
-        config.override("len_seg_haystack", 10)
-        config.override("num_haystack_examples", 200)
-        config.override(
-            "num_test_traces_configs",
-            config.num_sys_haystack if config.needle_in_haystack and not config.needle_final_seg_extended
-            else (1 if config.needle_in_haystack and config.needle_final_seg_extended
-                else (config.num_val_tasks if config.zero_cut else 1))
-        )
 
         # Training settings
         config.override("devices", [0, 1, 2])
@@ -2005,7 +1996,9 @@ if __name__ == '__main__':
     parser.add_argument('--only_needle_pos', help='Boolean. only run the needle position evals', action='store_true')
     parser.add_argument('--same_tokens', help='Boolean. use the same special tokens for all systems in the haystack', action='store_true')
     parser.add_argument('--irrelevant_tokens', help='Boolean. use an irrelevant special token for query system in the haystack', action='store_true')
-    parser.add_argument('--ortho_haar', help='Boolean. use orthogonal haar systems', action='store_true')
+    parser.add_argument('--ortho_haar', help='Boolean. use orthogonal haar systems for test', action='store_true')
+    parser.add_argument('--ortho', help='Boolean. use orthogonal systems test', action='store_true')
+    parser.add_argument('--only_beg', help='Boolean. only run the beginning evals', action='store_true')
 
 
 
@@ -2071,6 +2064,10 @@ if __name__ == '__main__':
     irrelevant_tokens = args.irrelevant_tokens
     print("ortho_haar arg", args.ortho_haar)
     ortho_haar = args.ortho_haar
+    print("ortho arg", args.ortho)
+    ortho = args.ortho
+    print("only_beg arg", args.only_beg)
+    only_beg = args.only_beg
 
 
 
@@ -2125,6 +2122,10 @@ if __name__ == '__main__':
     config.override("opposite_ortho", opposite_ortho) # set the opposite_ortho in the config object
     if config.opposite_ortho:
         config.override("val_dataset_typ", "ortho")
+
+    config.override("only_beg", only_beg) # set the only_beg in the config object
+    if config.only_beg:
+        print("only plotting the beginning evals\n\n\n")
 
     if zero_cut:
         config.override("multi_sys_trace", True)
@@ -2200,9 +2201,14 @@ if __name__ == '__main__':
         
             if ortho_haar:
                 config.override("val_dataset_typ", "ortho_haar")
+            elif ortho:
+                config.override("val_dataset_typ", "ortho")
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
-            steps_in = [1,2,3,5,10]
+
+            # steps_in = [1,2,3,5,10]
+            steps_in = list(range(1,11))
+
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
             if config.paren_swap:
@@ -2245,7 +2251,7 @@ if __name__ == '__main__':
                                 kal_step = get_kal_step(output_dir, model_name)
                             
                             print("making train_conv plots for haystack len:", num_sys)
-                            pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                            pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
                             if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
@@ -2284,7 +2290,7 @@ if __name__ == '__main__':
                             kal_step = get_kal_step(output_dir, model_name)
 
                             print("making train_conv plots for haystack len:", num_sys)
-                            pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                            pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
                             if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
@@ -2358,7 +2364,7 @@ if __name__ == '__main__':
                     kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
 
                     print(f"plotting train_conv convergence plots for haystack len {num_sys}")
-                    pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                    pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
 
                     if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
                         if desktop:

@@ -200,7 +200,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
                 if valA != "gaussA":
                     ax.legend(fontsize = 8, columnspacing=0.25, loc="lower right", ncol=3) #loc="upper left")
                     ax.set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
-                    ax.set_ylabel(("(" if valA== "gaussA" else "") + "Error" + (" Ratio" if valA == "gaussA" else ""), fontsize=12)
+                    ax.set_ylabel(("(" if valA== "gaussA" else "") + "Error" + (" Ratio - 1" if valA == "gaussA" else ""), fontsize=12)
                     ax.set_xlim(-3, haystack_len)
                     ax.grid(True)
                     ax.minorticks_on()
@@ -229,7 +229,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
 
                     ax[step_count].legend(fontsize = 10, ncol=5, columnspacing=0.4, handletextpad=0.25, loc="lower left") #, loc="upper left")
                     ax[step_count].set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
-                    ax[step_count].set_ylabel("Error" + (" Ratio" if valA == "gaussA" else "") + f": {step} After Open", fontsize=12)
+                    ax[step_count].set_ylabel("Error" + (" Ratio - 1" if valA == "gaussA" else "") + f": {step} After Open", fontsize=12)
                     ax[step_count].set_xlim(-3, haystack_len)
                     ax[step_count].grid(True)
                     ax[step_count].minorticks_on()
@@ -342,7 +342,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     ax.tick_params(axis='x', which='both', labelbottom=True, labelsize=12)
     ax.grid(which='major', linestyle='-', linewidth=1)
     ax.grid(which='minor', linestyle='--', linewidth=0.5)
-    ax.set_ylabel(f"Error" + (" Ratio" if valA == "gaussA" else ""), fontsize=14)
+    ax.set_ylabel(f"Error" + (" Ratio - 1" if valA == "gaussA" else ""), fontsize=14)
     ax.set_xlabel("Steps after the Open Token", fontsize=14)
     ax.set_yscale('log')
     # ax.set_title(f"Prediction Error for Needle Position {needle}", fontsize=30)
@@ -365,7 +365,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     return None
 
 
-def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err=False):
+def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, kal_ckpt, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err=False):
 
     nope = not config.use_pos_emb
 
@@ -410,17 +410,22 @@ def compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_ckpt, ha
             if len(pred_ckpts) > 0:
                 last_pred_ckpt = pred_ckpts[-1]
                 
-                if config.n_embd == 128 and not nope: #Vanilla models
-                    if config.val_dataset_typ == "ortho": #THIS IS FOR VANILLA ORTHO ONLY
-                        gpus = 2 #just for ortho case
-                    
-                    elif config.val_dataset_typ == "ident" and ckpt_step > 9600: #THIS IS FOR VANILLA IDENT ONLY
-                        gpus = 4
+                if model_name == "ortho": #THIS IS FOR VANILLA ORTHO ONLY
+                    gpus = 2 #just for ortho case
+                
+                elif model_name == "ident" and ckpt_step > 9600: #THIS IS FOR VANILLA IDENT ONLY
+                    gpus = 4
+
+                elif model_name == "ortho_haar" and ckpt_step > 16000:
+                    gpus = 3
 
             else:
                 last_pred_ckpt = 0
-                if config.val_dataset_typ == "ortho" and config.n_embd == 128 and not nope: #THIS IS FOR VANILLA ORTHO ONLY
+                # if config.val_dataset_typ == "ortho" and config.n_embd == 128 and not nope: #THIS IS FOR VANILLA ORTHO ONLY
+                if model_name == "ortho":
                     gpus = 3
+                elif model_name == "ortho_haar":
+                    gpus = 4
 
             with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
                 assert ("paren_swap" if config.paren_swap else "") in errs_loc, f"Error: paren_swap not in {errs_loc}"
@@ -552,6 +557,10 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     # else:
     #     steps = [1,2,3]
 
+    if len(steps) > len(colors):
+        # generate more colors from viridis colormap
+        colors = plt.cm.viridis(np.linspace(0, 1, len(steps)))
+
     print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
@@ -580,19 +589,25 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
 
                     # raise NotImplementedError("Check the early stop index")
                 
-                ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
-                # if not valA == "gaussA":
-                #     ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+                if not config.only_beg:
+                    ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
+                    # if not valA == "gaussA":
+                    #     ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
-                ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+                    ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
-                ax_len.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
-                ax_len.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+                    ax_len.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
+                    ax_len.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
+
+
+                    color = ax.get_lines()[-1].get_color()
+
+                else:
+                    color = colors[col_count]
 
                 beg_qs = np.array(beg_quartiles_ckpt[key][step])
                 beg_qs = np.transpose(beg_qs)
                 #set the color to the same as the fin quartiles
-                color = ax.get_lines()[-1].get_color()
                 ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
 
                 # if not valA == "gaussA":
@@ -645,7 +660,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     return early_stop_ind
 
 
-def haystack_plots_train_conv_full(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more=False, abs_err=False):
+def haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more=False, abs_err=False):
 
     model_dir, experiment = split_path(output_dir)
        
@@ -670,7 +685,7 @@ def haystack_plots_train_conv_full(config, haystack_len, output_dir, pred_ckpt_s
         ckpt_steps = gen_ckpt_steps(config.train_int, last_ckpt, config.train_int) #make sure to set the train_int for testing
 
         #compute quartiles for train conv
-        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err)
+        fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err)
 
 
     #plot haystack train conv
@@ -733,7 +748,7 @@ def haystack_plots_needle_full(config, haystack_len, output_dir, ckpt_step, step
    
 
 
-def haystack_plots(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in=[1,2,3,5,10], colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6'], compute_more=False, abs_err=False):
+def haystack_plots(config, model_name, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in=[1,2,3,5,10], colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6'], compute_more=False, abs_err=False):
 
        
     
@@ -761,7 +776,7 @@ def haystack_plots(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, 
 
     # ckpt_step = pred_ckpt_steps[early_stop_ind] #get the ckpt_step for the early stopping index
     
-    ckpt_step = haystack_plots_train_conv_full(config, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more, abs_err)
+    ckpt_step = haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more, abs_err)
 
     
     if haystack_len == 19 and not abs_err:
