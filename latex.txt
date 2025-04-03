@@ -1,6 +1,0 @@
-\newcommand{\xv}[0]{\mathbf{x}}
-\newcommand{\yv}[0]{\mathbf{y}}
-#same thing with with
-\newcommand{\wv}[0]{\mathbf{w}}
-#now v
-\newcommand{\vv}[0]{\mathbf{v}}
