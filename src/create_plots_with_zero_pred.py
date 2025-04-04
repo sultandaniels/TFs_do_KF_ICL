@@ -1971,13 +1971,14 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     return None
 
-def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run_kf_ols=True):
+def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, output_dir, run_kf_ols=True):
     # make the prediction errors directory
     # get the parent directory of the ckpt_path
-    parent_dir = os.path.dirname(config.ckpt_path)
+    # parent_dir = os.path.dirname(config.ckpt_path)
 
-    # get the parent directory of the parent directory
-    parent_parent_dir = os.path.dirname(parent_dir)
+    # # get the parent directory of the parent directory
+    # parent_parent_dir = os.path.dirname(parent_dir)
+    parent_parent_dir = output_dir
 
     ckpt_steps = get_step_number(config.ckpt_path)
     print("ckpt_steps:", ckpt_steps)
@@ -2321,7 +2322,7 @@ def setup_deg_kf_axs_arrs(num_systems):
     return cos_sims, err_ratios, zero_ratios, deg_fig, axs
 
 
-def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf, ys, sim_objs, run_kf_ols=True):
+def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems, shade, logscale, train_conv, tf, ys, sim_objs, output_dir, run_kf_ols=True):
     C_dist = config.C_dist
     
     if excess:
@@ -2330,7 +2331,7 @@ def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems,
 
     if run_preds:
         # print("config path:", config.ckpt_path)
-        save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, run_kf_ols=run_kf_ols)  # save the predictions to a file
+        save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, output_dir, run_kf_ols=run_kf_ols)  # save the predictions to a file
 
         if train_conv:
             return None

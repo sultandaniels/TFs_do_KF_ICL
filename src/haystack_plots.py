@@ -660,9 +660,11 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     return early_stop_ind
 
 
-def haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more=False, abs_err=False):
+def haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir, ckpt_dir, experiment_name, pred_ckpt_steps, kal_step, steps_in, colors, compute_more=False, abs_err=False):
 
     model_dir, experiment = split_path(output_dir)
+
+    experiment = experiment_name
        
     # load quartiles_ckpt_files
     train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = load_quartiles_ckpt_files(config, haystack_len, model_dir, experiment, abs_err)
@@ -676,7 +678,7 @@ def haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir,
 
         print(f"\ncomputing train conv quartiles for haystack_len: {haystack_len}")
     
-        last_ckpt_file = get_last_checkpoint(model_dir + experiment + "/checkpoints")
+        last_ckpt_file = get_last_checkpoint(ckpt_dir + "/checkpoints")
         last_ckpt = last_ckpt_file.split("=")[1].split(".")[0]
         last_ckpt = int(last_ckpt)
 
@@ -776,7 +778,7 @@ def haystack_plots(config, model_name, haystack_len, output_dir, pred_ckpt_steps
 
     # ckpt_step = pred_ckpt_steps[early_stop_ind] #get the ckpt_step for the early stopping index
     
-    ckpt_step = haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir, pred_ckpt_steps, kal_step, steps_in, colors, compute_more, abs_err)
+    ckpt_step = haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir, ckpt_dir, experiment_name, pred_ckpt_steps, kal_step, steps_in, colors, compute_more, abs_err)
 
     
     if haystack_len == 19 and not abs_err:
