@@ -26,18 +26,7 @@ from gen_pred_cktps import gen_pred_ckpts
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
 
-def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_state_dim=False):
-
-    # test_dataset_typ = config.dataset_typ
-    # test_C_dist = config.C_dist
-    # # add ckpt_path to config_dict
-    # config_dict["ckpt_path"] = config.ckpt_path
-    # config_dict["dataset_typ"] = "gaussA"
-    # config_dict["C_dist"] = "_gauss_C"
-
-    # #change dataset_typ and C_dist in config to "gaussA" and "_gauss_C" 
-    # config.override("dataset_typ", "gaussA")
-    # config.override("C_dist", "_gauss_C")
+def wandb_train(config_dict, model, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False):
 
     # 🐝 1️⃣ Start a new run to track this script
     run = wandb.init(
@@ -45,24 +34,23 @@ def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_
         project="transformer_kalman_no_sweep",
         # Track hyperparameters and run metadata
         config=config_dict,
-        settings=wandb.Settings(_disable_stats=True, _disable_meta=True)
+        settings=wandb.Settings(_disable_stats=False, _disable_meta=False)
     )
-    train_time = train_gpt2(model, config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+    train_time = train_gpt2(model, config, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+
+    print("Time spent training (days:hours:minutes):", time.strftime("%D:%H:%M", time.gmtime(train_time)))
 
     # Finish the run
     wandb.finish()
 
-    # Get the path to the current run directory
-    run_dir = run.dir
+    # # Get the path to the current run directory
+    # run_dir = run.dir
 
-    # Delete the run directory
-    shutil.rmtree(run_dir)
+    # # Delete the run directory
+    # shutil.rmtree(run_dir)
 
-    print(f"Deleted wandb run directory: {run_dir}")
+    # print(f"Deleted wandb run directory: {run_dir}")
 
-    # #change dataset_typ and C_dist back to the original values
-    # config.override("dataset_typ", test_dataset_typ)
-    # config.override("C_dist", test_C_dist)
     return None
 
 def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, ys=None, sim_objs=None, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
@@ -587,12 +575,16 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = np.arange(3000, 105000, 3000)
 
+    elif model_name == "ortho_haar_check":
+
+        ckpt_pred_steps = np.arange(1, 35)
+
     elif model_name == "ortho_haar":
         minval = 1000
-        maxval = 99000
+        maxval = 113000
         train_int = 1000
 
-        phases = [minval, 10000, 19000, maxval]
+        phases = [minval, 10000, 22000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
@@ -1028,6 +1020,51 @@ def set_config_params(config, model_name):
         config.override("n_dims_out", 5)
 
         output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+    elif model_name == "ortho_haar_check":
+        print("\n\nORTHOGONAL HAAR CHECK MEDIUM MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)
+        config.override("num_val_tasks", 100)
+        config.override("dataset_typ", "ortho_haar")
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")
+        config.override("C_dist", "_ident_C")
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)
+
+        # Training settings
+        config.override("devices", [0, 1, 2])
+        config.override("train_steps", 1008000)
+        config.override("num_epochs", 1)
+        config.override("train_int", 1000)
+        config.override("use_true_len", False)
+        config.override("batch_size", 512)
+        config.override("acc_grad_batch", 1)
+        config.override("train_data_workers", 128)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)
+
+        # Model settings
+        config.override("model_type", "GPT2")
+        config.override("use_pos_emb", True)
+        config.override("n_positions", 250)
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override(
+            "n_dims_in",
+            int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny
+        )
+        config.override("n_dims_out", 5)
+
+        experiment_name = "250403_174451.5c606a_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        output_dir = f"../outputs/{config.model_type}/{experiment_name}"
 
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")
@@ -1800,7 +1837,7 @@ def set_config_params(config, model_name):
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
 
 
-    return output_dir
+    return output_dir, experiment_name
 
 def get_entries(config, f):
     if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
@@ -1827,19 +1864,24 @@ def get_entries(config, f):
     return ys
 
     
-def get_test_data(config, output_dir, num_haystack_ex=50):
+def get_test_data(config, experiment_name, num_haystack_ex=50):
     # load the validation data
+
+    #for BLISS server
+    path = "/data/shared/ICL_Kalman_Experiments/train_and_test_data"
     if (config.datasource == "val"):
+
+        path = path + f"/{config.val_dataset_typ}/"
 
         print(f"getting test data from datasource {config.datasource}")
 
         # get the sim objs for the validation data
-        with open(output_dir + f"/data/" + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the validation data
-        print(f"/data/" + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl")
-        with open(output_dir + f"/data/" + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        print(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl")
+        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
             # samples = pickle.load(f)
             # # for every 2000 entries in samples, get the observation values and append them to the ys list
             # ys = np.stack(
@@ -1853,14 +1895,17 @@ def get_test_data(config, output_dir, num_haystack_ex=50):
 
         print(f"getting test data from datasource {config.datasource}")
 
+
+        path = path + f"/{config.dataset_typ}/"
+
         max_num_sys = num_haystack_ex + config.max_sys_trace #max number of systems to use for testing
 
         #get the sim_objs for the training data
-        with open (output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open (path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the training data
-        with open(output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
             #get train traces
             # samples = pickle.load(f)
             # ys = np.stack(
@@ -1878,18 +1923,21 @@ def get_test_data(config, output_dir, num_haystack_ex=50):
         print(f"shape of ys: {ys.shape}")
     
 
-    elif config.datasource == "train_systems":
+    elif config.datasource == "train_systems": #DEPRECATED
 
         print(f"getting test data from datasource {config.datasource}")
 
+
+        path = path + f"/{config.dataset_typ}/"
+
         #get the sim_objs for the training data
-        with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(path + f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #generate traces from the training systems
         collect_data(config, output_dir, "val", False, False, False, sim_objs) 
 
-        with open(output_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + f"{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
             #get train traces
             # samples = pickle.load(f)
             # ys = np.stack(
@@ -2197,7 +2245,7 @@ if __name__ == '__main__':
 
         if multi_haystack:
 
-            output_dir = set_config_params(config, model_name)
+            output_dir, experiment_name = set_config_params(config, model_name)
         
             if ortho_haar:
                 config.override("val_dataset_typ", "ortho_haar")
@@ -2429,49 +2477,51 @@ if __name__ == '__main__':
         
         model.to(device)
         
-        output_dir = setup_train(model, train_mix_dist, train_mix_state_dim)
+        output_dir, ckpt_dir, experiment_name = setup_train(model, train_mix_dist, train_mix_state_dim)
         # output_dir = output_dir + f"_{config.dataset_typ}{config.C_dist}"
-        os.makedirs(output_dir + f"/data/", exist_ok=True)
 
-        if part_train_set:
-            start_path_str = "../outputs/GPT2/"
-            prev_exper = start_path_str + "241103_013426.749aca_gaussA_gauss_C_lr_0" #path to previous experiment to load
+        #update code for checking if training data exists
+        # os.makedirs(output_dir + f"/data/", exist_ok=True)
 
-            #load training data
-            with open(prev_exper + f"/data/train_{config.dataset_typ}{config.C_dist}.pkl", "rb") as f:
-                past_train_set = pickle.load(f)
+        # if part_train_set:
+        #     start_path_str = "../outputs/GPT2/"
+        #     prev_exper = start_path_str + "241103_013426.749aca_gaussA_gauss_C_lr_0" #path to previous experiment to load
 
-            new_train_set = past_train_set[0:config.num_tasks]
-            print("len of past train set:", len(past_train_set))
-            print("len of new train set:", len(new_train_set))
+        #     #load training data
+        #     with open(prev_exper + f"/data/train_{config.dataset_typ}{config.C_dist}.pkl", "rb") as f:
+        #         past_train_set = pickle.load(f)
 
-            with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}.pkl", "wb") as f:
-                pickle.dump(new_train_set, f)
+        #     new_train_set = past_train_set[0:config.num_tasks]
+        #     print("len of past train set:", len(past_train_set))
+        #     print("len of new train set:", len(new_train_set))
 
-            with open(prev_exper + f"/data/train_{config.dataset_typ}{config.C_dist}_sim_objs.pkl", "rb") as f:
-                past_train_sim_objs = pickle.load(f)
+        #     with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}.pkl", "wb") as f:
+        #         pickle.dump(new_train_set, f)
 
-            new_train_sim_objs = past_train_sim_objs[0:config.num_tasks]
-            print("len of past train sim objs:", len(past_train_sim_objs))
-            print("len of new train sim objs:", len(new_train_sim_objs))
+        #     with open(prev_exper + f"/data/train_{config.dataset_typ}{config.C_dist}_sim_objs.pkl", "rb") as f:
+        #         past_train_sim_objs = pickle.load(f)
 
-            with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_sim_objs.pkl", "wb") as f:
-                pickle.dump(new_train_sim_objs, f)
+        #     new_train_sim_objs = past_train_sim_objs[0:config.num_tasks]
+        #     print("len of past train sim objs:", len(past_train_sim_objs))
+        #     print("len of new train sim objs:", len(new_train_sim_objs))
 
-            del past_train_set
-            del new_train_set
-            del past_train_sim_objs
-            del new_train_sim_objs
-            torch.cuda.empty_cache()
-            gc.collect()
+        #     with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_sim_objs.pkl", "wb") as f:
+        #         pickle.dump(new_train_sim_objs, f)
+
+        #     del past_train_set
+        #     del new_train_set
+        #     del past_train_sim_objs
+        #     del new_train_sim_objs
+        #     torch.cuda.empty_cache()
+        #     gc.collect()
                
-        else:
-            collect_data(config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
+        # else:
+        #     collect_data(config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
 
         # replace ckpt_path with the path to the checkpoint file
-        config.override("ckpt_path", output_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
+        config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
 
-        wandb_train(config_dict, model, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+        wandb_train(config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
 
         # create prediction plots
         run_preds = True #run the predictions evaluation
