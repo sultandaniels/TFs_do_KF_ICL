@@ -1627,6 +1627,31 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config
 
 
+def tf_preds(multi_sys_ys, model, device, config):
+    with torch.no_grad():  # no gradients
+        I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+
+        # print("before model.predict_step()")
+        batch_shape = I.shape[:-2]
+        # print("batch_shape:", batch_shape)
+        flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
+        # print("flattened_I.shape:", flattened_I.shape)
+        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
+                                                        batch_size=config.test_batch_size)
+        preds_arr = []  # Store the predictions for all batches
+        for validation_batch in iter(validation_loader):
+            _, flattened_preds_tf = model.predict_step(
+                {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
+            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                            (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
+        # print("preds_tf.shape:", preds_tf.shape)
+        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
+                                axis=-2)  # concatenate the predictions
+        
+    return preds_tf
+
+
 def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=None):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
@@ -1701,29 +1726,31 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
 
     # print("\nstart tf pred")
     # start = time.time()  # start the timer for transformer predictions
-    with torch.no_grad():  # no gradients
-        I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+    # with torch.no_grad():  # no gradients
+    #     I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
 
-        # print("before model.predict_step()")
-        batch_shape = I.shape[:-2]
-        # print("batch_shape:", batch_shape)
-        flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
-        # print("flattened_I.shape:", flattened_I.shape)
-        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
-                                                        batch_size=config.test_batch_size)
-        preds_arr = []  # Store the predictions for all batches
-        for validation_batch in iter(validation_loader):
-            _, flattened_preds_tf = model.predict_step(
-                {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
-            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
-        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
-                            (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
-        # print("preds_tf.shape:", preds_tf.shape)
-        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
-                                axis=-2)  # concatenate the predictions
+    #     # print("before model.predict_step()")
+    #     batch_shape = I.shape[:-2]
+    #     # print("batch_shape:", batch_shape)
+    #     flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
+    #     # print("flattened_I.shape:", flattened_I.shape)
+    #     validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
+    #                                                     batch_size=config.test_batch_size)
+    #     preds_arr = []  # Store the predictions for all batches
+    #     for validation_batch in iter(validation_loader):
+    #         _, flattened_preds_tf = model.predict_step(
+    #             {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
+    #         preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+    #     preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+    #                         (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
+    #     # print("preds_tf.shape:", preds_tf.shape)
+    #     preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
+    #                             axis=-2)  # concatenate the predictions
         # print("preds_tf.shape:", preds_tf.shape)
     # end = time.time()  # end the timer for transformer predictions
     # print("time elapsed for MOP Pred:", (end - start), "sec")  # print the time elapsed for transformer predictions
+
+    preds_tf = tf_preds(multi_sys_ys, model, device, config) #get the transformer predictions
 
     #take the last config.ny columns of axis=-1 as the true test observations
     multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations

@@ -25,9 +25,9 @@ if __name__ == "__main__":
     config = Config()
 
     #get val data from "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
-    path = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+    path = "/data/shared/ICL_Kalman_Experiments/train_and_test_data/ident"
 
-    valA = "ortho" #"ident", "ortho", "gaussA" #system family for linear systems
+    valA = "ident" #"ident", "ortho", "gaussA" #system family for linear systems
 
     if valA == "ortho" or valA == "ident":
         valC = "_ident_C"
@@ -49,6 +49,20 @@ if __name__ == "__main__":
     #set num_sys_haystack
 
 
+    config.override("late_start", False)
+
+    config.override("paren_swap", False) # set the paren_swap in the config object
+
+    config.override("same_tokens", False) # set the same_tokens in the config object
+
+    config.override("irrelevant_tokens", False) # set the irrelevant_tokens in the config object
+
+    config.override("fix_needle", False) # set the fix_needle in the config object
+
+    config.override("opposite_ortho", False) # set the opposite_ortho in the config object
+
+    config.override("only_beg", False) # set the only_beg in the config object
+
 
     num_sys_haystack = 1 #number of systems in the haystack
 
@@ -59,7 +73,7 @@ if __name__ == "__main__":
     config.override("num_test_traces_configs", num_sys_haystack)
     config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys_haystack+1)) #number of positions in the needle in haystack prompt
 
-    val_path = path + f"/data/val_{valA}{valC}_state_dim_{nx}.pkl"
+    val_path = path + f"/val_{valA}{valC}_state_dim_{nx}.pkl"
 
     print(f"Getting val data from {val_path}")
     with open(val_path, 'rb') as f:
@@ -72,7 +86,7 @@ if __name__ == "__main__":
     file_dict = {"multi_sys_ys": multi_sys_ys, "sys_choices_per_config": sys_choices_per_config, "sys_dict_per_config": sys_dict_per_config, "tok_seg_lens_per_config": tok_seg_lens_per_config, "seg_starts_per_config": seg_starts_per_config, "real_seg_lens_per_config": real_seg_lens_per_config, "sys_inds_per_config": sys_inds_per_config}
 
 
-    filename = path + f"/data/interleaved_traces_{valA}{valC}_state_dim_{nx}_num_sys_haystack_{num_sys_haystack}.pkl"
+    filename = path + f"/interleaved_traces_{valA}{valC}_state_dim_{nx}_num_sys_haystack_{num_sys_haystack}.pkl"
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     with open(filename, 'wb') as f:
