@@ -495,11 +495,11 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
                 if os.access(errs_loc + "err_lss_examples.pkl", os.W_OK):
                     os.remove(errs_loc + "err_lss_examples.pkl") #delete the err_lss_examples.pkl file
                 else:
-                    print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} is not writable.")
+                    print(f"path: {errs_loc + 'err_lss_examples'} for ckpt_step: {ckpt_step} is not writable.")
             else:
-                print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} does not exist.")
+                print(f"path: {errs_loc + 'err_lss_examples'} for ckpt_step: {ckpt_step} does not exist.")
         else:
-            print(f"path: {errs_loc + "err_lss_examples"} for ckpt_step: {ckpt_step} does not exist.")
+            print(f"path: {errs_loc + 'err_lss_examples'} for ckpt_step: {ckpt_step} does not exist.")
 
 
     os.makedirs(os.path.dirname(train_conv_fin_quartiles_file), exist_ok=True)

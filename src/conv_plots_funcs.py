@@ -56,7 +56,7 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     filepath = os.path.abspath(f"../outputs/train_conv/{filename}")
     print(filepath)
 
-    print(f"quantiles 5 path exists?: {os.path.exists(parent_path + experiments[0] + "/train_conv/quantiles_5.npz")}")
+    print(f"quantiles 5 path exists?: {os.path.exists(parent_path + experiments[0] + '/train_conv/quantiles_5.npz')}")
 
     ckpt_steps = gen_ckpt_steps(min_ckpt, max_ckpt, interval)
 
