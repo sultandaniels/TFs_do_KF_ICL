@@ -20,6 +20,7 @@ from core import Config
 from data_train import get_entries
 import pickle
 import os
+import numpy as np
 
 if __name__ == "__main__":
     config = Config()
@@ -64,14 +65,8 @@ if __name__ == "__main__":
     config.override("only_beg", False) # set the only_beg in the config object
 
 
-    num_sys_haystack = 1 #number of systems in the haystack
 
-
-
-    config.override("num_sys_haystack", num_sys_haystack)
-    #set num_test_traces_configs to num_sys_haystack
-    config.override("num_test_traces_configs", num_sys_haystack)
-    config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys_haystack+1)) #number of positions in the needle in haystack prompt
+    
 
     val_path = path + f"/val_{valA}{valC}_state_dim_{nx}.pkl"
 
@@ -79,18 +74,25 @@ if __name__ == "__main__":
     with open(val_path, 'rb') as f:
         ys = get_entries(config, f) #get the uninterleaved validation data
 
-    #get interleaved traces
-    multi_sys_ys, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config = interleave_traces(config, ys, num_test_traces_configs=config.num_test_traces_configs, num_trials=config.num_traces["val"], ex=0)
+    for num_sys_haystack in np.arange(1,20):
 
-    #save the outputs of interleave traces to a zipped file
-    file_dict = {"multi_sys_ys": multi_sys_ys, "sys_choices_per_config": sys_choices_per_config, "sys_dict_per_config": sys_dict_per_config, "tok_seg_lens_per_config": tok_seg_lens_per_config, "seg_starts_per_config": seg_starts_per_config, "real_seg_lens_per_config": real_seg_lens_per_config, "sys_inds_per_config": sys_inds_per_config}
+        config.override("num_sys_haystack", num_sys_haystack)
+        #set num_test_traces_configs to num_sys_haystack
+        config.override("num_test_traces_configs", num_sys_haystack)
+        config.override("n_positions", (config.len_seg_haystack + 2)*(num_sys_haystack+1)) #number of positions in the needle in haystack prompt
+
+        #get interleaved traces
+        multi_sys_ys, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config = interleave_traces(config, ys, num_test_traces_configs=config.num_test_traces_configs, num_trials=config.num_traces["val"], ex=0)
+
+        #save the outputs of interleave traces to a zipped file
+        file_dict = {"multi_sys_ys": multi_sys_ys, "sys_choices_per_config": sys_choices_per_config, "sys_dict_per_config": sys_dict_per_config, "tok_seg_lens_per_config": tok_seg_lens_per_config, "seg_starts_per_config": seg_starts_per_config, "real_seg_lens_per_config": real_seg_lens_per_config, "sys_inds_per_config": sys_inds_per_config}
 
 
-    filename = path + f"/interleaved_traces_{valA}{valC}_state_dim_{nx}_num_sys_haystack_{num_sys_haystack}.pkl"
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+        filename = path + f"/interleaved_traces_{valA}{valC}_state_dim_{nx}_num_sys_haystack_{num_sys_haystack}.pkl"
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    with open(filename, 'wb') as f:
-        pickle.dump(file_dict, f)
-    print(f"Saved interleaved traces to {filename}")
+        with open(filename, 'wb') as f:
+            pickle.dump(file_dict, f)
+        print(f"Saved interleaved traces to {filename}")
     
 
