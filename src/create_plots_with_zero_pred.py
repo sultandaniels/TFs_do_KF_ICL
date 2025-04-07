@@ -1940,19 +1940,24 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
                 print("interleaving kf and OLS errors")
                 err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
-                interleaved_errs_lss = {}
+                interleaved_err_lss = {}
                 for name in ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
-                    interleaved_errs_lss[name] = err_lss[name]
+                    if name in err_lss.keys():
+                        interleaved_err_lss[name] = err_lss[name]
             
             else:
                 for name in ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
-                    err_lss[name] = interleaved_errs_lss[name]
+                    if name in interleaved_err_lss.keys():
+                        err_lss[name] = interleaved_err_lss[name]
 
         for key in err_lss.keys():
             # print(f"err_lss[{key}] len: {len(err_lss[key])}")
             if ex == 0:
                 err_lss_examples[key] = [] #initialize the list for the prediction errors
             err_lss_examples[key].append(err_lss[key])
+
+        print(f"err_lss_examples.keys(): {err_lss_examples.keys()}")
+        raise ValueError("Need to implement interleaving of KF and OLS errors")
 
 
         del err_lss

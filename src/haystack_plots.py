@@ -21,6 +21,8 @@ def comp_quartiles(config, err_lss_examples, ratio=False, train_conv=False, kal_
         if not train_conv:
             kal_err = err_lss_examples["Kalman_rem"]
 
+    print(f"err_lss_examples keys: {err_lss_examples.keys()}")
+    raise NotImplementedError("checking for negative values")
     for key in err_lss_examples.keys():
         if not (key == "Analytical_Kalman" or key == "Kalman_rem" or key == "Kalman"):
             if ratio:
@@ -458,7 +460,7 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
                 fin_seg_start = seg_starts_per_conf[needle][-1]
                 beg_seg_start = seg_starts_per_conf[needle][0]
                 for step in steps_in:
-                    for key in ["MOP"]:
+                    for key in ["MOP", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
                         if "OLS_analytical" not in key and key not in  ["Zero", "Analytical_Simulation", "Kalman_rem", "Kalman", "Analytical_Kalman"]:
                             
                             y = quartiles[key][1, needle, fin_seg_start + step]
@@ -564,7 +566,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
-        if key == "MOP":
+        if key == "MOP" or True:
             col_count = 0
             for step in steps:
 
