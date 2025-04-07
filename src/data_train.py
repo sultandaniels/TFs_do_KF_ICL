@@ -1019,7 +1019,11 @@ def set_config_params(config, model_name):
         )
         config.override("n_dims_out", 5)
 
-        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        experiment_name = "250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
     elif model_name == "ortho_haar_check":
         print("\n\nORTHOGONAL HAAR CHECK MEDIUM MODEL\n\n")
@@ -1067,7 +1071,7 @@ def set_config_params(config, model_name):
 
         output_dir = f"../outputs/{config.model_type}/{experiment_name}"
 
-        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{experiment_name}"
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints//{config.model_type}/{experiment_name}"
 
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")

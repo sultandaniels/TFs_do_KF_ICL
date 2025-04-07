@@ -1231,9 +1231,11 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
 def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choices_per_config, next_start_per_config, sys_inds_per_config, max_ir_length, err_lss):
 
     num_trace_configs = config.num_test_traces_configs
-    err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
-    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, config.n_positions + 1), np.inf)
-    err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
+
+    if not config.val_dataset_typ == "ortho_haar":
+        err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
+        err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, config.n_positions + 1), np.inf)
+        err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
 
     for ir_length in range(1, max_ir_length + 1):
         # Initialize the err_lss ols and ols analytical values to infinity shaped like the multi_sys_ys
@@ -1253,9 +1255,11 @@ def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choi
                 sys = sys_choices_per_config[trace_conf][seg_count]
 
                 seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
-                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
+
+                if not config.val_dataset_typ == "ortho_haar":
+                    err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
+                    err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys, sys_start[sys]:sys_start[sys] + seg_len]
+                    err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
 
                 for ir_length in range(1, max_ir_length + 1):
                     err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_ir_{ir_length}"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
@@ -1892,7 +1896,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     err_lss_all = {}
 
-    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar")) and run_kf_ols:
+    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho")) and run_kf_ols:
 
         if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
             num_trials = config.num_traces["val"]
@@ -1901,11 +1905,16 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         else:
             raise ValueError(f"datasource {config.datasource} not recognized")
     
-        start = time.time()  # start the timer for kf predictions
-        errs_kf = compute_kf(ys, sim_objs)
-        end = time.time()  # end the timer for kf predictions
-        print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
-        err_lss_all["Kalman"] = errs_kf
+        if not config.val_dataset_typ == "ortho_haar":
+            start = time.time()  # start the timer for kf predictions
+            errs_kf = compute_kf(ys, sim_objs)
+            end = time.time()  # end the timer for kf predictions
+            print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
+            err_lss_all["Kalman"] = errs_kf
+
+            analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs, num_trials)
+            err_lss_all["Analytical_Kalman"] = analytical_kf
+            err_lss_all["Analytical_Simulation"] = an_sims
 
         start = time.time()  # start the timer for ols predictions
         err_lss_all = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss_all)
@@ -1917,12 +1926,6 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         # for name in names:
         #     err_lss_all[name] = np.zeros((config.num_val_tasks, num_trials, config.n_positions + 1))
 
-        analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs, num_trials)
-        err_lss_all["Analytical_Kalman"] = analytical_kf
-        print(f"err_lss_all[Analytical_Kalman].shape: {err_lss_all['Analytical_Kalman'].shape}")
-        err_lss_all["Analytical_Simulation"] = an_sims
-        print(f"err_lss_all[Analytical_Simulation].shape: {err_lss_all['Analytical_Simulation'].shape}")
-
         # raise ValueError("Need to implement interleaving of KF and OLS errors")
 
     err_lss_examples = {}
@@ -1932,10 +1935,18 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         end = time.time()  # end the timer for needle predictions
         # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 
-        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar") and run_kf_ols:
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
+            if ex == 0:
+                print("interleaving kf and OLS errors")
+                err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
-            print("interleaving kf and OLS errors")
-            err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
+                interleaved_errs_lss = {}
+                for name in ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
+                    interleaved_errs_lss[name] = err_lss[name]
+            
+            else:
+                for name in ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
+                    err_lss[name] = interleaved_errs_lss[name]
 
         for key in err_lss.keys():
             # print(f"err_lss[{key}] len: {len(err_lss[key])}")
