@@ -44,7 +44,7 @@ def pl_lr_finder(config, model, trainer, datamodule):
         file.close()
     return new_lr
 
-def train_gpt2(model, config, output_dir, train_mix_dist=False, train_mix_state_dim=False): #input emd_dim as a parameter for the embed dim experiment plots
+def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False): #input emd_dim as a parameter for the embed dim experiment plots
     # a function to train GPT2 model
 
     torch.set_float32_matmul_precision('high') #set the matmul performance for Tensor Cores (or 'medium' depending on your precision-performance trade-off preference)
@@ -56,14 +56,20 @@ def train_gpt2(model, config, output_dir, train_mix_dist=False, train_mix_state_
     print("context length:", config.n_positions)
     print("num_tasks:", config.num_tasks)
 
-    val_dset = FilterDataset(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
+    #for BLISS server
+    main_dir = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data"
 
-    datamodule = DataModuleWrapper(FilterDataset(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
+    val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
+
+    datamodule = DataModuleWrapper(FilterDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
 
     # Define model
     # output_dir = training.setup_train(model)
-    print("output_dir:", output_dir)
-    callbacks, loggers = training.get_callbacks_and_loggers(output_dir, config.train_int)
+
+    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl")
+
+    
+    callbacks, loggers = training.get_callbacks_and_loggers(ckpt_dir, config.train_int)
     ckpt_path = config.ckpt_path if config.ckpt_path != '' else None
     print("ckpt_path:", config.ckpt_path)
     

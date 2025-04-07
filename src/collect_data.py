@@ -21,7 +21,7 @@ def mix_ind(i, total_number, labels, counts, max_ind=2):
     return index, counts
 
 #modify collect data so that it can tolerate multiple traces for one system
-def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_state_dim=False, train_mix_C=False, specific_sim_objs=None):
+def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_state_dim=False, train_mix_C=False, specific_sim_objs=None, opposite_ortho=False):
 
     
     if specific_sim_objs:
@@ -30,6 +30,11 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
         config.override("val_dataset_typ", "specA")
         config.override("C_dist", "_spec_C")
 
+
+    if opposite_ortho:
+        config.override("val_dataset_typ", "ortho")
+        config.override("num_val_tasks", 2)
+        config.override("C_dist", "_ident_C")
 
 
     for name, num_tasks in zip(["train", "val"], [config.num_tasks, config.num_val_tasks]):
@@ -94,8 +99,14 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
 
                     config.override("C_dist", C_dists[C_index]) #override the dataset_typ
 
+            if opposite_ortho and i > 0:
+                #get the A from sim_objs and negate it
+                fsim = sim_objs[0]
+                fsim.A = -fsim.A
+
+                specific_sim_objs = [fsim]
                 
-            fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None, specific_sim_obj=specific_sim_objs[i] if specific_sim_objs else None)
+            fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None, specific_sim_obj=(specific_sim_objs[0] if opposite_ortho and specific_sim_objs else (specific_sim_objs[i] if specific_sim_objs else None)))
 
             if (name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num"):
                 cond_counts[int(np.floor(config.distinct_cond_nums*i/num_tasks))] += 1
@@ -110,10 +121,12 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
             
             samples.extend([{k: v[i] for k, v in sample.items()} for i in range(config.num_traces[name])])
             # raise Exception("just checking fsim type umich_meta_output_predictor/src/collect_data.py")
+            if opposite_ortho:
+                print(f"fsim.A: {fsim.A}")
             sim_objs.append(fsim)
         print("Saving", len(samples), "samples for", name)
 
-        loc = output_dir + f"/data/" + ("train_systems_" if specific_sim_objs else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")
+        loc = output_dir + f"/data/" + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")
 
         with open(loc + ".pkl", "wb") as f:
             pickle.dump(samples, f)
@@ -170,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument('--train', help='Boolean. only generate training data', action='store_true')
     parser.add_argument('--train_mix_dist', help='Boolean. generate training data from gaussian, uppertriA, and rotdiagA', action='store_true')
     parser.add_argument('--train_mix_state_dim', help='Boolean. generate training data from a mixture of state dimensions', action='store_true')
+    parser.add_argument('--opposite_ortho', help='Boolean. generate training data from opposite orthogonal systems', action='store_true')
 
 
     # Parse the arguments
@@ -178,9 +192,11 @@ if __name__ == "__main__":
     print("only train:", args.train)
     print("train_mix_dist:", args.train_mix_dist)
     print("train_mix_state_dim:", args.train_mix_state_dim)
+    print("opposite_ortho:", args.opposite_ortho)
 
     train_mix_dist = args.train_mix_dist
     train_mix_state_dim = args.train_mix_state_dim
+    opposite_ortho = args.opposite_ortho
 
     # Now you can use the flag
     if args.val:
@@ -191,7 +207,5 @@ if __name__ == "__main__":
         only = ""
 
     config = Config()
-    model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
-                 n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
     
-    collect_data(config, "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000", only, train_mix_dist)
+    collect_data(config, "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000", only, train_mix_dist, opposite_ortho=opposite_ortho)

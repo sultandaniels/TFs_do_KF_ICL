@@ -21,11 +21,11 @@ from check_ecdf import get_empirical_cdf
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
-def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False, nope=False, needle=False, fin_seg_ext=False, haystack_len=19, train_conv=False):
+def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False, nope=False, needle=False, fin_seg_ext=False, haystack_len=19, train_conv=False, datasource="val", paren_swap=False, fix_needle=False, opposite_ortho=False, irrelevant_tokens=False, same_tokens=False):
     # load the sys choices etc
     errs_dir = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
     # + ("train_conv_" if needle else "")
-    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if not needle else "") + (f"needle_haystack_len_{haystack_len}_val_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if needle else "") + ".pkl"
+    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if not needle else "") + (f"needle_haystack_len_{haystack_len}_{datasource}_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_" + ("fix_needle_" if fix_needle else "") + ("opposite_ortho_" if opposite_ortho else "") + ("irrelevant_tokens_" if irrelevant_tokens else "") + ("same_tokens_" if same_tokens else "") + ("paren_swap_" if paren_swap else "") + f"sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if needle else "") + ".pkl"
 
     if not os.path.exists(errs_loc):
         print(f"errs_loc {errs_loc} does not exist")

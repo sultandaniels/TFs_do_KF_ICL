@@ -118,6 +118,27 @@ def generate_random_mat_cond_number(n, cond_number):
     # print("cond number = ", np.linalg.cond(random_matrix))
     return random_matrix
 
+def gen_rand_ortho_haar_real(n):
+    """
+    Generate a random orthogonal matrix 'uniformly' distributed over real orthogonal matrices using QR decomposition.
+    :param n: Size of the matrix
+    :return: Random orthogonal matrix of size n x n
+    """
+    # Generate a random matrix
+    A = np.random.randn(n, n)
+    
+    # Perform QR decomposition
+    Q, R = np.linalg.qr(A)
+
+    d = np.diag(R)
+    d = d/np.abs(d)
+
+    # Construct the diagonal matrix D
+    D = np.diag(d)
+    Q = Q @ D
+    
+    return Q
+
 ####################################################################################################
 
 
@@ -229,6 +250,9 @@ class FilterSim:
                 Q, R = np.linalg.qr(random_matrix) #get the QR decomposition
                 self.A = Q #set A to be the orthogonal matrix
 
+            elif tri == "ortho_haar":
+                self.A = gen_rand_ortho_haar_real(nx)
+
             else:
                 if new_eig:
                     self.A = gen_A(0.97, 0.99, nx)
@@ -244,7 +268,7 @@ class FilterSim:
             self.C = self.construct_C(self.A, ny, C_dist)
 
             
-            if tri == "ident" or tri == "ortho":
+            if tri == "ident" or tri == "ortho" or tri == "ortho_haar":
                 self.S_state_inf = (1/nx)*np.eye(nx) # for ident: Pi = A^T Pi A + W = Pi so every sym pos def matrix is a solution. just choose identity
                 #for ortho case there is no steady state covariance unless A is Identity.
                 #we have Pi = U Lambda U^T = A U Lambda U^T A^T so U = AU.

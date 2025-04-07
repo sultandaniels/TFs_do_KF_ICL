@@ -42,6 +42,7 @@ def generate_seg_lens(n_positions, sys_in_trace):
 
     num_cut = rng.poisson(lam) # number of cuts in the trace
 
+    # generate num_cut random cut positions in trace distributed uniformly over the entire context
     positions = rng.integers(0, n_positions, size=num_cut) #positions are the index of the closed paren (and start token)
     if not 0 in positions:
         positions = np.append(positions, 0)
@@ -51,7 +52,7 @@ def generate_seg_lens(n_positions, sys_in_trace):
     # calculate the difference between successive positions
     diffs = np.diff(positions)
 
-    # calculate the real segment lengths
+    # calculate the real segment lengths (just the number of observations in each segment)
     seg_lens = diffs - 2
     return seg_lens
 
@@ -90,6 +91,7 @@ def special_tokens(segment, sys_name, style):
     return start_token, end_token
 
 def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None, example=None):
+
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -99,10 +101,10 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
 
     sys_names = np.arange(config.max_sys_trace) #system names
-    #randomly shuffle the system names
+    #randomly shuffle the system names to assign to the system indices for the open and close tokens
     np.random.shuffle(sys_names)
     
-    if config.single_system: #if single sys multi segment test
+    if config.single_system: #if single sys multi segment test (DEPRECATED)
         sys_in_trace = 1
         sys_inds = [0] #list of system indices
         sys_dict = {sys_inds[0]: sys_names[0]}
@@ -113,6 +115,8 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
 
     else:
+
+        #Set the number of systems to include in the context
         if config.needle_in_haystack:
             sys_in_trace = config.num_sys_haystack #number of systems to include in the context
         elif config.zero_cut:
@@ -120,10 +124,16 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
         else:
             sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
 
-        if config.zero_cut and test:
+        #set the system indices to be used from the library of traces
+        if config.zero_cut and test: #zero cut test
             sys_inds = [trace_conf] #set the system index to the trace_conf
         elif config.needle_in_haystack and test:
-            sys_inds = np.arange(example, example + sys_in_trace) #set the system indices for the specific example
+            if config.fix_needle and config.num_sys_haystack == 2:
+                start_sys = 0
+                sys_inds = [start_sys, start_sys + example + 1] #Fix the needle to be the same system for each example
+                # sys_inds = [start_sys + example + 1, start_sys] #Fix the other system to be the same system for each example
+            else:
+                sys_inds = np.arange(example, example + sys_in_trace) #set the system indices for the specific example
         else:
             #uniformly at random select sys_in_traces numbers between 0 and num_tasks without replacement for the system indices
             rng = np.random.default_rng()
@@ -131,18 +141,31 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
         #create a tuple that matches the system names to the system indices
         sys_dict = {}
-        for i in range(len(sys_inds)):
-            sys_dict[sys_inds[i]] = sys_names[i]
+        if config.irrelevant_tokens:
+            for i in range(len(sys_inds) + 1):
+                if i < len(sys_inds):
+                    sys_dict[sys_inds[i]] = sys_names[i]
+                else:
+                    sys_dict[sys_inds[-1] + 1] = sys_names[i] #add the irrelevant token to the dictionary
+
+        else:
+            for i in range(len(sys_inds)):
+                if config.same_tokens: #use the same tokens for all systems
+                    sys_dict[sys_inds[i]] = sys_names[0]
+                else:
+                    sys_dict[sys_inds[i]] = sys_names[i]
         
 
-        if config.needle_in_haystack:
+        #set the segment lengths for the context
+        if config.needle_in_haystack: #needle in haystack test
             if config.needle_final_seg_extended:
                 seg_lens = [config.len_seg_haystack]*(config.num_sys_haystack - 1) + [context_len - ((config.num_sys_haystack - 1)*(config.len_seg_haystack + 2) + 2)]
                 print(f"final seg extended seg lens: {seg_lens}")
             else:
                 seg_lens = [config.len_seg_haystack]*config.num_sys_haystack + [context_len - (1 + config.num_sys_haystack*(config.len_seg_haystack + 2) + 2)]
-        else:
-            if config.zero_cut:
+
+        else: #train or non needle in haystack test
+            if config.zero_cut: #zero cut
                 seg_lens = [config.n_positions - 2]
             else:
                 seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
@@ -171,9 +194,6 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
         else:
 
-            if seg_start > 1:
-                old_sys_ind = sys_ind
-
             if config.needle_in_haystack:
                 #pick the system index from the list of system indices
                 ind = seg_count % len(sys_inds) #use mod to cycle through the system indices
@@ -186,16 +206,15 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
             sys_choices.append(sys_ind) #add the system index to the list of system choices
 
-
-            # #make sure the same system isn't picked twice in a row
-            # sys_inds.remove(sys_ind)
-
-            # if seg_start > 1:
-            #     sys_inds.append(old_sys_ind) #replace the old sys_ind in the list (this ensures the same system isn't picked twice in a row)
-
         #get obs from the system trace corresponding to sys_trace_ind
         if test:
-            sys_trace_obs = entries[sys_ind]
+            #catch exception if the system index is not in the entries
+            try:
+                sys_trace_obs = entries[sys_ind]
+            except IndexError as e:
+                print(f"System index {sys_ind} is out of bounds from sys_inds: {sys_inds}")
+                raise IndexError(e)
+            
 
         else:
             sys_trace_obs = entries[sys_ind]["obs"]
@@ -256,7 +275,27 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             zeros = np.zeros((segment.shape[0], 2*config.max_sys_trace + 1))
             segment = np.concatenate((zeros, segment), axis=1)
 
-            start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
+            if test and config.needle_in_haystack and config.paren_swap and len(seg_starts) == config.num_sys_haystack + 1: #swap open token for query experiment
+
+                swap_sys_ind = sys_inds[int((seg_count + 1) % config.num_sys_haystack)] #swap the system index for the query to the next system index in a cycle
+                # print("sys_dict: ", sys_dict) 
+                # print(f"sys_ind: {sys_ind}, sys_dict[sys_ind]: {sys_dict[sys_ind]}, swap_sys_ind: {swap_sys_ind}, sys_dict[swap_sys_ind]: {sys_dict[swap_sys_ind]}")
+
+                start_paren, end_paren = special_tokens(segment, sys_dict[swap_sys_ind], style="zeros") #get the special tokens for the segment
+
+            elif test and config.needle_in_haystack and config.irrelevant_tokens and len(seg_starts) == config.num_sys_haystack + 1: #give irrelevant open token for query experiment
+
+                irr_sys_ind = sys_inds[-1] + 1
+
+                # print("in populate_traces")
+
+                # print("sys_dict: ", sys_dict) 
+                # print(f"sys_ind: {sys_ind}, sys_dict[sys_ind]: {sys_dict[sys_ind]}, irr_sys_ind: {irr_sys_ind}, sys_dict[irr_sys_ind]: {sys_dict[irr_sys_ind]}\n\n")
+
+                start_paren, end_paren = special_tokens(segment, sys_dict[irr_sys_ind], style="zeros") #get the special tokens for the segment
+
+            else:
+                start_paren, end_paren = special_tokens(segment, sys_dict[sys_ind], style="zeros") #get the special tokens for the segment
 
             segment = np.concatenate([start_paren, segment, end_paren], axis=0) #concatenate the special tokens to the segment
 
@@ -278,11 +317,6 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
             seg_start += tok_seg_len #update the starting index for the next segment
             seg_count += 1
-
-
-    #uncomment if code that makes sure the same system isn't picked twice in a row is uncommented
-    # if not config.single_system:
-    #     sys_inds.append(sys_ind) #add the last system index back to the list of system indices
         
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 

@@ -24,12 +24,17 @@ def setup_train(model, train_mix_dist=False, train_mix_state_dim=False):
         logger.info(f'Resuming from the checkpoint: {config.ckpt_path}')
     if output_dir is None:
         print("in output_dir is None")
-        identifier = (config.model_type + ("_NoPE" if not config.use_pos_emb else "") + '/' +
-                      time.strftime('%y%m%d_%H%M%S') + '.' +
-                      hashlib.md5(config.get_full_yaml().encode('utf-8')).hexdigest()[:6]
-                      )
+        identifier = config.model_type + ("_NoPE" if not config.use_pos_emb else "") + '/'
+                      
+        timestamp = time.strftime('%y%m%d_%H%M%S') + '.' + hashlib.md5(config.get_full_yaml().encode('utf-8')).hexdigest()[:6]
 
-        output_dir = '../outputs/' + identifier + ("_multi_sys_trace" if config.multi_sys_trace else "") + ("_zero_cut" if config.zero_cut else "") + f"_{config.dataset_typ}_state_dim_{config.nx}{config.C_dist}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + "_lr_" + str(config.learning_rate) + "_num_train_sys_" + str(config.num_tasks)
+        experiment_name = timestamp + ("_multi_sys_trace" if config.multi_sys_trace else "") + ("_zero_cut" if config.zero_cut else "") + f"_{config.dataset_typ}_state_dim_{config.nx}{config.C_dist}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + "_lr_" + str(config.learning_rate) + "_num_train_sys_" + str(config.num_tasks)
+
+        output_dir = '../outputs/' + identifier + experiment_name
+
+        #for BLISS server 
+        ckpt_dir = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/" + experiment_name
+
 
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
@@ -55,7 +60,7 @@ def setup_train(model, train_mix_dist=False, train_mix_state_dim=False):
     ])
     logger.info('\nThere are %d trainable parameters.\n' % num_params)
 
-    return output_dir
+    return output_dir, ckpt_dir, experiment_name
 
 
 def get_callbacks_and_loggers_old(model, output_dir):

@@ -26,18 +26,7 @@ from gen_pred_cktps import gen_pred_ckpts
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
 
-def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_state_dim=False):
-
-    # test_dataset_typ = config.dataset_typ
-    # test_C_dist = config.C_dist
-    # # add ckpt_path to config_dict
-    # config_dict["ckpt_path"] = config.ckpt_path
-    # config_dict["dataset_typ"] = "gaussA"
-    # config_dict["C_dist"] = "_gauss_C"
-
-    # #change dataset_typ and C_dist in config to "gaussA" and "_gauss_C" 
-    # config.override("dataset_typ", "gaussA")
-    # config.override("C_dist", "_gauss_C")
+def wandb_train(config_dict, model, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False):
 
     # 🐝 1️⃣ Start a new run to track this script
     run = wandb.init(
@@ -45,27 +34,26 @@ def wandb_train(config_dict, model, output_dir, train_mix_dist=False, train_mix_
         project="transformer_kalman_no_sweep",
         # Track hyperparameters and run metadata
         config=config_dict,
-        settings=wandb.Settings(_disable_stats=True, _disable_meta=True)
+        settings=wandb.Settings(_disable_stats=False, _disable_meta=False)
     )
-    train_time = train_gpt2(model, config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+    train_time = train_gpt2(model, config, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+
+    print("Time spent training (days:hours:minutes):", time.strftime("%D:%H:%M", time.gmtime(train_time)))
 
     # Finish the run
     wandb.finish()
 
-    # Get the path to the current run directory
-    run_dir = run.dir
+    # # Get the path to the current run directory
+    # run_dir = run.dir
 
-    # Delete the run directory
-    shutil.rmtree(run_dir)
+    # # Delete the run directory
+    # shutil.rmtree(run_dir)
 
-    print(f"Deleted wandb run directory: {run_dir}")
+    # print(f"Deleted wandb run directory: {run_dir}")
 
-    # #change dataset_typ and C_dist back to the original values
-    # config.override("dataset_typ", test_dataset_typ)
-    # config.override("C_dist", test_C_dist)
     return None
 
-def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, ys=None, sim_objs=None, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
+def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, output_dir, ys=None, sim_objs=None, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
 
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
 
@@ -82,14 +70,14 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
     #get the parent directory of the ckpt_path
     parent_dir = os.path.dirname(config.ckpt_path)
     #get the parent directory of the parent directory
-    output_dir = os.path.dirname(parent_dir)
+    ckpt_dir = os.path.dirname(parent_dir)
     # instantiate gpt2 model
 
     if resume_train:
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                 n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb)
         
-        wandb_train(config_dict, model, output_dir, train_mix_dist, train_mix_state_dim)
+        wandb_train(config_dict, model, ckpt_dir, train_mix_dist, train_mix_state_dim)
 
     # print(f"config.use_pos_emb: {config.use_pos_emb}")
     # print(f"in preds_thread: config.ckpt_path: {config.ckpt_path}")
@@ -111,7 +99,7 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
                                 n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb, map_location=device, strict=True).eval().to(
     device)
 
-    create_plots(config=config, model=model, run_preds=run_preds, run_deg_kf_test=run_deg_kf_test, excess=excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols)
+    create_plots(config=config, model=model, run_preds=run_preds, run_deg_kf_test=run_deg_kf_test, excess=excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, run_kf_ols=run_kf_ols, output_dir=output_dir)
 
     return run_preds, run_deg_kf_test, excess, shade
 
@@ -587,6 +575,19 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = np.arange(3000, 105000, 3000)
 
+    elif model_name == "ortho_haar_check":
+
+        ckpt_pred_steps = np.arange(1, 3)
+
+    elif model_name == "ortho_haar":
+        minval = 1000
+        maxval = 113000
+        train_int = 1000
+
+        phases = [minval, 10000, 22000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
     #params for vanilla gauss model:
     # elif config.val_dataset_typ == "gaussA" and config.use_pos_emb and config.n_embd == 128:
     elif model_name == "gauss":
@@ -598,6 +599,15 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
         hande_code_scale = False
 
         ckpt_pred_steps = gen_pred_ckpts(minval,maxval, train_int, phases, hande_code_scale)
+
+    elif model_name == "gauss_zero_cut":
+        minval = 1000
+        maxval = 99000
+        train_int = 1000
+
+        phases = [minval, 10000, 19000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     #params for ident nope model:
     # elif config.val_dataset_typ == "ident" and not config.use_pos_emb:
@@ -809,13 +819,41 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
         phases = [minval, 10000, 27000, 70000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+    
+    #
+    #
+    elif model_name == "ortho_big_20k":
+        minval = 1000
+        maxval = 262000
+        train_int = 1000
+
+        phases = [minval, 3000, 27000, 50000, 100000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    elif model_name == "ortho_big_4k":
+        minval = 1000
+        maxval = 262000
+        train_int = 1000
+
+        phases = [minval, 3000, 27000, 50000, 100000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+
+    elif model_name == "ortho_big_20k_single_gpu":
+        minval = 1000
+        maxval = 115000
+        train_int = 1000
+
+        phases = [minval, 10000, 27000, 70000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     return ckpt_pred_steps
 
-    
 
-
-def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name):
+def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name):
         
     kal_step = None
     if config.needle_in_haystack:
@@ -842,26 +880,29 @@ def predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_na
     ckpt_pred_steps = gen_ckpt_pred_steps(model_name) #generate specific ckpt steps to predict on
 
     run_kf_ols = True
-    for filename in os.listdir(output_dir + "/checkpoints/"):
+    for filename in os.listdir(ckpt_dir + "/checkpoints/"):
 
-        filename_step = filename.split("=")[1].split(".")[0]
-        filename_step = int(filename_step)
-
-        if config.needle_in_haystack and filename_step not in ckpt_pred_steps:
+        if filename.endswith(".ckpt") == False:
             continue
+        else:
+            filename_step = filename.split("=")[1].split(".")[0]
+            filename_step = int(filename_step)
+
+            if config.needle_in_haystack and filename_step not in ckpt_pred_steps:
+                continue
 
 
-        filecount += 1
-        print("\nfilecount:", filecount)
-        ckpt_path = output_dir + "/checkpoints/" + filename
-        # print("ckpt_path:", ckpt_path)
-        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols, ys=ys, sim_objs=sim_objs)
+            filecount += 1
+            print("\nfilecount:", filecount)
+            ckpt_path = ckpt_dir + "/checkpoints/" + filename
+            # print("ckpt_path:", ckpt_path)
+            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds=True, resume_train=False, train_conv=True, logscale=logscale, tf=True, run_kf_ols=run_kf_ols, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
 
-        if run_kf_ols:
-            # filename looks like "step=40000.ckpt" get the step number
-            kal_step = filename_step
+            if run_kf_ols:
+                # filename looks like "step=40000.ckpt" get the step number
+                kal_step = filename_step
 
-        run_kf_ols = False
+            run_kf_ols = False
 
     print(f"kal_step: {kal_step}")
 
@@ -916,6 +957,44 @@ def set_config_params(config, model_name):
 
         output_dir = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
+    if model_name == "gauss_zero_cut":
+        print("\n\nGAUSSIAN MEDIUM ZERO CUT MODEL\n\n")
+
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "gaussA")  # dataset type
+        config.override("val_dataset_typ", "gaussA")  # validation dataset type
+        config.override("C_dist", "_gauss_C")  # C distribution
+        config.override("nx", 10)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+
+        config = Config()  # create a config object
+
+        # Training settings overrides
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 99000)  # number of training steps
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int", 1000)  # number of steps between logging
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 2048)  # tune this to fit into GPU memory
+        config.override("train_data_workers", 64)  # set to 1 to check if it changes the speed of the training process
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+
+        # Model settings overrides
+        config.override("model_type", "GPT2")  # model type
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension
+        config.override("n_dims_out", 5)  # IMPORTANT TO KEEP THIS AT 5 FOR NOW
+
+        output_dir = "../outputs/GPT2/250127_001511.3ac954_multi_sys_trace_zero_cut_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
 
     elif model_name == "ortho":
         print("\n\nORTHOGONAL MEDIUM MODEL\n\n")
@@ -957,6 +1036,98 @@ def set_config_params(config, model_name):
 
 
         output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+    elif model_name == "ortho_haar":
+        print("\n\nORTHOGONAL HAAR MEDIUM MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)
+        config.override("num_val_tasks", 100)
+        config.override("dataset_typ", "ortho_haar")
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")
+        config.override("C_dist", "_ident_C")
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)
+
+        # Training settings
+        config.override("devices", [0, 1, 2])
+        config.override("train_steps", 1008000)
+        config.override("num_epochs", 1)
+        config.override("train_int", 1000)
+        config.override("use_true_len", False)
+        config.override("batch_size", 512)
+        config.override("acc_grad_batch", 1)
+        config.override("train_data_workers", 128)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)
+
+        # Model settings
+        config.override("model_type", "GPT2")
+        config.override("use_pos_emb", True)
+        config.override("n_positions", 250)
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override(
+            "n_dims_in",
+            int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny
+        )
+        config.override("n_dims_out", 5)
+
+        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+    elif model_name == "ortho_haar_check":
+        print("\n\nORTHOGONAL HAAR CHECK MEDIUM MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)
+        config.override("num_val_tasks", 100)
+        config.override("dataset_typ", "ortho_haar")
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")
+        config.override("C_dist", "_ident_C")
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)
+
+        # Training settings
+        config.override("devices", [0, 1, 2])
+        config.override("train_steps", 1008000)
+        config.override("num_epochs", 1)
+        config.override("train_int", 1)
+        config.override("use_true_len", False)
+        config.override("batch_size", 8)
+        config.override("acc_grad_batch", 1)
+        config.override("train_data_workers", 128)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)
+
+        # Model settings
+        config.override("model_type", "GPT2")
+        config.override("use_pos_emb", True)
+        config.override("n_positions", 250)
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override(
+            "n_dims_in",
+            int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny
+        )
+        config.override("n_dims_out", 5)
+
+        experiment_name = "250403_174451.5c606a_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{experiment_name}"
 
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")
@@ -1856,7 +2027,7 @@ def set_config_params(config, model_name):
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
 
 
-    return output_dir
+    return output_dir, ckpt_dir, experiment_name
 
 def get_entries(config, f):
     if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
@@ -1883,18 +2054,24 @@ def get_entries(config, f):
     return ys
 
     
-def get_test_data(config, output_dir, num_haystack_ex=50):
+def get_test_data(config, experiment_name, num_haystack_ex=50):
     # load the validation data
+
+    #for BLISS server
+    path = "/data/shared/ICL_Kalman_Experiments/train_and_test_data"
     if (config.datasource == "val"):
+
+        path = path + f"/{config.val_dataset_typ}/"
 
         print(f"getting test data from datasource {config.datasource}")
 
         # get the sim objs for the validation data
-        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the validation data
-        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        print(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl")
+        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
             # samples = pickle.load(f)
             # # for every 2000 entries in samples, get the observation values and append them to the ys list
             # ys = np.stack(
@@ -1908,14 +2085,17 @@ def get_test_data(config, output_dir, num_haystack_ex=50):
 
         print(f"getting test data from datasource {config.datasource}")
 
+
+        path = path + f"/{config.dataset_typ}/"
+
         max_num_sys = num_haystack_ex + config.max_sys_trace #max number of systems to use for testing
 
         #get the sim_objs for the training data
-        with open (output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open (path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the training data
-        with open(output_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
             #get train traces
             # samples = pickle.load(f)
             # ys = np.stack(
@@ -1933,18 +2113,21 @@ def get_test_data(config, output_dir, num_haystack_ex=50):
         print(f"shape of ys: {ys.shape}")
     
 
-    elif config.datasource == "train_systems":
+    elif config.datasource == "train_systems": #DEPRECATED
 
         print(f"getting test data from datasource {config.datasource}")
 
+
+        path = path + f"/{config.dataset_typ}/"
+
         #get the sim_objs for the training data
-        with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(path + f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #generate traces from the training systems
         collect_data(config, output_dir, "val", False, False, False, sim_objs) 
 
-        with open(output_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + f"{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
             #get train traces
             # samples = pickle.load(f)
             # ys = np.stack(
@@ -1987,7 +2170,7 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
 
         #check for err_lss_examples at the last ckpt
         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={pred_ckpt_step}.ckpt"
-        errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
+        errs_loc = errs_dir + f"/needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
 
         if not os.path.exists(errs_loc + "err_lss_examples.pkl") and not desktop:
             print(f"err_lss_examples.pkl does not exist for non train conv at early stop ckpt")
@@ -1999,13 +2182,13 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
 
             #run none train_conv
             config.override("num_test_traces_configs", num_sys)
-            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
             print("finished making predictions for non train conv at early stop ckpt")
 
             #run no punctuation final segment
             config.override("needle_final_seg_extended", True)
 
-            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+            run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
             make_preds = False
         
         print("making needle plots for haystack len:", num_sys)
@@ -2044,6 +2227,16 @@ if __name__ == '__main__':
     parser.add_argument('--datasource', type=str, help='Name of the datasource to use', default="val")
     parser.add_argument('--late_start', type=int, help="Integer. Start traces from a later index for interleaving at test time", default=None)
     parser.add_argument('--last_ckpt', help='Boolean. Take last checkpoint for needle plots', action='store_true')
+    parser.add_argument('--zero_cut', help='Boolean. Run zero cut trace interleaving', action='store_true')
+    parser.add_argument('--paren_swap', help='Boolean. Run experiment that swaps the open paren for the query in needle in a haystack tests', action='store_true')  
+    parser.add_argument('--fix_needle', help='Boolean. Fix the needle in the haystack to be the same system for every example', action='store_true')
+    parser.add_argument('--opposite_ortho', help='Boolean. generate training data from opposite orthogonal systems', action='store_true')
+    parser.add_argument('--only_needle_pos', help='Boolean. only run the needle position evals', action='store_true')
+    parser.add_argument('--same_tokens', help='Boolean. use the same special tokens for all systems in the haystack', action='store_true')
+    parser.add_argument('--irrelevant_tokens', help='Boolean. use an irrelevant special token for query system in the haystack', action='store_true')
+    parser.add_argument('--ortho_haar', help='Boolean. use orthogonal haar systems for test', action='store_true')
+    parser.add_argument('--ortho', help='Boolean. use orthogonal systems test', action='store_true')
+    parser.add_argument('--only_beg', help='Boolean. only run the beginning evals', action='store_true')
 
 
 
@@ -2093,6 +2286,26 @@ if __name__ == '__main__':
     late_start = args.late_start
     print("last_ckpt arg", args.last_ckpt)
     last_ckpt = args.last_ckpt
+    print("zero_cut arg", args.zero_cut)
+    zero_cut = args.zero_cut
+    print("paren_swap arg", args.paren_swap)
+    paren_swap = args.paren_swap
+    print("fix_needle arg", args.fix_needle)
+    fix_needle = args.fix_needle
+    print("opposite_ortho arg", args.opposite_ortho)
+    opposite_ortho = args.opposite_ortho
+    print("only_needle_pos arg", args.only_needle_pos)
+    only_needle_pos = args.only_needle_pos
+    print("same_tokens arg", args.same_tokens)
+    same_tokens = args.same_tokens
+    print("irrelevant_tokens arg", args.irrelevant_tokens)
+    irrelevant_tokens = args.irrelevant_tokens
+    print("ortho_haar arg", args.ortho_haar)
+    ortho_haar = args.ortho_haar
+    print("ortho arg", args.ortho)
+    ortho = args.ortho
+    print("only_beg arg", args.only_beg)
+    only_beg = args.only_beg
 
 
 
@@ -2128,6 +2341,36 @@ if __name__ == '__main__':
     # config.override("late_start", late_start) # set the late_start in the config object
     config.override("late_start", late_start)
 
+    config.override("paren_swap", paren_swap) # set the paren_swap in the config object
+    if config.paren_swap:
+        print("Running paren swap experiment\n\n\n")
+
+    config.override("same_tokens", same_tokens) # set the same_tokens in the config object
+    if config.same_tokens:
+        print("Running same tokens experiment\n\n\n")
+
+    config.override("irrelevant_tokens", irrelevant_tokens) # set the irrelevant_tokens in the config object
+    if config.irrelevant_tokens:
+        print("Running irrelevant tokens experiment\n\n\n")
+
+    config.override("fix_needle", fix_needle) # set the fix_needle in the config object
+    if config.fix_needle:
+        print("Running fix needle experiment\n\n\n")
+
+    config.override("opposite_ortho", opposite_ortho) # set the opposite_ortho in the config object
+    if config.opposite_ortho:
+        config.override("val_dataset_typ", "ortho")
+
+    config.override("only_beg", only_beg) # set the only_beg in the config object
+    if config.only_beg:
+        print("only plotting the beginning evals\n\n\n")
+
+    if zero_cut:
+        config.override("multi_sys_trace", True)
+        config.override("zero_cut", zero_cut)
+        config.override("needle_in_haystack", False)
+
+    
     # Get the class variables in dictionary format
     config_dict  = {
         "seed": 0,
@@ -2168,13 +2411,14 @@ if __name__ == '__main__':
 
         set_config_params(config, model_name)
         
-        ckpt_path = "../outputs/GPT2/250221_215216.337051_multi_sys_trace_ortho_state_dim_5_ident_C_lr_6.339572769844456e-05_num_train_sys_40000/checkpoints/step=49000.ckpt"
+        ckpt_path = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=16000.ckpt"
+        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
         #"../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=141000.ckpt"
         
-        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim)
+        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim, output_dir=output_dir)
         
     elif train_conv or multi_haystack:
 
@@ -2183,20 +2427,41 @@ if __name__ == '__main__':
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
+        elif config.opposite_ortho:
+            num_haystack_examples = 1
         else:
             num_haystack_examples = 50 #number of haystack examples to use for testing
 
         config.override("num_haystack_examples", num_haystack_examples)
 
-        if multi_haystack:
+        output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
 
-            output_dir = set_config_params(config, model_name)
+        if multi_haystack:
+        
+            if ortho_haar:
+                config.override("val_dataset_typ", "ortho_haar")
+            elif ortho:
+                config.override("val_dataset_typ", "ortho")
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
-            steps_in = [1,2,3,5,10]
+
+            # steps_in = [1,2,3,5,10]
+            steps_in = list(range(1,11))
+
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
-            num_sys_haystacks = list(range(1,last_haystack_len+1))
+            if config.paren_swap:
+                if fix_needle or opposite_ortho:
+                    num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
+                else:
+                    # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
+                    num_sys_haystacks = list(range(2,last_haystack_len+1))
+            elif config.same_tokens or config.irrelevant_tokens:
+                num_sys_haystacks = list(range(2,5))
+                
+            else:
+                num_sys_haystacks = list(range(1,last_haystack_len+1))
+
             print("num_sys_haystacks:", num_sys_haystacks)
 
             config.override("needle_in_haystack", True)
@@ -2219,12 +2484,13 @@ if __name__ == '__main__':
                         print(f"quartiles already exist for haystack length {num_sys}")
 
                         if saved_preds:
+                            print("saved preds")
                             
                             if config.val_dataset_typ == "gaussA" and not desktop:
                                 kal_step = get_kal_step(output_dir, model_name)
                             
                             print("making train_conv plots for haystack len:", num_sys)
-                            pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                            pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_dir, experiment_name, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
                             if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
@@ -2254,7 +2520,7 @@ if __name__ == '__main__':
 
 
                         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
-                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_"
+                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
 
 
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
@@ -2263,7 +2529,7 @@ if __name__ == '__main__':
                             kal_step = get_kal_step(output_dir, model_name)
 
                             print("making train_conv plots for haystack len:", num_sys)
-                            pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                            pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_dir, experiment_name, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
 
                             if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
@@ -2320,29 +2586,37 @@ if __name__ == '__main__':
 
                 config.override("needle_final_seg_extended", False)
 
+                if opposite_ortho:
+                    config.override("num_val_tasks", 2)
+
                 ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
                 print(f"output dir: {output_dir}")
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
 
                 print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
-                #run train_conv
 
-                print(f"config.use_pos_emb: {config.use_pos_emb}")
-                kal_step = predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
+                if not only_needle_pos:
+                    #run train_conv
 
-                print(f"plotting train_conv convergence plots for haystack len {num_sys}")
-                pred_ckpt_step = haystack_plots_train_conv_full(config, num_sys, output_dir, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+                    print(f"config.use_pos_emb: {config.use_pos_emb}")
+                    kal_step = predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
 
-                if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
-                    if desktop:
-                        pred_ckpt_step = maxval_dict[model_name]
-                    else:
-                        pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])
+                    print(f"plotting train_conv convergence plots for haystack len {num_sys}")
+                    pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_dir, experiment_name, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
 
-                if num_sys == 19 and not abs_err:
+                    if config.val_dataset_typ == "ident" or last_ckpt: #choose last ckpt for identity system because overfitting phenomenon is not observed
+                        if desktop:
+                            pred_ckpt_step = maxval_dict[model_name]
+                        else:
+                            pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])
+
+                if (num_sys == 19 and not abs_err) or paren_swap:
                     # #get the last checkpoint
                     # last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
+
+                    if paren_swap:
+                        pred_ckpt_step = 27000
 
                     if pred_ckpt_step is not None:
 
@@ -2350,15 +2624,15 @@ if __name__ == '__main__':
 
                         print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 
-                        #run none train_conv
+                        #run non train_conv
                         config.override("num_test_traces_configs", num_sys)
-                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
 
 
                         #run no punctuation final segment
                         config.override("needle_final_seg_extended", True)
 
-                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs)
+                        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
                 
                         # if last_ckpt is not None:
                         #     last_ckpt_step = last_ckpt.split("=")[1].split(".")[0]
@@ -2382,7 +2656,7 @@ if __name__ == '__main__':
 
                 ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
-                predict_all_checkpoints(config, output_dir, logscale, ys, sim_objs, model_name)
+                predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
         
     else:
 
@@ -2394,51 +2668,51 @@ if __name__ == '__main__':
         
         model.to(device)
         
-        output_dir = setup_train(model, train_mix_dist, train_mix_state_dim)
+        output_dir, ckpt_dir, experiment_name = setup_train(model, train_mix_dist, train_mix_state_dim)
         # output_dir = output_dir + f"_{config.dataset_typ}{config.C_dist}"
-        os.makedirs(output_dir + f"/data/", exist_ok=True)
 
-        if part_train_set:
-            start_path_str = "../outputs/GPT2/"
-            prev_exper = start_path_str + "250308_025624.b6f29d_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_20000" #path to previous experiment to load 
+        #update code for checking if training data exists
+        # os.makedirs(output_dir + f"/data/", exist_ok=True)
 
-            #load training data
-            loc = f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist  else "") + ("_state_dim_mix" if train_mix_state_dim else "")
-            
-            with open(prev_exper + f"{loc}.pkl", "rb") as f:
-                past_train_set = pickle.load(f)
+        # if part_train_set:
+        #     start_path_str = "../outputs/GPT2/"
+        #     prev_exper = start_path_str + "241103_013426.749aca_gaussA_gauss_C_lr_0" #path to previous experiment to load
 
-            new_train_set = past_train_set[0:config.num_tasks]
-            print("len of past train set:", len(past_train_set))
-            print("len of new train set:", len(new_train_set))
+        #     #load training data
+        #     with open(prev_exper + f"/data/train_{config.dataset_typ}{config.C_dist}.pkl", "rb") as f:
+        #         past_train_set = pickle.load(f)
 
-            with open(output_dir + f"{loc}.pkl", "wb") as f:
-                pickle.dump(new_train_set, f)
+        #     new_train_set = past_train_set[0:config.num_tasks]
+        #     print("len of past train set:", len(past_train_set))
+        #     print("len of new train set:", len(new_train_set))
 
-            with open(prev_exper + f"{loc}_sim_objs.pkl", "rb") as f:
-                past_train_sim_objs = pickle.load(f)
+        #     with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}.pkl", "wb") as f:
+        #         pickle.dump(new_train_set, f)
 
-            new_train_sim_objs = past_train_sim_objs[0:config.num_tasks]
-            print("len of past train sim objs:", len(past_train_sim_objs))
-            print("len of new train sim objs:", len(new_train_sim_objs))
+        #     with open(prev_exper + f"/data/train_{config.dataset_typ}{config.C_dist}_sim_objs.pkl", "rb") as f:
+        #         past_train_sim_objs = pickle.load(f)
 
-            with open(output_dir + f"{loc}_sim_objs.pkl", "wb") as f:
-                pickle.dump(new_train_sim_objs, f)
+        #     new_train_sim_objs = past_train_sim_objs[0:config.num_tasks]
+        #     print("len of past train sim objs:", len(past_train_sim_objs))
+        #     print("len of new train sim objs:", len(new_train_sim_objs))
 
-            del past_train_set
-            del new_train_set
-            del past_train_sim_objs
-            del new_train_sim_objs
-            torch.cuda.empty_cache()
-            gc.collect()
+        #     with open(output_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_sim_objs.pkl", "wb") as f:
+        #         pickle.dump(new_train_sim_objs, f)
+
+        #     del past_train_set
+        #     del new_train_set
+        #     del past_train_sim_objs
+        #     del new_train_sim_objs
+        #     torch.cuda.empty_cache()
+        #     gc.collect()
                
-        else:
-            collect_data(config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
+        # else:
+        #     collect_data(config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
 
         # replace ckpt_path with the path to the checkpoint file
-        config.override("ckpt_path", output_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
+        config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
 
-        wandb_train(config_dict, model, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+        wandb_train(config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
 
         # create prediction plots
         run_preds = True #run the predictions evaluation
@@ -2462,23 +2736,4 @@ if __name__ == '__main__':
             gc.collect()  # Start the garbage collector
 
         print("ckpt_path", config.ckpt_path)
-        create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
