@@ -21,8 +21,6 @@ def comp_quartiles(config, err_lss_examples, ratio=False, train_conv=False, kal_
         if not train_conv:
             kal_err = err_lss_examples["Kalman_rem"]
 
-    print(f"err_lss_examples keys: {err_lss_examples.keys()}")
-    raise NotImplementedError("checking for negative values")
     for key in err_lss_examples.keys():
         if not (key == "Analytical_Kalman" or key == "Kalman_rem" or key == "Kalman"):
             if ratio:
@@ -369,6 +367,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
 
 def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, kal_ckpt, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err=False):
 
+    OLS_errs = None
     nope = not config.use_pos_emb
 
     batch_size = config.batch_size
@@ -398,6 +397,21 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
 
     else:
         rat = False
+
+
+    if model_name == "ortho_haar":
+        errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={kal_ckpt}.ckpt"
+        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{config.datasource}_" + f"{config.val_dataset_typ}_state_dim_{config.nx}_"  + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
+
+        with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
+                kal_ckpt_errs = pickle.load(f)
+
+        #get the OLS errors
+        OLS_errs = {}
+        for key in kal_ckpt_errs.keys():
+            if "OLS_ir" in key:
+                OLS_errs[key] = kal_ckpt_errs[key]
+        
 
     for ckpt_step in ckpt_steps:
 
@@ -432,6 +446,10 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
             with open(errs_loc + "err_lss_examples.pkl", "rb") as f:
                 assert ("paren_swap" if config.paren_swap else "") in errs_loc, f"Error: paren_swap not in {errs_loc}"
                 err_lss_examples = pickle.load(f)
+
+            if OLS_errs is not None:
+                for key in ["OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
+                    err_lss_examples[key] = OLS_errs[key]
 
             # if os.path.exists(seg_ext_errs_loc + "err_lss_examples.pkl"):
             #     with open(seg_ext_errs_loc + "err_lss_examples.pkl", "rb") as f:
@@ -566,7 +584,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
-        if key == "MOP" or True:
+        if key == "MOP" or key == "OLS_ir_1":
             col_count = 0
             for step in steps:
 
@@ -610,13 +628,13 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
                 beg_qs = np.array(beg_quartiles_ckpt[key][step])
                 beg_qs = np.transpose(beg_qs)
                 #set the color to the same as the fin quartiles
-                ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
+                ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS" in key_lab else "--", linewidth=2)
 
                 # if not valA == "gaussA":
                 #     ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
                 ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
-                ax_len.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=5, marker="x", color=color, linestyle="--", linewidth=2)
+                ax_len.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS" in key_lab else "--", linewidth=2)
                 ax_len.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
                 col_count += 1

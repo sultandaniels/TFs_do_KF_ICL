@@ -1956,10 +1956,6 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
                 err_lss_examples[key] = [] #initialize the list for the prediction errors
             err_lss_examples[key].append(err_lss[key])
 
-        print(f"err_lss_examples.keys(): {err_lss_examples.keys()}")
-        raise ValueError("Need to implement interleaving of KF and OLS errors")
-
-
         del err_lss
         torch.cuda.empty_cache()
         gc.collect()
@@ -1981,6 +1977,8 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         # print(f"err_lss_examples[{key}] len: {len(err_lss_examples[key])}")
         err_lss_examples[key] = np.array(err_lss_examples[key])
         # print(f"err_lss_examples[{key}] shape: {err_lss_examples[key].shape}")
+
+    print("err_lss_examples keys:", err_lss_examples.keys())
 
     with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)
