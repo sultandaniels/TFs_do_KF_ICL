@@ -74,7 +74,7 @@ if __name__ == "__main__":
     for root, dirs, files in os.walk(base_dir):
         for dir_name in dirs:
             # Check if the directory is 'checkpoints' or 'data'
-            if dir_name in ["checkpoints", "data"]:
+            if "prediction_errors" in dir_name:
                 dir_path = os.path.join(root, dir_name)
                 try:
                     # Delete the directory
