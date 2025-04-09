@@ -2240,7 +2240,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 19
+        last_haystack_len = 1
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1

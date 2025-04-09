@@ -543,7 +543,8 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # SECTION: Compute analytical errors
             preds_rls_wentinn_analytical_sys = CnnKF.analytical_error(
                 observation_IRs,            # [n_systems x n_traces x (n_positions - 1) x ...]
-                sim_objs_td[sys, None, None]  # [n_systems x 1 x 1 x ...]
+                sim_objs_td[sys, None, None],  # [n_systems x 1 x 1 x ...]
+                ridge=ridge #ridge parameter
             )   # [n_systems x n_traces x (n_positions - 1)]
 
             preds_rls_wentinn_analytical_sys = torch.cat([
