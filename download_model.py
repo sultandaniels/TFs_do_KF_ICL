@@ -5,8 +5,8 @@ from safetensors.torch import save_file
 
 repo_id = "sultan-daniels/TFs_do_KF_ICL_ortho_med_GPT2_checkpoints"
 filename = "step=42000.ckpt"
-custom_path = "/data/dhruv_gautam/models"  
-checkpoint_path = "/data/dhruv_gautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71/post_emerge.ckpt"
+custom_path = "/scratch/users/dhruvgautam/models"  
+checkpoint_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71/post_emerge.ckpt"
 
 if not os.path.exists(checkpoint_path):
     print(f"Checkpoint not found at {checkpoint_path}. Downloading from Hugging Face...")

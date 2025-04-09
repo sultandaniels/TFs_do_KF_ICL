@@ -1,7 +1,7 @@
 import os
 from huggingface_hub import hf_hub_download
 
-save_path = "/data/dhruv_gautam/TFs_do_KF_ICL/outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/data/val_ortho_ident_C_state_dim_5.pkl"
+save_path = "/scratch/users/dhruvgautam/TFs_do_KF_ICL/outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/data/val_ortho_ident_C_state_dim_5.pkl"
 
 os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
