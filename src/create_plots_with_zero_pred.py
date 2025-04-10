@@ -487,7 +487,7 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             else:
                 _rank_deficient = torch.stack(_rank_deficient, dim=-3)
 
-            # [n_systems x n_traces x (n_positions - 1) x (ir_length * O_D) x O_D]
+            # [n_systems x n_traces x (n_positions - 1) x (ir_length *D) x O_D]
             # -> [n_systems x n_traces x (n_positions - 1) x ir_length x O_D x O_D]
             # -> [n_systems x n_traces x (n_positions - 1) x O_D x ir_length x O_D]
             observation_IRs = torch.cat([_rank_deficient, _rank_full], dim=-3).unflatten(-2, (ir_length, config.ny)).transpose(dim0=-3, dim1=-2)

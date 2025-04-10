@@ -980,6 +980,12 @@ def set_config_params(config, model_name):
     elif model_name == "ortho_haar":
         print("\n\nORTHOGONAL HAAR MEDIUM MODEL\n\n")
 
+        experiment_name = "250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
+
         # Dataset settings
         config.override("num_tasks", 40000)
         config.override("num_val_tasks", 100)
@@ -1018,8 +1024,6 @@ def set_config_params(config, model_name):
             int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny
         )
         config.override("n_dims_out", 5)
-
-        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
     elif model_name == "ortho_haar_check":
         print("\n\nORTHOGONAL HAAR CHECK MEDIUM MODEL\n\n")
@@ -1316,7 +1320,11 @@ def set_config_params(config, model_name):
     elif model_name == "ident_big":
         print("\n\nIDENTITY BIG MODEL\n\n")
 
-        output_dir = "../outputs/GPT2/250125_210849.09203d_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+        experiment_name = "250125_210849.09203d_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.3207437987531975e-05_num_train_sys_40000"
+
+        output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
         # Dataset settings
         config.override("num_tasks", 40000)  # number of training systems
