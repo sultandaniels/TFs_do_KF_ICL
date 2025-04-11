@@ -20,7 +20,7 @@ from datetime import datetime
 from core import Config
 from dyn_models import apply_kf
 from models import GPT2, CnnKF
-from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
+from src.utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
 from datasources import filter_dataset
 from datasources.filter_dataset import populate_traces, special_tokens
 from collect_data import collect_data

@@ -3,10 +3,12 @@ import torch
 from huggingface_hub import hf_hub_download
 from safetensors.torch import save_file
 
-repo_id = "sultan-daniels/TFs_do_KF_ICL_ortho_med_GPT2_checkpoints"
-filename = "step=42000.ckpt"
+checkpoint_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ident_med_GPT2_experiment/snapshots/f94c23e0e6a3c5c36cc04e005356cfa3ee007072/checkpoints/step=16000.ckpt"
+
+
+repo_id = "sultan-daniels/TFs_do_KF_ICL_ident_med_GPT2_experiment"
+filename = "checkpoints/step=16000.ckpt"
 custom_path = "/scratch/users/dhruvgautam/models"  
-checkpoint_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71/post_emerge.ckpt"
 
 if not os.path.exists(checkpoint_path):
     print(f"Checkpoint not found at {checkpoint_path}. Downloading from Hugging Face...")
@@ -20,12 +22,12 @@ if not os.path.exists(checkpoint_path):
 else:
     print(f"Checkpoint already exists at: {checkpoint_path}")
 
-checkpoint = torch.load(checkpoint_path, map_location="cpu")
+# checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
 
-safetensor_path = checkpoint_path.replace("post_emerge.ckpt", "model.safetensors")
-checkpoint_tensors = {k: v for k, v in checkpoint.items() if isinstance(v, torch.Tensor)}
-save_file(checkpoint_tensors, safetensor_path)
-print(f"Checkpoint converted and saved to {safetensor_path}")
+# safetensor_path = checkpoint_path.replace("post_emerge.ckpt", "model.safetensors")
+# checkpoint_tensors = {k: v for k, v in checkpoint.items() if isinstance(v, torch.Tensor)}
+# save_file(checkpoint_tensors, safetensor_path)
+# print(f"Checkpoint converted and saved to {safetensor_path}")
 
 # from huggingface_hub import hf_hub_download
 
