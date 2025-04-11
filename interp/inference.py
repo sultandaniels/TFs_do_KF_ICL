@@ -294,10 +294,14 @@ if __name__ == "__main__":
     model.to(device)
 
     dataset_path = "/scratch/users/dhruvgautam/TFs_do_KF_ICL/identity_data/data/val_ident_ident_C_state_dim_5.pkl"
+    dataset_path = "/scratch/users/dhruvgautam/TFs_do_KF_ICL/ortho_data/data/val_ortho_ident_C_state_dim_5.pkl"
+    
     with open(dataset_path, "rb") as f:
         dataset = pickle.load(f)
     
     filename = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/identity_data/data/interleaved_traces_ident_ident_C_state_dim_5_num_sys_haystack_1.pkl'
+    filename = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/ortho_data/data/interleaved_traces_ortho_ident_C_state_dim_5_num_sys_haystack_1.pkl'
+
 
     with open(filename, 'rb') as f:
         file_dict = pickle.load(f)
