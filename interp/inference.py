@@ -244,6 +244,7 @@ def interfered_mse(multi_sys_ys, model, device, config):
         
         I = np.take(multi_sys_ys[0], np.arange(multi_sys_ys[0].shape[-2] - 2), axis=-2)
         other_sys = np.take(multi_sys_ys[1], [multi_sys_ys[1].shape[-2] - 2], axis=-2)
+        # other_sys_2 = np.take(multi_sys_ys[0], [multi_sys_ys[0].shape[-2] - 2], axis=-2)
         I = np.concatenate([I, other_sys], axis=-2)
 
         print("before model.predict_step()")
