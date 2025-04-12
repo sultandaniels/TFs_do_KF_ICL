@@ -2,7 +2,7 @@
 #multiline comment
 """"
 multi_sys_ys: np array, shape (num_test_traces_configs, num_traces_per_config, trace length, ny + special token dim), this holds the prompts
-sys_choices_per_config: list of lists, shape (num_test_traces_configs, # of segments in the prompt), this holds the order of the systems in the haystack. The system indices correspond to the unintereaved system corpus
+sys_choices_per_config: list of lists, shape (num_test_traces_configs, # of segments in the prompt), this holds the order of the systems in the haystack. The system indices correspond to the uninterleaved system corpus
 sys_dict_per_config: list of dictionaries, length num_test_traces_configs, each dictionary's keys are the system index in the entire uninterleaved system corpus and the values are the system index for the subset of systems chosen for each trace
 tok_seg_lens_per_config: list of lists, shape (num_test_traces_configs, # of segments in the prompt), this holds the lengths of the segments in the interleaved traces including special tokens
 seg_starts_per_config: list of lists, shape (num_test_traces_configs, # of segments in the prompt), this holds the starting indices of the segments in the interleaved traces
