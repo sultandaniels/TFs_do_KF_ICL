@@ -506,6 +506,50 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # [n_systems x n_traces x (n_positions + 1) x O_D]
             torch_ys = torch.Tensor(ys_sys).to(device)
 
+            # #plot a histogram of the squared norms of ys_sys[i,0,:] for all i
+            # print("shape of ys_flatten axis 0:", ys.reshape(ys.shape[0]*ys.shape[1], ys.shape[2], ys.shape[3]).shape)
+            # flattend_val = ys.shape[0]*ys.shape[1]
+            # reshape_ys = ys.reshape(flattend_val, ys.shape[2], ys.shape[3])
+            # fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+            # n_bins = 100
+            # print("ys_sys shape:", ys_sys.shape)
+
+            # norms_0 = np.linalg.norm(reshape_ys[:,0,:], axis=-1) ** 2
+            # norms_1 = np.linalg.norm(reshape_ys[:,1,:], axis=-1) ** 2
+
+            # # norms_0 = np.linalg.norm(reshape_ys[:int(0.5*flattend_val),0,:], axis=-1)
+            # # norms_1 = np.linalg.norm(reshape_ys[:int(0.5*flattend_val),1,:], axis=-1)
+            # print("norms_0 shape:", norms_0.shape)
+            # ax.hist(norms_0, bins=n_bins, label="index 1-after", color="blue", alpha=0.7)
+            # #plot a vertical bar of the median value of norms_0
+            # median_0 = np.median(norms_0)
+            # ax.axvline(median_0, color='blue', linestyle='dashed', linewidth=1, label="index 1-after median")
+            # #plot a vertical bar of the median value of norms_1
+            # median_1 = np.median(norms_1)
+            # ax.axvline(median_1, color='red', linestyle='dashed', linewidth=1, label="index 2-after median")
+            # #plot a vertical bar of the mean value of norms_0
+            # mean_0 = np.mean(norms_0)
+            # ax.axvline(mean_0, color='blue', linestyle='solid', linewidth=1, label="index 1-after mean")
+            # #plot a vertical bar of the mean value of norms_1
+            # mean_1 = np.mean(norms_1)
+            # ax.axvline(mean_1, color='red', linestyle='solid', linewidth=1, label="index 2-after mean")
+            # #plot a histogram of the squared norms of ys_sys[i,1,:] for all i
+            # ax.hist(norms_1, bins=n_bins, label="index 2-after", color="red", alpha=0.7)
+            # #set minor xticks every 0.1
+            # ax.xaxis.set_minor_locator(plt.MultipleLocator(0.1))
+
+
+            # ax.set_title("Squared norms of ys")
+            # ax.set_xlabel("Squared norm")
+            # ax.set_ylabel("Frequency")
+            # ax.legend()
+            # os.makedirs("../outputs/debug_OLS", exist_ok=True)
+            # fig.savefig(f"../outputs/debug_OLS/ys_hist_ind_0_1.pdf", format='pdf')
+
+
+            # norm_ys = np.linalg.norm(ys_sys, axis=-1) ** 2
+            # sys_median_ys = np.median(median_ys[:50], axis=0)
+
             del ys_sys
             torch.cuda.empty_cache()
             gc.collect()
