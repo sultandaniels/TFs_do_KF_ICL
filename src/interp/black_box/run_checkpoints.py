@@ -50,26 +50,27 @@ from predictors import getMats, getSims
 def getPredsEx(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name="ident", max_step = 17600, debug=False):
     model_preds = []
     ckpt_lst = []
-    ckpt_base = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step="
     for ckpt_step in range(100, max_step, 100):
-        ckpt_path = ckpt_base + str(ckpt_step) + ".ckpt"
-
-        if not os.path.exists(ckpt_path):
-            if debug:
-                print(f"Ckpt path {ckpt_path} not valid.")
-            continue
-
-        if debug:
-            print(f"Ckpt path {ckpt_path} found.")
         
         # init config, params
         config = Config()
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
+        config.override("ckpt_path", ckpt_dir + f"/checkpoints/step={ckpt_step}.ckpt")
+
+
+        if not os.path.exists(config.ckpt_path):
+            if debug:
+                print(f"Ckpt path {config.ckpt_path} not valid.")
+            continue
+
+        if debug:
+            print(f"Ckpt path {config.ckpt_path} found.")
+
         num_gpu = len(config.devices)
         batch_size = config.batch_size
 
         if debug:
-            print(f"Checkpoint Path: {ckpt_path}")
+            print(f"Checkpoint Path: {config.ckpt_path}")
             print(f"Output Directory: {output_dir}")
             print(f"Checkpoint Directory: {ckpt_dir}")
             print(f"Batch size: {batch_size}")
@@ -93,6 +94,9 @@ def getPredsEx(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name="ident
         config.override("n_positions", num_sys_haystack*12 + 12)
 
         preds_tf = tf_preds(multi_sys_ys, model, device, config)
+
+        if debug:
+            print(f"preds_tf[0,0,26,:] = {preds_tf[0,0,26,:]}")
         num_ex = ckpt_step*batch_size*num_gpu
         model_preds.append(copy.deepcopy(preds_tf))
         ckpt_lst.append(num_ex)
