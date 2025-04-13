@@ -7,6 +7,7 @@ import os
 import pickle
 import time
 import re
+import copy
 
 import sys
 notebook_dir = os.getcwd()
@@ -46,8 +47,9 @@ from predictors import getMats, getSims
 
 
 # loops through all checkpoints in identity model
-def applyFuncToIdent(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name="ident", max_step = 17600, debug=False):
-    model_preds = {}
+def getPredsEx(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name="ident", max_step = 17600, debug=False):
+    model_preds = []
+    ckpt_lst = []
     ckpt_base = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step="
     for ckpt_step in range(100, max_step, 100):
         ckpt_path = ckpt_base + str(ckpt_step) + ".ckpt"
@@ -91,6 +93,8 @@ def applyFuncToIdent(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name=
         config.override("n_positions", num_sys_haystack*12 + 12)
 
         preds_tf = tf_preds(multi_sys_ys, model, device, config)
-        model_preds[ckpt_step] = preds_tf
+        num_ex = ckpt_step*batch_size*num_gpu
+        model_preds.append(copy.deepcopy(preds_tf))
+        ckpt_lst.append(num_ex)
 
-    return model_preds
+    return np.asarray(model_preds), np.asarray(ckpt_lst)

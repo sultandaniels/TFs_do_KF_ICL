@@ -30,6 +30,25 @@ from data_train import set_config_params
 from create_plots_with_zero_pred import tf_preds
 from linalg_helpers import print_matrix
 
+def get_test_data(config, num_sys_haystack, valA, valC, nx):
+
+    config.override("n_positions", num_sys_haystack*12 + 12)
+
+
+    data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{valA}/interleaved_traces_{valA}{valC}_state_dim_{nx}_num_sys_haystack_{num_sys_haystack}.pkl"
+
+
+    with open(data_path, "rb") as f:
+        data_dict = pickle.load(f)
+
+        multi_sys_ys = data_dict["multi_sys_ys"]
+        seg_starts_per_config = data_dict["seg_starts_per_config"]
+        sys_inds_per_config = data_dict["sys_inds_per_config"]
+        sys_dict_per_config = data_dict["sys_dict_per_config"]
+        sys_choices_per_config = data_dict["sys_choices_per_config"]
+
+    return multi_sys_ys, seg_starts_per_config, sys_inds_per_config, sys_dict_per_config, sys_choices_per_config
+
 def getMats(trace_config, seg_starts, multi_sys, preds_tf):
     #returns the one-after matrices of the transformer ouput, true ouput, and average of outputs, and average with 0 predictions
     num_sys = np.size(seg_starts[trace_config])-1
