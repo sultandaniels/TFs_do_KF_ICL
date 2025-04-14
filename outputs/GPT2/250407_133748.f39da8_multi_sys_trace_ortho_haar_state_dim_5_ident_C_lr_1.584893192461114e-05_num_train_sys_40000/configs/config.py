@@ -7,7 +7,6 @@ import coloredlogs
 from utils import log_info
 from utils import Singleton
 from utils import set_seed
-import numpy as np
 
 # /checkpoints/step=10000.ckpt
 
@@ -18,26 +17,17 @@ class Config(object, metaclass=Singleton):
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
-    num_val_tasks = 100 #number of test systems
-    dataset_typ = "ortho_haar"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
+    num_val_tasks = 1 #number of test systems
+    dataset_typ = "ortho_haar" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar"
     max_cond_num = 100
     distinct_cond_nums = 10
-    val_dataset_typ = "ortho_haar"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
+    val_dataset_typ = "ortho_haar" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar"
     C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
     nx = 5
     ny = 5
     n_noise = 1
     num_traces = {"train": 1, "val": 1}
     changing = False #used only for plotting
-
-    #mem_suppress experiment settings
-    mem_suppress = True #run the memory suppression experiment
-    masking = False #run the masking training run
-    cached_data = False #use cached data
-    backstory = True #use masked backstories
-    init_seg = False #use masked initial segments
-    backstory_len = ny + 2 #length of the backstory
-    mask_budget = 10 #max # of systems that will be masked on first appearance (alpha)
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
@@ -53,7 +43,8 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[1] #which GPU
+
+    devices=[2] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
@@ -61,16 +52,16 @@ class Config(object, metaclass=Singleton):
     batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
-    test_batch_size = 512
-    test_data_workers = 128 #keep at 1
+    test_batch_size = 256
+    test_data_workers = 1 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
-    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 250  #500 for extended OLS #250 #context length
-    n_embd = 192 #128 #192 #288
-    n_layer = 24 #12 #24 #48
-    n_head = 12 #8 #12 #18
+    n_positions = 250 #500 for extended OLS #250 #context length
+    n_embd = 128
+    n_layer = 12
+    n_head = 8
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
@@ -84,8 +75,8 @@ class Config(object, metaclass=Singleton):
     # same_length = True
     # clamp_len = 1000
 
-    # Optimizer parameters
-    learning_rate = np.sqrt((len(devices) * batch_size)/512)*(0.833333333)*1.584893192461114e-05 #1.9054607179632464e-05
+    # Optimizer parameters 
+    learning_rate = 1.584893192461114e-05#1.584893192461114e-05 #1.9054607179632464e-05
     weight_decay = 1e-2
 
     # Gradient Clipping
