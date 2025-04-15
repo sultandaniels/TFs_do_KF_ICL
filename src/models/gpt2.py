@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import GPT2Model, GPT2Config, TransfoXLConfig, TransfoXLModel
+from src.models.modeling_fpt2 import FPT2Model
 from src.models import BaseModel
 from src.core import Config
 from src.linalg_helpers import print_matrix
@@ -39,11 +40,11 @@ class GPT2(BaseModel):
         self._read_in = nn.Linear(n_dims_in, n_embd)
 
         if config.model_type == "GPT2":
-            self._backbone = GPT2Model(gpt_configuration)
+            self._backbone = FPT2Model(gpt_configuration)
             self.name = f"gpt2_embd={n_embd}_layer={n_layer}_head={n_head}"
         elif config.model_type == "GPT2_NoPE":
             print()
-            self._backbone = GPT2Model(gpt_configuration)
+            self._backbone = FPT2Model(gpt_configuration)
             self.name = f"gpt2_embd={n_embd}_layer={n_layer}_head={n_head}"
         elif config.model_type == "transfoXL":
             self._backbone = TransfoXLModel(gpt_configuration)

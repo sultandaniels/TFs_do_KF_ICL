@@ -171,7 +171,7 @@ def setup_model(args):
     config = Config()
     if "gpt" in model_name_or_path.lower():
         model = GPT2.load_from_checkpoint(model_name_or_path, n_dims_in=config.n_dims_in, n_positions=250, n_embd=128,
-                                use_pos_emb=True, map_location=device, strict=True).eval().to(device)
+                                use_pos_emb=True, map_location=device, strict=False).eval().to(device)
         #model = GPT2LMHeadModel.from_pretrained("gpt2")
 
     checkpoint = torch.load(model_name_or_path, map_location="cuda")
