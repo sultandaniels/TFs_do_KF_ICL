@@ -1015,6 +1015,15 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
+    elif model_name == "hyperparameter_sweep":
+        minval = 1000
+        maxval = 10000
+        train_int = 1000
+
+        phases = [minval, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
     return ckpt_pred_steps
 
 
@@ -3150,9 +3159,9 @@ if __name__ == '__main__':
                 predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
     
     elif multi_train:
-        train_steps = 10000
+        train_steps = 20000
         parameter = "learning_rate"
-        sweep = [10, 1, 0.1, 0.01, 0.001, 0.0001, 0.00001]
+        sweep = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
 
         config.override("train_steps", train_steps)
         config_dict["train_steps"] = train_steps
@@ -3163,6 +3172,8 @@ if __name__ == '__main__':
         print("\ndevice:", device)
 
         for value in sweep:
+            print(f"\n\nstarting training for {parameter} = {value}")
+            
             config.override(parameter, value)
             config_dict[parameter] = value
 
@@ -3176,6 +3187,39 @@ if __name__ == '__main__':
             config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
 
             wandb_train(config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+
+            #### perfomrm predictions for one needle ####
+            num_sys = 1
+            num_haystack_examples = 50
+
+            print(f"\n\nstarting predictions for {parameter} = {value}")
+
+            config.override("num_haystack_examples", num_haystack_examples)
+            output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
+            if ortho_haar:
+                config.override("val_dataset_typ", "ortho_haar")
+            
+            model_name = "hyperparameter_sweep"
+
+            ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
+
+            colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
+            config.override("needle_in_haystack", True)
+            config.override("needle_final_seg_extended", False)
+
+            ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
+
+            print(f"output dir: {output_dir}")
+            print(f"config.use_pos_emb: {config.use_pos_emb}")
+
+            print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
+
+            kal_step = predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
+
+            print(f"plotting train_conv convergence plots for haystack len {num_sys}")
+            pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_dir, experiment_name, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+
+
 
 
 
