@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
 
 
-    num_sys_haystack = 1 #number of systems in the haystack
+    num_sys_haystack = 5 #number of systems in the haystack
 
 
 

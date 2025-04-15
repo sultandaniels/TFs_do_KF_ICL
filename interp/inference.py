@@ -243,10 +243,17 @@ def interfered_mse(multi_sys_ys, model, device, config):
         print(multi_sys_ys[0].shape[-2])
         
         I = np.take(multi_sys_ys[0], np.arange(multi_sys_ys[0].shape[-2] - 2), axis=-2)
+        
+        
         other_sys = np.take(multi_sys_ys[1], [multi_sys_ys[1].shape[-2] - 2], axis=-2)
-        # other_sys_2 = np.take(multi_sys_ys[0], [multi_sys_ys[0].shape[-2] - 2], axis=-2)
+        other_sys_2 = np.take(multi_sys_ys[0], [multi_sys_ys[0].shape[-2] - 2], axis=-2)
         I = np.concatenate([I, other_sys], axis=-2)
-
+        
+        other_sys_1 = np.squeeze(other_sys, axis=-2)
+        other_sys_2 = np.squeeze(other_sys_2, axis=-2)
+        mse = np.mean((other_sys_1 - other_sys_2) ** 2)
+        print("MSE between systems:", mse)
+        
         print("before model.predict_step()")
         batch_shape = I.shape[:-2]
         print("batch_shape:", batch_shape)
@@ -288,6 +295,84 @@ def interfered_mse(multi_sys_ys, model, device, config):
         print("MSE between ground truth and prediction for the last 5 features:", mse_sys2)
     return preds_tf
 
+def interleaved_mse(multi_sys_ys, model, device, config):
+    with torch.no_grad():  # no gradients
+        print(multi_sys_ys[0].shape[-2])
+        
+        I = np.take(multi_sys_ys[0], np.arange(8), axis=-2)
+        other_sys = np.take(multi_sys_ys[1], [8], axis=-2)
+        other_sys_2 = np.take(multi_sys_ys[0], [8], axis=-2)
+        I = np.concatenate([I, other_sys], axis=-2)
+        print("other_sys:")
+        print(other_sys)
+        print("I:")
+        print(I)
+        
+        other_sys_1 = np.squeeze(other_sys, axis=-2)
+        other_sys_2 = np.squeeze(other_sys_2, axis=-2)
+        mse = np.mean((other_sys_1 - other_sys_2) ** 2)
+        print("MSE between systems:", mse)
+        
+        print("before model.predict_step()")
+        batch_shape = I.shape[:-2]
+        print("batch_shape:", batch_shape)
+        flattened_I = np.reshape(I, (int(np.prod(batch_shape)), *I.shape[-2:]))
+        print("flattened_I.shape:", flattened_I.shape)
+        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I), batch_size=config.test_batch_size)
+        preds_arr = []  # Store the predictions for all batches
+        for validation_batch in iter(validation_loader):
+            print("predicting...")
+            _, flattened_preds_tf = model.predict_step({"current": validation_batch.to(device)})  # predict using the model
+            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+        print(preds_arr)
+        print(len(preds_arr))
+        print(len(preds_arr[0]))
+        print(len(preds_arr[0][0]))
+        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                            (*batch_shape, 9, config.ny))  # Combine the predictions for all batches
+        print("preds_tf.shape:", preds_tf.shape)
+        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf], axis=-2)  # concatenate the predictions
+        print("after concatenation:")
+        print(preds_tf)
+        ground_truth_sys1 = np.take(multi_sys_ys[0], [8], axis=-2)
+        ground_truth_sys2 = np.take(multi_sys_ys[1], [8], axis=-2)
+        
+        ground_truth_last5_sys1 = ground_truth_sys1[..., -5:]  # shape: (batch, 1, 5)
+        ground_truth_last5_sys2 = ground_truth_sys2[..., -5:]  # shape: (batch, 1, 5)
+        
+        predicted_last = preds_tf[-1:, :]
+        
+        # Calculate mean squared error (MSE) over the last 5 features
+        mse_sys1 = np.mean((ground_truth_last5_sys1 - predicted_last) ** 2)
+        mse_sys2 = np.mean((ground_truth_last5_sys2 - predicted_last) ** 2)
+        print("Ground truth System 1 (last timestep, last 5 features):")
+        print(ground_truth_last5_sys1)
+        print("Ground truth System 2 (last timestep, last 5 features):")
+        print(ground_truth_last5_sys2)
+        print("Predicted last timestep (5 features):")
+        print(predicted_last)
+        print("MSE between ground truth and prediction for system 1:", mse_sys1)
+        print("MSE between ground truth and prediction for system 2:", mse_sys2)
+        
+        # Extract last 3 predicted timesteps (shape: (3, 5))
+        predicted_last3 = preds_tf[-3:, :]  # shape: (3, 5)
+        
+        for i in range(3):
+            mse = np.mean((predicted_last3[i] - ground_truth_last5_sys1) ** 2)
+            print(f"MSE for prediction {i} vs system 1 ground truth: {mse}")
+
+        for i in range(3):
+            mse = np.mean((predicted_last3[i] - ground_truth_last5_sys2) ** 2)
+            print(f"MSE for prediction {i} vs system 2 ground truth: {mse}")
+
+        print("Predicted last 3 timesteps (3x5):")
+        print(predicted_last3)
+        print("I:")
+        print(I)
+        
+
+    return preds_tf
+
 if __name__ == "__main__":
     args = get_args()
     model = setup_model(args)
@@ -300,7 +385,7 @@ if __name__ == "__main__":
         dataset = pickle.load(f)
     
     filename = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/identity_data/data/interleaved_traces_ident_ident_C_state_dim_5_num_sys_haystack_1.pkl'
-    filename = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/ortho_data/data/interleaved_traces_ortho_ident_C_state_dim_5_num_sys_haystack_1.pkl'
+    filename = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/ortho_data/data/interleaved_traces_ortho_ident_C_state_dim_5_num_sys_haystack_5.pkl'
 
 
     with open(filename, 'rb') as f:
@@ -315,7 +400,7 @@ if __name__ == "__main__":
     print("First row of multi_sys_ys[0,0,:,:]:\n")
     print(len(multi_sys_ys[0, 0, :, :][0])) # 57
 
-    print(len(multi_sys_ys[0, 0, :, :])) # 25
+    print(len(multi_sys_ys[0, 0, :, :])) # 73
 
     for config_idx, (seg_lengths, sys_choices) in enumerate(zip(tok_seg_lens_per_config, sys_choices_per_config)):
         print(f"\nConfiguration {config_idx}:")
@@ -330,10 +415,10 @@ if __name__ == "__main__":
         else:
             print("-> This trace is not interleaved; it contains only system:", unique_systems.pop())
 
-    print("\nFirst row of multi_sys_ys[0,0,:,:]:\n")
-    print(multi_sys_ys[0, 0, :, :])
-    print("\nFirst row of multi_sys_ys[0,1,:,:]:\n")
-    print(multi_sys_ys[0, 1, :, :])
+    # print("\nFirst row of multi_sys_ys[0,0,:,:]:\n")
+    # print(multi_sys_ys[0, 0, :, :])
+    # print("\nFirst row of multi_sys_ys[0,1,:,:]:\n")
+    # print(multi_sys_ys[0, 1, :, :])
     
     haystack_prompts = [
         multi_sys_ys[0, 0, :, :],
@@ -359,7 +444,7 @@ if __name__ == "__main__":
     #     print(f"Prediction for prompt {i} has shape:", pred.shape)
         
     
-    interfered_mse(haystack_prompts, model, device, config)
+    interleaved_mse(haystack_prompts, model, device, config)
     
     # token_a = tokenizer.convert_tokens_to_ids("") # what it should predict
     # token_b = tokenizer.convert_tokens_to_ids("") # what it should predict if swap interferes properly (all encodings on the same token)
