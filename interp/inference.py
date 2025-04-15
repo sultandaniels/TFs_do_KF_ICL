@@ -6,7 +6,6 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import datetime
 import pickle
-from transformers import GPT2Model, GPT2LMHeadModel, AutoTokenizer
 import sys
 import numpy as np
 from src.models import GPT2
