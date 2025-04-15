@@ -397,9 +397,9 @@ if __name__ == "__main__":
     np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
     print("First row of multi_sys_ys[0,0,:,:]:\n")
-    print(len(multi_sys_ys[0, 0, :, :][0])) # 57
+    print(len(multi_sys_ys[1, 0, :, :][0])) # 57
 
-    print(len(multi_sys_ys[0, 0, :, :])) # 73
+    print(len(multi_sys_ys[1, 0, :, :])) # 73
 
     for config_idx, (seg_lengths, sys_choices) in enumerate(zip(tok_seg_lens_per_config, sys_choices_per_config)):
         print(f"\nConfiguration {config_idx}:")
@@ -420,7 +420,7 @@ if __name__ == "__main__":
     # print(multi_sys_ys[0, 1, :, :])
     
     haystack_prompts = [
-        multi_sys_ys[0, 0, :, :],
+        multi_sys_ys[1, 0, :, :],
         multi_sys_ys[0, 1, :, :]
     ]
     
