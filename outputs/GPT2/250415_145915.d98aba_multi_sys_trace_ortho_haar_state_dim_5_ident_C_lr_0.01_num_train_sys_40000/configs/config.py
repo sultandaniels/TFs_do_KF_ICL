@@ -47,7 +47,7 @@ class Config(object, metaclass=Singleton):
     devices=[2] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 5#1000 #number of steps between logging (train interval)
+    train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
     batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over

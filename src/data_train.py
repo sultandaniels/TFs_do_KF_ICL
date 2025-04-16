@@ -860,9 +860,9 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     elif model_name == "hyperparameter_sweep":
-        minval = 1000
-        maxval = 10000
-        train_int = 1000
+        minval = 5#1000
+        maxval = 20#20000
+        train_int = 5#1000
 
         phases = [minval, maxval]
 
@@ -2087,6 +2087,55 @@ def set_config_params(config, model_name):
         output_dir = f"../outputs/{config.model_type}/{experiment_name}"
 
         ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
+    
+    
+    elif model_name == "hyperparameter_sweep":
+        print("\n\nHyperparameter Sweep\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [3])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 512)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", 1.584893192461114e-05)
+
+
+        experiment_name = None#"250407_133748.f39da8_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        output_dir = None #f"../outputs/{config.model_type}/{experiment_name}"
+
+        ckpt_dir = None #f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
+
 
     else:
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
@@ -2732,9 +2781,10 @@ if __name__ == '__main__':
                 predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
     
     elif multi_train:
-        train_steps = 20000
+        train_steps = 20#000
         parameter = "learning_rate"
-        sweep = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
+        sweep = [1e-2, 1e-3] #[1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
+        model_name = "hyperparameter_sweep" #check this when running
 
         config.override("train_steps", train_steps)
         config_dict["train_steps"] = train_steps
@@ -2768,11 +2818,14 @@ if __name__ == '__main__':
             print(f"\n\nstarting predictions for {parameter} = {value}")
 
             config.override("num_haystack_examples", num_haystack_examples)
-            output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
+            
+            _, _, _ = set_config_params(config, model_name) #Not sure if this matters
+            steps_in = list(range(1,11))
+
             if ortho_haar:
                 config.override("val_dataset_typ", "ortho_haar")
             
-            model_name = "hyperparameter_sweep"
+            
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
