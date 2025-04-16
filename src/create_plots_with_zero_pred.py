@@ -506,6 +506,50 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # [n_systems x n_traces x (n_positions + 1) x O_D]
             torch_ys = torch.Tensor(ys_sys).to(device)
 
+            # #plot a histogram of the squared norms of ys_sys[i,0,:] for all i
+            # print("shape of ys_flatten axis 0:", ys.reshape(ys.shape[0]*ys.shape[1], ys.shape[2], ys.shape[3]).shape)
+            # flattend_val = ys.shape[0]*ys.shape[1]
+            # reshape_ys = ys.reshape(flattend_val, ys.shape[2], ys.shape[3])
+            # fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+            # n_bins = 100
+            # print("ys_sys shape:", ys_sys.shape)
+
+            # norms_0 = np.linalg.norm(reshape_ys[:,0,:], axis=-1) ** 2
+            # norms_1 = np.linalg.norm(reshape_ys[:,1,:], axis=-1) ** 2
+
+            # # norms_0 = np.linalg.norm(reshape_ys[:int(0.5*flattend_val),0,:], axis=-1)
+            # # norms_1 = np.linalg.norm(reshape_ys[:int(0.5*flattend_val),1,:], axis=-1)
+            # print("norms_0 shape:", norms_0.shape)
+            # ax.hist(norms_0, bins=n_bins, label="index 1-after", color="blue", alpha=0.7)
+            # #plot a vertical bar of the median value of norms_0
+            # median_0 = np.median(norms_0)
+            # ax.axvline(median_0, color='blue', linestyle='dashed', linewidth=1, label="index 1-after median")
+            # #plot a vertical bar of the median value of norms_1
+            # median_1 = np.median(norms_1)
+            # ax.axvline(median_1, color='red', linestyle='dashed', linewidth=1, label="index 2-after median")
+            # #plot a vertical bar of the mean value of norms_0
+            # mean_0 = np.mean(norms_0)
+            # ax.axvline(mean_0, color='blue', linestyle='solid', linewidth=1, label="index 1-after mean")
+            # #plot a vertical bar of the mean value of norms_1
+            # mean_1 = np.mean(norms_1)
+            # ax.axvline(mean_1, color='red', linestyle='solid', linewidth=1, label="index 2-after mean")
+            # #plot a histogram of the squared norms of ys_sys[i,1,:] for all i
+            # ax.hist(norms_1, bins=n_bins, label="index 2-after", color="red", alpha=0.7)
+            # #set minor xticks every 0.1
+            # ax.xaxis.set_minor_locator(plt.MultipleLocator(0.1))
+
+
+            # ax.set_title("Squared norms of ys")
+            # ax.set_xlabel("Squared norm")
+            # ax.set_ylabel("Frequency")
+            # ax.legend()
+            # os.makedirs("../outputs/debug_OLS", exist_ok=True)
+            # fig.savefig(f"../outputs/debug_OLS/ys_hist_ind_0_1.pdf", format='pdf')
+
+
+            # norm_ys = np.linalg.norm(ys_sys, axis=-1) ** 2
+            # sys_median_ys = np.median(median_ys[:50], axis=0)
+
             del ys_sys
             torch.cuda.empty_cache()
             gc.collect()
@@ -543,7 +587,8 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # SECTION: Compute analytical errors
             preds_rls_wentinn_analytical_sys = CnnKF.analytical_error(
                 observation_IRs,            # [n_systems x n_traces x (n_positions - 1) x ...]
-                sim_objs_td[sys, None, None]  # [n_systems x 1 x 1 x ...]
+                sim_objs_td[sys, None, None],  # [n_systems x 1 x 1 x ...]
+                ridge=ridge #ridge parameter
             )   # [n_systems x n_traces x (n_positions - 1)]
 
             preds_rls_wentinn_analytical_sys = torch.cat([
@@ -1231,9 +1276,11 @@ def compute_kf_multi_sys(num_trace_configs, ys, seg_lens_per_config, sys_choices
 def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choices_per_config, next_start_per_config, sys_inds_per_config, max_ir_length, err_lss):
 
     num_trace_configs = config.num_test_traces_configs
-    err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
-    err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, config.n_positions + 1), np.inf)
-    err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
+
+    if not config.val_dataset_typ == "ortho_haar":
+        err_lss[f"Kalman_rem"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
+        err_lss[f"Analytical_Kalman"] = np.full((num_trace_configs, config.n_positions + 1), np.inf)
+        err_lss[f"Analytical_Simulation"] = np.full((num_trace_configs, ys.shape[1], config.n_positions + 1), np.inf)
 
     for ir_length in range(1, max_ir_length + 1):
         # Initialize the err_lss ols and ols analytical values to infinity shaped like the multi_sys_ys
@@ -1253,9 +1300,11 @@ def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choi
                 sys = sys_choices_per_config[trace_conf][seg_count]
 
                 seg_len = seg_lens_per_config[trace_conf][seg_count] # get the length of the segment
-                err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys, sys_start[sys]:sys_start[sys] + seg_len]
-                err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
+
+                if not config.val_dataset_typ == "ortho_haar":
+                    err_lss[f"Kalman_rem"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Kalman"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
+                    err_lss[f"Analytical_Kalman"][trace_conf, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Kalman"][sys, sys_start[sys]:sys_start[sys] + seg_len]
+                    err_lss[f"Analytical_Simulation"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all["Analytical_Simulation"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
 
                 for ir_length in range(1, max_ir_length + 1):
                     err_lss[f"OLS_ir_{ir_length}"][trace_conf, :, next_start + 1:next_start + 1 + seg_len] = errs_all[f"OLS_ir_{ir_length}"][sys, :, sys_start[sys]:sys_start[sys] + seg_len]
@@ -1892,7 +1941,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     err_lss_all = {}
 
-    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar")) and run_kf_ols:
+    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho")) and run_kf_ols:
 
         if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
             num_trials = config.num_traces["val"]
@@ -1901,11 +1950,16 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         else:
             raise ValueError(f"datasource {config.datasource} not recognized")
     
-        start = time.time()  # start the timer for kf predictions
-        errs_kf = compute_kf(ys, sim_objs)
-        end = time.time()  # end the timer for kf predictions
-        print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
-        err_lss_all["Kalman"] = errs_kf
+        if not config.val_dataset_typ == "ortho_haar":
+            start = time.time()  # start the timer for kf predictions
+            errs_kf = compute_kf(ys, sim_objs)
+            end = time.time()  # end the timer for kf predictions
+            print("time elapsed for KF Pred:", (end - start) / 60, "min")  # print the time elapsed for kf predictions
+            err_lss_all["Kalman"] = errs_kf
+
+            analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs, num_trials)
+            err_lss_all["Analytical_Kalman"] = analytical_kf
+            err_lss_all["Analytical_Simulation"] = an_sims
 
         start = time.time()  # start the timer for ols predictions
         err_lss_all = compute_OLS_ir(config, ys, sim_objs, max_ir_length=3, err_lss=err_lss_all)
@@ -1917,12 +1971,6 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         # for name in names:
         #     err_lss_all[name] = np.zeros((config.num_val_tasks, num_trials, config.n_positions + 1))
 
-        analytical_kf, an_sims = compute_analytical_kf_simulation(config, ys, sim_objs, num_trials)
-        err_lss_all["Analytical_Kalman"] = analytical_kf
-        print(f"err_lss_all[Analytical_Kalman].shape: {err_lss_all['Analytical_Kalman'].shape}")
-        err_lss_all["Analytical_Simulation"] = an_sims
-        print(f"err_lss_all[Analytical_Simulation].shape: {err_lss_all['Analytical_Simulation'].shape}")
-
         # raise ValueError("Need to implement interleaving of KF and OLS errors")
 
     err_lss_examples = {}
@@ -1932,17 +1980,26 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         end = time.time()  # end the timer for needle predictions
         # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 
-        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar") and run_kf_ols:
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
+            if ex == 0:
+                print("interleaving kf and OLS errors")
+                err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
 
-            print("interleaving kf and OLS errors")
-            err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
+                interleaved_err_lss = {}
+                for name in ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
+                    if name in err_lss.keys():
+                        interleaved_err_lss[name] = err_lss[name]
+            
+            else:
+                for name in ["Kalman", "Kalman_rem", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3"]:
+                    if name in interleaved_err_lss.keys():
+                        err_lss[name] = interleaved_err_lss[name]
 
         for key in err_lss.keys():
             # print(f"err_lss[{key}] len: {len(err_lss[key])}")
             if ex == 0:
                 err_lss_examples[key] = [] #initialize the list for the prediction errors
             err_lss_examples[key].append(err_lss[key])
-
 
         del err_lss
         torch.cuda.empty_cache()
@@ -1965,6 +2022,8 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         # print(f"err_lss_examples[{key}] len: {len(err_lss_examples[key])}")
         err_lss_examples[key] = np.array(err_lss_examples[key])
         # print(f"err_lss_examples[{key}] shape: {err_lss_examples[key].shape}")
+
+    print("err_lss_examples keys:", err_lss_examples.keys())
 
     with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)

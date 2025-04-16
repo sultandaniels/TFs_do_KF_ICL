@@ -1097,7 +1097,11 @@ def set_config_params(config, model_name):
         )
         config.override("n_dims_out", 5)
 
-        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        experiment_name = "250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+
+        output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
     elif model_name == "ortho_haar_check":
         print("\n\nORTHOGONAL HAAR CHECK MEDIUM MODEL\n\n")
@@ -1145,7 +1149,7 @@ def set_config_params(config, model_name):
 
         output_dir = f"../outputs/{config.model_type}/{experiment_name}"
 
-        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{experiment_name}"
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints//{config.model_type}/{experiment_name}"
 
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")
@@ -2545,7 +2549,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 19
+        last_haystack_len = 1
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
@@ -2568,7 +2572,7 @@ if __name__ == '__main__':
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
             # steps_in = [1,2,3,5,10]
-            steps_in = list(range(1,11))
+            steps_in = list(range(1,7))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         

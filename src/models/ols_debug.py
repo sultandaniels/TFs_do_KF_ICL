@@ -26,7 +26,7 @@ class CnnKF(nn.Module):
 
     
     @classmethod
-    def analytical_error(cls, observation_IR: torch.Tensor, systems: TensorDict[str, torch.Tensor]) -> torch.Tensor:
+    def analytical_error(cls, observation_IR: torch.Tensor, systems: TensorDict[str, torch.Tensor], ridge = 0.0) -> torch.Tensor:
         with torch.no_grad():
             device = observation_IR.device
 
