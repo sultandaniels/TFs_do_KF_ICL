@@ -68,6 +68,9 @@ sys.path.append(
 )   # Very hacky but the imports are annoying otherwise
 from src.models.gpt2 import GPT2
 
+device = torch.device("cuda")
+
+
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/text-classification/requirements.txt")
 logger = logging.getLogger(__name__)
 
@@ -190,7 +193,7 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
 @dataclass
 class DataTrainingArguments:
     dataset_path: Optional[str] = field(
-        default="./identity_data/data/",
+        default="./identity_data/prune/",
         metadata={"help": "The path to the directory with the JSON files of the task."},
     )
     train_split: Optional[str] = field(
@@ -323,7 +326,7 @@ class ModelArguments:
         metadata={"help": "Will enable to load a pretrained model whose head dimensions are different."},
     )
     initialize_from: str = field(
-        default="gpt2",
+        default="/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ident_med_GPT2_experiment/snapshots/f94c23e0e6a3c5c36cc04e005356cfa3ee007072/checkpoints/step=16000.ckpt",
         metadata={"help": "The model to initialize from."},
     )
 
@@ -376,27 +379,31 @@ class DataCollatorGP:
         for example in examples:
             seq = example["sequence"]
             corr_seq = example["corr_sequence"]
-            prediction = example["prediction"]
-            corr_prediction = example["corr_prediction"]
+            one_after_prediction = example["1_after_prediction"]
+            corr_one_after_prediction = example["corr_1_after_prediction"]
+            # two_after_prediction = example["2_after_prediction"]
+            # corr_two_after_prediction = example["corr_2_after_prediction"]
+            # three_after_prediction = example["3_after_prediction"]
+            # corr_three_after_prediction = example["corr_3_after_prediction"]
             
-            l = self.tokenizer(seq, return_tensors="pt")["input_ids"].shape[1]
-            input_ids = self.tokenizer(seq+" "+prediction, return_tensors="pt", padding="max_length", max_length=self.max_length)["input_ids"][0]
-            corr_input_ids = self.tokenizer(corr_seq+" "+corr_prediction, return_tensors="pt", padding="max_length", max_length=self.max_length)["input_ids"][0]
-            labels = input_ids.clone()
+            l = len(seq)
+            input_ids = np.concatenate([seq, one_after_prediction], axis=-1)
+            corr_input_ids = np.concatenate([corr_seq, corr_one_after_prediction], axis=-1)
+            labels = input_ids.copy()
             labels[:l] = -100
-            labels[labels == self.tokenizer.pad_token_id] = -100
+            # labels[labels == self.tokenizer.pad_token_id] = -100 # not sure if we need to pad our inputs in this setup
 
             input_ids_all.append(input_ids)
             corr_input_ids_all.append(corr_input_ids)
             labels_all.append(labels)
             
-            first_pad = (input_ids == self.tokenizer.pad_token_id).nonzero()[0]
+            # first_pad = (input_ids == self.tokenizer.pad_token_id).nonzero()[0]
             start_idxes.append(l-1)
-            end_idxes.append(first_pad-1)
+            end_idxes.append(l)
         
         return {
-            "input_ids": torch.stack(input_ids_all),
-            "corr_input_ids": torch.stack(corr_input_ids_all),
+            "sequence": torch.stack(input_ids_all),
+            "corr_sequence": torch.stack(corr_input_ids_all),
             "labels": torch.stack(labels_all),
             "start_idxes": torch.LongTensor(start_idxes),
             "end_idxes": torch.LongTensor(end_idxes),
@@ -563,18 +570,33 @@ def main():
     raw_datasets = load_datasets(data_args.dataset_path, data_args.max_train_samples, data_args.max_eval_samples, train_split=data_args.train_split)
     n_train = len(raw_datasets["train"])
     
-    model = FPT2LMHeadModel.from_pretrained(
-        model_args.initialize_from,
-        with_embedding_nodes=data_args.with_embedding_nodes,
-        disable_linear_regularization_term=data_args.disable_linear_reg_term,
+    # model = FPT2LMHeadModel.from_pretrained(
+    #     model_args.initialize_from,
+    #     with_embedding_nodes=data_args.with_embedding_nodes,
+    #     disable_linear_regularization_term=data_args.disable_linear_reg_term,
+    # )
+    # gpt2_model = FPT2LMHeadModel.from_pretrained(
+    #     "gpt2",
+    #     with_embedding_nodes=data_args.with_embedding_nodes,
+    # ).to("cuda")
+    model_name_or_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ident_med_GPT2_experiment/snapshots/f94c23e0e6a3c5c36cc04e005356cfa3ee007072/checkpoints/step=16000.ckpt"
+    config = Config()
+    model = GPT2.load_from_checkpoint(model_name_or_path, n_dims_in=config.n_dims_in, n_positions=250, n_embd=128,
+                                use_pos_emb=True, map_location=device, strict=False).eval().to(device)
+    model.load_state_dict(
+        {k.replace("model.", ""): v for k, v in checkpoint["state_dict"].items()},
+        strict=False
     )
-    gpt2_model = FPT2LMHeadModel.from_pretrained(
-        "gpt2",
-        with_embedding_nodes=data_args.with_embedding_nodes,
-    ).to("cuda")
     
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    tokenizer.pad_token = tokenizer.eos_token
+    gpt2_model = GPT2.load_from_checkpoint(model_name_or_path, n_dims_in=config.n_dims_in, n_positions=250, n_embd=128,
+                                use_pos_emb=True, map_location=device, strict=False).eval().to(device)
+    gpt2_model.load_state_dict(
+        {k.replace("model.", ""): v for k, v in checkpoint["state_dict"].items()},
+        strict=False
+    )
+    
+    # tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    # tokenizer.pad_token = tokenizer.eos_token
     
     freeze_all_except_pruning_params(model)
 
@@ -591,7 +613,6 @@ def main():
 
     # Data collator
     collator = DataCollatorGP(
-        tokenizer=tokenizer,
         max_length=data_args.max_seq_length
     )
     
