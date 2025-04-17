@@ -126,69 +126,107 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
                 raise ValueError(f'Unknown warmup type: {self.warmup_type}')
         else:
             return self.target_layer_sparsity
-
+        
     def compute_loss(self, model, inputs, return_outputs=False):
-        start_idxes = inputs.pop("start_idxes")
-        end_idxes = inputs.pop("end_idxes")
-        _ = inputs.pop("labels")
-        corr_input_ids = inputs.pop("corr_input_ids")
-        input_ids = inputs.pop("input_ids")
+        # 1) pop off what we don't need
+        start_idxes = inputs.pop("start_idxes")     # (B,)
+        end_idxes = inputs.pop("end_idxes")       # (B,)
+        _ = inputs.pop("labels")          # (B, L) -- ignored
+        _ = inputs.pop("corr_input_ids")  # (B, L) -- no teacher/KL here
+        input_ids = inputs.pop("input_ids")       # (B, L, d_in=57)
+
+        bsz, L, d_in = input_ids.shape
+
+        # 2) split context vs true‑next
+        #    context: everything except the last time‑step
+        context = input_ids[:, :L-1, :]         # (B, L-1, 57)
+        #    true_full: the ground‑truth vector at the final pos
+        true_full = input_ids[torch.arange(bsz), end_idxes, :]  # (B, 57)
+        true_next = true_full[..., -5:]                       # (B, 5)
+
+        # 3) run the model on the context only
+        #    predict_step will apply read_in → backbone → read_out
+        _, out_dict = model.predict_step({"current": context})
+        preds_full = out_dict["preds"]            # (B, L-1, 5)
+
+        # 4) grab the model's last‑step prediction
+        pred_next = preds_full[:, -1, :]         # (B, 5)
+
+        # 5) compute MSE on those 5 payload dims
+        mse_loss = F.mse_loss(pred_next, true_next)
+
+        # 6) if you still have any sparsity losses in out_dict, you could add them:
+        reg_edge = out_dict.get("edge_loss", 0) or 0
+        reg_node = out_dict.get("node_loss", 0) or 0
+        total_loss = mse_loss + reg_edge + reg_node
+
+        # 7) package outputs for HF Trainer
+        out_dict["loss"] = total_loss
+        out_dict["mse_loss"] = mse_loss
+        return (total_loss, out_dict) if return_outputs else total_losss
+
+    # def compute_loss(self, model, inputs, return_outputs=False): # change this for our setup
+    #     start_idxes = inputs.pop("start_idxes")
+    #     end_idxes = inputs.pop("end_idxes")
+    #     _ = inputs.pop("labels")
+    #     corr_input_ids = inputs.pop("corr_input_ids")
+    #     input_ids = inputs.pop("input_ids")
         
-        bsz = input_ids.shape[0]
+    #     bsz = input_ids.shape[0]
         
-        with torch.no_grad():
-            # First get the logits from the GPT-2 model
-            logits_gpt2 = self.gpt2_model(input_ids=input_ids, **inputs).logits
+    #     with torch.no_grad():
+    #         # First get the logits from the GPT-2 model
+    #         logits_gpt2 = self.gpt2_model(input_ids=input_ids, **inputs)
             
-            # Now run the corrupted inputs through it, and retain the activations
-            corr_x = self.gpt2_model(
-                input_ids=corr_input_ids, 
-                **inputs,
-                output_writer_states=True
-            ).writer_states
+    #         # Now run the corrupted inputs through it, and retain the activations
+    #         corr_x = self.gpt2_model(
+    #             input_ids=corr_input_ids, 
+    #             **inputs,
+    #             output_writer_states=True
+    #         ).writer_states
 
-            # Reshape corr_x in case we have distributed training
-            tgt_shape = (-1, bsz // self.device_count, *corr_x.shape[2:])
-            corr_x = corr_x.reshape(tgt_shape)
+    #         # Reshape corr_x in case we have distributed training
+    #         tgt_shape = (-1, bsz // self.device_count, *corr_x.shape[2:])
+    #         corr_x = corr_x.reshape(tgt_shape)
         
-        outputs = model(
-            input_ids=input_ids,
-            **inputs, 
-            target_edge_sparsity=self.get_current_edge_target_sparsity(self.state.global_step),
-            target_node_sparsity=self.get_current_layer_target_sparsity(self.state.global_step),
-            corr_x=corr_x
-        )
+    #     outputs = model(
+    #         input_ids=input_ids,
+    #         **inputs, 
+    #         target_edge_sparsity=self.get_current_edge_target_sparsity(self.state.global_step),
+    #         target_node_sparsity=self.get_current_layer_target_sparsity(self.state.global_step),
+    #         corr_x=corr_x
+    #     )
         
-        reg_edge_loss = outputs["edge_loss"]
-        if self.skip_layer_loss_if_higher_sparsity and outputs["model_node_sparsity"] > outputs["target_node_sparsity"]:
-            reg_layer_loss = 0
-        else:
-            reg_layer_loss = outputs["node_loss"]
-        reg_loss = reg_edge_loss + reg_layer_loss
-        logits = outputs["logits"]
+    #     reg_edge_loss = outputs["edge_loss"]
+    #     if self.skip_layer_loss_if_higher_sparsity and outputs["model_node_sparsity"] > outputs["target_node_sparsity"]:
+    #         reg_layer_loss = 0
+    #     else:
+    #         reg_layer_loss = outputs["node_loss"]
+    #     reg_loss = reg_edge_loss + reg_layer_loss
+    #     logits = outputs["logits"]
         
-        logits_idx = torch.gather(
-            logits,
-            1,
-            start_idxes.reshape(-1, 1, 1).repeat(1, 1, logits.shape[-1])
-        ).squeeze() # (batch_size, num_labels)
-        logits_gpt2_idx = torch.gather(
-            logits_gpt2,
-            1,
-            start_idxes.reshape(-1, 1, 1).repeat(1, 1, logits_gpt2.shape[-1])
-        ).squeeze()
+    #     logits_idx = torch.gather(
+    #         logits,
+    #         1,
+    #         start_idxes.reshape(-1, 1, 1).repeat(1, 1, logits.shape[-1])
+    #     ).squeeze() # (batch_size, num_labels)
+    #     logits_gpt2_idx = torch.gather(
+    #         logits_gpt2,
+    #         1,
+    #         start_idxes.reshape(-1, 1, 1).repeat(1, 1, logits_gpt2.shape[-1])
+    #     ).squeeze()
 
-        kl_loss = nn.functional.kl_div(
-            nn.functional.log_softmax(logits_idx, dim=-1),
-            nn.functional.softmax(logits_gpt2_idx, dim=-1),
-            reduction='batchmean',
-        )
+    #     kl_loss = nn.functional.kl_div(
+    #         nn.functional.log_softmax(logits_idx, dim=-1),
+    #         nn.functional.softmax(logits_gpt2_idx, dim=-1),
+    #         reduction='batchmean',
+    #     )
         
-        loss = kl_loss + reg_loss
-        outputs["loss"] = loss
-        outputs["kl_loss"] = kl_loss
+    #     loss = kl_loss + reg_loss
+    #     outputs["loss"] = loss
+    #     outputs["kl_loss"] = kl_loss
 
-        return (loss, outputs) if return_outputs else loss
+    #     return (loss, outputs) if return_outputs else loss
 
 @dataclass
 class DataTrainingArguments:
@@ -402,8 +440,8 @@ class DataCollatorGP:
             end_idxes.append(l)
         
         return {
-            "sequence": torch.stack(input_ids_all),
-            "corr_sequence": torch.stack(corr_input_ids_all),
+            "input_ids": torch.stack(input_ids_all),
+            "corr_input_ids": torch.stack(corr_input_ids_all),
             "labels": torch.stack(labels_all),
             "start_idxes": torch.LongTensor(start_idxes),
             "end_idxes": torch.LongTensor(end_idxes),
