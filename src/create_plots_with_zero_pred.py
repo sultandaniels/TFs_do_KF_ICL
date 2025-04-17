@@ -506,16 +506,33 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # [n_systems x n_traces x (n_positions + 1) x O_D]
             torch_ys = torch.Tensor(ys_sys).to(device)
 
-            # #plot a histogram of the squared norms of ys_sys[i,0,:] for all i
-            # print("shape of ys_flatten axis 0:", ys.reshape(ys.shape[0]*ys.shape[1], ys.shape[2], ys.shape[3]).shape)
-            # flattend_val = ys.shape[0]*ys.shape[1]
-            # reshape_ys = ys.reshape(flattend_val, ys.shape[2], ys.shape[3])
-            # fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-            # n_bins = 100
-            # print("ys_sys shape:", ys_sys.shape)
+            #plot a histogram of the squared norms of ys_sys[i,0,:] for all i
+            print("shape of ys_flatten axis 0:", ys.reshape(ys.shape[0]*ys.shape[1], ys.shape[2], ys.shape[3]).shape)
+            flattend_val = ys.shape[0]*ys.shape[1]
+            reshape_ys = ys.reshape(flattend_val, ys.shape[2], ys.shape[3])
+            fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+            n_bins = 100
+            print("ys_sys shape:", ys_sys.shape)
+
+            norm_inds = [0,1,10,20,50,100,240]
+            count = 0
+            for ind in norm_inds:
+                norms = np.linalg.norm(reshape_ys[:,ind,:], axis=-1) ** 2
+                print("norms shape:", norms.shape)
+                ax.hist(norms, bins=n_bins, label=f"index {ind}", alpha=1, zorder=len(norm_inds)-count-1)
+                #get the color of the histogram
+                color = ax.patches[-1].get_facecolor()
+                #plot a vertical bar of the median value of norms
+                median = np.median(norms)
+                ax.axvline(median, linestyle='dashed', linewidth=1, label=f"index {ind} median", color=color)
+                #plot a vertical bar of the mean value of norms
+                mean = np.mean(norms)
+                ax.axvline(mean, linestyle='solid', linewidth=1, label=f"index {ind} mean", color=color)
+                count += 1
 
             # norms_0 = np.linalg.norm(reshape_ys[:,0,:], axis=-1) ** 2
             # norms_1 = np.linalg.norm(reshape_ys[:,1,:], axis=-1) ** 2
+            # norms_250 = np.linalg.norm(reshape_ys[:,240,:], axis=-1) ** 2
 
             # # norms_0 = np.linalg.norm(reshape_ys[:int(0.5*flattend_val),0,:], axis=-1)
             # # norms_1 = np.linalg.norm(reshape_ys[:int(0.5*flattend_val),1,:], axis=-1)
@@ -535,20 +552,23 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # ax.axvline(mean_1, color='red', linestyle='solid', linewidth=1, label="index 2-after mean")
             # #plot a histogram of the squared norms of ys_sys[i,1,:] for all i
             # ax.hist(norms_1, bins=n_bins, label="index 2-after", color="red", alpha=0.7)
-            # #set minor xticks every 0.1
-            # ax.xaxis.set_minor_locator(plt.MultipleLocator(0.1))
+            # #plot a histogram of the squared norms of ys_sys[i,250,:] for all i
+            # ax.hist(norms_250, bins=n_bins, label="index 251-after", color="green", alpha=0.7)
+            #set minor xticks every 0.1
+            ax.xaxis.set_minor_locator(plt.MultipleLocator(0.1))
 
 
-            # ax.set_title("Squared norms of ys")
-            # ax.set_xlabel("Squared norm")
-            # ax.set_ylabel("Frequency")
-            # ax.legend()
-            # os.makedirs("../outputs/debug_OLS", exist_ok=True)
-            # fig.savefig(f"../outputs/debug_OLS/ys_hist_ind_0_1.pdf", format='pdf')
+            ax.set_title("Squared norms of ys")
+            ax.set_xlabel("Squared norm")
+            ax.set_ylabel("Frequency")
+            ax.legend()
+            os.makedirs("../outputs/debug_OLS", exist_ok=True)
+            fig.savefig(f"../outputs/debug_OLS/ys_hist_ind_multi_inds.pdf", format='pdf')
+
+            raise NotImplementedError("Debugging the OLS implementation")
 
 
-            # norm_ys = np.linalg.norm(ys_sys, axis=-1) ** 2
-            # sys_median_ys = np.median(median_ys[:50], axis=0)
+            # plt.sho
 
             del ys_sys
             torch.cuda.empty_cache()
