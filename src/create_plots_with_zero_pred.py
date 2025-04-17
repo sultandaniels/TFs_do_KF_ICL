@@ -506,43 +506,6 @@ def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
             # [n_systems x n_traces x (n_positions + 1) x O_D]
             torch_ys = torch.Tensor(ys_sys).to(device)
 
-            #plot a histogram of the squared norms of ys_sys[i,0,:] for all i
-            flattend_val = ys.shape[0]*ys.shape[1]
-            reshape_ys = ys.reshape(flattend_val, ys.shape[2], ys.shape[3])
-            fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-            n_bins = 100
-
-            norm_inds = [0,1,10,20,50,100,240]
-            count = 0
-            for ind in norm_inds:
-                norms = np.linalg.norm(reshape_ys[:,ind,:], axis=-1) ** 2
-                ax.hist(norms, bins=n_bins, label=f"index {ind}", alpha=1, zorder=len(norm_inds)-count-1)
-                #get the color of the histogram
-                color = ax.patches[-1].get_facecolor()
-                #plot a vertical bar of the median value of norms
-                median = np.median(norms)
-                ax.axvline(median, linestyle='dashed', linewidth=1, label=f"index {ind} median", color=color)
-                #plot a vertical bar of the mean value of norms
-                mean = np.mean(norms)
-                ax.axvline(mean, linestyle='solid', linewidth=1, label=f"index {ind} mean", color=color)
-                count += 1
-
-            #set minor xticks every 0.1
-            ax.xaxis.set_minor_locator(plt.MultipleLocator(0.1))
-
-
-            ax.set_title("Squared norms of ys")
-            ax.set_xlabel("Squared norm")
-            ax.set_ylabel("Frequency")
-            ax.legend()
-            os.makedirs("../outputs/debug_OLS", exist_ok=True)
-            fig.savefig(f"../outputs/debug_OLS/{config.val_dataset_typ}_ys_hist_ind_multi_inds.pdf", format='pdf')
-
-            raise NotImplementedError("Debugging the OLS implementation")
-
-
-            # plt.sho
-
             del ys_sys
             torch.cuda.empty_cache()
             gc.collect()
@@ -1934,7 +1897,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     err_lss_all = {}
 
-    if True: # if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho")) and run_kf_ols:
+    if config.val_dataset_typ == "gaussA" and run_kf_ols:
 
         if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
             num_trials = config.num_traces["val"]
@@ -1943,7 +1906,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         else:
             raise ValueError(f"datasource {config.datasource} not recognized")
     
-        if False: #if config.val_dataset_typ == "gaussA":
+        if config.val_dataset_typ == "gaussA":
             start = time.time()  # start the timer for kf predictions
             errs_kf = compute_kf(ys, sim_objs)
             end = time.time()  # end the timer for kf predictions
@@ -1973,7 +1936,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         end = time.time()  # end the timer for needle predictions
         # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 
-        if True:# if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
+        if config.val_dataset_typ == "gaussA" and run_kf_ols:
             if ex == 0:
                 print("interleaving kf and OLS errors")
                 err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
