@@ -895,9 +895,9 @@ def set_config_params(config, model_name):
         config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension
         config.override("n_dims_out", 5)  # IMPORTANT TO KEEP THIS AT 5 FOR NOW
 
-        output_dir = "../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        experiment_name = "250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
-    if model_name == "gauss_zero_cut":
+    elif model_name == "gauss_zero_cut":
         print("\n\nGAUSSIAN MEDIUM ZERO CUT MODEL\n\n")
 
         config.override("num_tasks", 40000)  # number of training systems
@@ -974,8 +974,7 @@ def set_config_params(config, model_name):
         config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
         config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
-
-        output_dir = "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        experiment_name = "250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
     elif model_name == "ortho_haar":
         print("\n\nORTHOGONAL HAAR MEDIUM MODEL\n\n")
@@ -1076,7 +1075,7 @@ def set_config_params(config, model_name):
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")
 
-        output_dir = "../outputs/GPT2/250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        experiment_name = "250124_052617.8dd0f8_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
 
         # Dataset settings
@@ -1842,6 +1841,10 @@ def set_config_params(config, model_name):
 
     else:
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
+
+    output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+
+    ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
 
     return output_dir, ckpt_dir, experiment_name

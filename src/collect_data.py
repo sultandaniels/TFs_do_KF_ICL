@@ -126,7 +126,7 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
             sim_objs.append(fsim)
         print("Saving", len(samples), "samples for", name)
 
-        loc = output_dir + f"/data/" + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")
+        loc = f"{output_dir}/" + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")
 
         with open(loc + ".pkl", "wb") as f:
             pickle.dump(samples, f)
@@ -208,4 +208,4 @@ if __name__ == "__main__":
 
     config = Config()
     
-    collect_data(config, "../outputs/GPT2/250125_104123.f75c04_multi_sys_trace_ortho_state_dim_5_ident_C_lr_3.169786384922228e-05_num_train_sys_40000", only, train_mix_dist, opposite_ortho=opposite_ortho)
+    collect_data(config, "/data/shared/ICL_Kalman_Experiments/train_and_test_data/ortho_haar", only, train_mix_dist, opposite_ortho=opposite_ortho)
