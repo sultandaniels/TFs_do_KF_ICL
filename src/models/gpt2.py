@@ -7,6 +7,8 @@ from src.core import Config
 from src.linalg_helpers import print_matrix
 
 config = Config()
+device = torch.device("cuda")
+
 
 
 class GPT2(BaseModel):
@@ -62,7 +64,23 @@ class GPT2(BaseModel):
         # predict only on xs
         return input_dict, {"preds": prediction}
 
-    def forward(self, input_dict, batch_idx=None, return_intermediate_dict=False):
+    def forward(
+        self,
+        input_dict=None,
+        batch_idx=None,
+        return_intermediate_dict=False,
+        *,
+        input_ids=None,      # <— accept this from Trainer
+        **kwargs
+    ):
+        if input_ids is not None:
+            input_ids = torch.from_numpy(input_ids).to(device).float()
+            bsz, num_sys, L, d = input_ids.shape
+            input_ids = input_ids.view(bsz * num_sys, L, d)
+            
+            _ , interm = self.predict_step({"current": input_ids})
+            return interm["preds"]
+        
         input_dict, intermediate_dict = self.predict_step(input_dict, batch_idx)
 
         # Calculate all loss terms and metrics (scores)

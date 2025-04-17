@@ -31,6 +31,8 @@ import datasets
 import evaluate
 import numpy as np
 from datasets import load_dataset, load_from_disk, Dataset, DatasetDict
+import torch.nn.functional as F
+import math
 
 import transformers
 from transformers import (
@@ -67,6 +69,8 @@ sys.path.append(
     )
 )   # Very hacky but the imports are annoying otherwise
 from src.models.gpt2 import GPT2
+from src.core import Config
+
 
 device = torch.device("cuda")
 
@@ -127,7 +131,7 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         else:
             return self.target_layer_sparsity
         
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         # 1) pop off what we don't need
         start_idxes = inputs.pop("start_idxes")     # (B,)
         end_idxes = inputs.pop("end_idxes")       # (B,)
@@ -135,17 +139,28 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         _ = inputs.pop("corr_input_ids")  # (B, L) -- no teacher/KL here
         input_ids = inputs.pop("input_ids")       # (B, L, d_in=57)
 
-        bsz, L, d_in = input_ids.shape
+        
+        # unpack
+        bsz, num_sys, L, d_in = input_ids.shape
+
+        # collapse 2nd axis into batch:
+        input_ids = input_ids.reshape(bsz * num_sys, L, d_in)
+
+        # now you have a 3‑D tensor again:
+        new_bsz, L, d_in = input_ids.shape  # new_bsz == bsz * num_sys
+        end_idxes = np.repeat(end_idxes, num_sys)         # → (bsz * num_sys)
+        start_idxes = np.repeat(start_idxes, num_sys)     # → (bsz * num_sys)
 
         # 2) split context vs true‑next
         #    context: everything except the last time‑step
         context = input_ids[:, :L-1, :]         # (B, L-1, 57)
         #    true_full: the ground‑truth vector at the final pos
-        true_full = input_ids[torch.arange(bsz), end_idxes, :]  # (B, 57)
+        true_full = input_ids[torch.arange(new_bsz), end_idxes, :]  # (B, 57)
         true_next = true_full[..., -5:]                       # (B, 5)
 
         # 3) run the model on the context only
         #    predict_step will apply read_in → backbone → read_out
+        context = torch.from_numpy(context).to(device).float()
         _, out_dict = model.predict_step({"current": context})
         preds_full = out_dict["preds"]            # (B, L-1, 5)
 
@@ -153,6 +168,7 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         pred_next = preds_full[:, -1, :]         # (B, 5)
 
         # 5) compute MSE on those 5 payload dims
+        true_next = torch.from_numpy(true_next).to(device).float()
         mse_loss = F.mse_loss(pred_next, true_next)
 
         # 6) if you still have any sparsity losses in out_dict, you could add them:
@@ -163,7 +179,7 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         # 7) package outputs for HF Trainer
         out_dict["loss"] = total_loss
         out_dict["mse_loss"] = mse_loss
-        return (total_loss, out_dict) if return_outputs else total_losss
+        return (total_loss, out_dict) if return_outputs else total_loss
 
     # def compute_loss(self, model, inputs, return_outputs=False): # change this for our setup
     #     start_idxes = inputs.pop("start_idxes")
@@ -425,8 +441,11 @@ class DataCollatorGP:
             # corr_three_after_prediction = example["corr_3_after_prediction"]
             
             l = len(seq)
-            input_ids = np.concatenate([seq, one_after_prediction], axis=-1)
-            corr_input_ids = np.concatenate([corr_seq, corr_one_after_prediction], axis=-1)
+            one_pred = np.expand_dims(one_after_prediction, axis=1)
+            corr_one_pred = np.expand_dims(corr_one_after_prediction, axis=1)
+
+            input_ids = np.concatenate([seq, one_pred], axis=1)
+            corr_input_ids = np.concatenate([corr_seq, corr_one_pred], axis=1)
             labels = input_ids.copy()
             labels[:l] = -100
             # labels[labels == self.tokenizer.pad_token_id] = -100 # not sure if we need to pad our inputs in this setup
@@ -440,12 +459,12 @@ class DataCollatorGP:
             end_idxes.append(l)
         
         return {
-            "input_ids": torch.stack(input_ids_all),
-            "corr_input_ids": torch.stack(corr_input_ids_all),
-            "labels": torch.stack(labels_all),
-            "start_idxes": torch.LongTensor(start_idxes),
-            "end_idxes": torch.LongTensor(end_idxes),
-        }        
+            "input_ids":      np.stack(input_ids_all, axis=0),      # shape (batch, 63, feat)
+            "corr_input_ids": np.stack(corr_input_ids_all, axis=0),
+            "labels":         np.stack(labels_all, axis=0),
+            "start_idxes":    np.array(start_idxes, dtype=np.int64), # shape (batch,)
+            "end_idxes":      np.array(end_idxes, dtype=np.int64),
+        }       
 
 def eval_fn(eval_pred): 
     logits, target_edge_sparsity, target_layer_sparsity, model_edge_sparsity, model_layer_sparsity, reg_edge_loss, reg_layer_loss, kl_loss = eval_pred.predictions
@@ -619,6 +638,7 @@ def main():
     # ).to("cuda")
     model_name_or_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ident_med_GPT2_experiment/snapshots/f94c23e0e6a3c5c36cc04e005356cfa3ee007072/checkpoints/step=16000.ckpt"
     config = Config()
+    checkpoint = torch.load(model_name_or_path, map_location="cuda")
     model = GPT2.load_from_checkpoint(model_name_or_path, n_dims_in=config.n_dims_in, n_positions=250, n_embd=128,
                                 use_pos_emb=True, map_location=device, strict=False).eval().to(device)
     model.load_state_dict(
