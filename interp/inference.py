@@ -220,9 +220,14 @@ def tf_preds(multi_sys_ys, model, device, config):
                             (*batch_shape, 24, config.ny))  # Combine the predictions for all batches
         print("preds_tf.shape:", preds_tf.shape)
         preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf], axis=-2)  # concatenate the predictions
-        ground_truth = np.take(multi_sys_ys, [multi_sys_ys.shape[-2] - 1], axis=-2)
+        ground_truth = np.take(multi_sys_ys, [multi_sys_ys.shape[-2] - 1], axis=-2) #this takes the ground truth inputs without the last index. Since the tf predicts the last index we want the below line of code
+        #ground_truth = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1)
+        #print("ground_truth.shape:", ground_truth.shape)
         
-        ground_truth_last5 = ground_truth[..., -5:]  # shape: (batch, 1, 5)
+        ground_truth_last5 = ground_truth[..., -5:]  # shape: (batch, 1, 5) #the above line takes care taking the last 5 dimensions as the ground truth observations so this line is no longer needed
+        #ground_truth_last5 = ground_truth[:,-1:,:] #take the last index of the ground truth observations
+        #print("ground_truth_last5.shape:", ground_truth_last5.shape)
+
         
         # Extract the predicted last timestep from preds_tf (should be shape: (batch, 1, 5))
         predicted_last = preds_tf[:, -1:, :]
