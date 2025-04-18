@@ -2500,9 +2500,9 @@ def set_config_params(config, model_name):
         
         # Training settings
         config.override("devices", [3])  # which GPU
-        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("train_steps", 20000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
         config.override("num_epochs", 1)  # minimum number of epochs to train for
-        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("train_int",5)  #1000 number of steps between logging (train interval)
         config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
         config.override("batch_size", 512)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
         config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
@@ -3208,7 +3208,7 @@ if __name__ == '__main__':
                 predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
     
     elif multi_train:
-        train_steps = 20#000
+        train_steps = 20#000  #set this in set_config_params as well
         parameter = "learning_rate"
         sweep = [1e-2, 1e-3] #[1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
         model_name = "hyperparameter_sweep" #check this when running

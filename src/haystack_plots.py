@@ -709,7 +709,7 @@ def haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir,
         #compute quartiles for train conv
         fin_quartiles_ckpt, beg_quartiles_ckpt, x_values = compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, kal_step, haystack_len, ckpt_steps, train_conv_fin_quartiles_file, train_conv_beg_quartiles_file, x_values_file, abs_err)
 
-
+    print(f"x_values {x_values} \nconfig.train_int {config.train_int} \nlast_ckpt {last_ckpt}\nckpt_steps {ckpt_steps}")
     #plot haystack train conv
     early_stop_ind = plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
 
