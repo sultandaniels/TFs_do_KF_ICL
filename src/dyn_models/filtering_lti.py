@@ -281,7 +281,7 @@ class FilterSim:
                 valid_system = True
 
 
-                if not (tri == "ident" or tri == "ortho"):
+                if not (tri == "ident" or tri == "ortho" or tri == "ortho_haar"):
 
                     S_state_inf_intermediate = sc.linalg.solve_discrete_are(self.A.T, self.C.T, np.eye(nx) * self.sigma_w ** 2, np.eye(ny) * self.sigma_v ** 2) #solve the riccati equation for the steady-state state error covariance
                     self.S_observation_inf = self.C @ S_state_inf_intermediate @ self.C.T + np.eye(ny) * self.sigma_v ** 2 #steady state observation error covariance
