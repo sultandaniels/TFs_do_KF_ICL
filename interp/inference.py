@@ -48,115 +48,13 @@ ckpt_step = 16000
 # print(f"Batch size: {batch_size}")
 # print(f"Number of training examples: {ckpt_step*batch_size*num_gpu}")
 
-def swap_token_activations_logits(model, input_strings, args_b, token_a, token_b):
-    prefix = "" # setup to see if 2 after can be predicted so this should just contain: special open token, first token
-    
-    final_list = input_strings
-    swap_seq = [6, 7, 8, 9, 10]
-    full_seq = len(input_strings[0]) #full frozen sequence
-
-    seq = list(range(0, len(input_strings[0])))
-    if not final_list:
-        print("No valid inputs to process.")
-        return
-    print(f"Length of final_list: {len(final_list)}")
-
-    layers = list(range(args_b.n_layers))
-    module_list_a = [model.transformer.h[i] for i in layers]
-
-    activation_cache_a_out = []
-    activation_cache_b_out = []
-    
-    for idx in layers:
-        module_str = f"model.transformer.h[{idx}]"
-        try:
-            cached_out_a = cache_activations(
-                model=model,
-                module_list_or_str=[module_str],
-                cache_input_output='output',
-                inputs=[final_list[0]],
-                batch_size=args_b.batch_size,
-                token_idx=seq,
-            )[0]
-            cached_out_b = cache_activations(
-                model=model,
-                module_list_or_str=[module_str],
-                cache_input_output='output',
-                inputs=[final_list[1]],
-                batch_size=args_b.batch_size,
-                token_idx=seq,
-            )[0]
-            activation_cache_a_out.append(cached_out_a)
-            activation_cache_b_out.append(cached_out_b)
-        except Exception as e:
-            print(f"Error caching activations for layer {idx}: {e}")
-            return
-
-    log_prob_a_changes = []
-    log_prob_b_changes = []
-
-    for num_tokens_to_swap in range(0, len(swap_seq) + 1):
-        activation_cache_swapped_out = []
-
-        for layer_idx, (layer_out_a, layer_out_b) in enumerate(zip(activation_cache_a_out, activation_cache_b_out)):
-            swapped_layer_out = layer_out_a.clone()
-            try:
-                for j in range(num_tokens_to_swap):
-                    swapped_layer_out[:, j+5] = layer_out_b[:, j+5]
-            except IndexError:
-                print(f"Token indices out of bounds at swap {j}.")
-                return
-            activation_cache_swapped_out.append(swapped_layer_out)
-
-        try:
-            sub_out_logits = generate_substitute_layer_single_logits(
-                model,
-                final_list[0],
-                module_list_a,
-                activation_cache_swapped_out,
-                'output',
-                token_idx=seq,
-                max_new_tokens=30
-            )
-            sub_out_log_probs = F.log_softmax(sub_out_logits, dim=-1)
-            next_token_log_probs = sub_out_log_probs[:, -1, :]
-            log_prob_a_changes.append(next_token_log_probs[:, token_a].cpu().numpy())
-            log_prob_b_changes.append(next_token_log_probs[:, token_b].cpu().numpy())
-        except Exception as e:
-            print(f"Error generating substitute logits for swap {num_tokens_to_swap}: {e}")
-            return
-
-    print("Token-by-token swapping complete.")
-    return log_prob_a_changes, log_prob_b_changes
-
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ident_med_GPT2_experiment/snapshots/f94c23e0e6a3c5c36cc04e005356cfa3ee007072/checkpoints/step=16000.ckpt")
+    parser.add_argument("--model", type=str, default="/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_experiment/snapshots/76bbc4fdd910adef1de36fc3e03828f23913f816/checkpoints/step=105000.ckpt")
     parser.add_argument("--layer-skip", type=int, default=3)
     parser.add_argument("--batch-size", "-bs", type=int, default=10)
-    parser.add_argument("--checkpoint", type=str, default="step=16000.ckpt")
+    parser.add_argument("--checkpoint", type=str, default="step=105000.ckpt")
     return parser.parse_args()
-
-def plot_results(log_prob_a_changes, log_prob_b_changes, token_a, token_b):
-    x_labels = [str(i) for i in range(len(log_prob_a_changes))]
-    plt.figure(figsize=(12, 8))
-    
-    plt.plot(range(len(log_prob_a_changes)), log_prob_a_changes, marker='o', label=f"Token A ({token_a})")
-    plt.plot(range(len(log_prob_b_changes)), log_prob_b_changes, marker='x', label=f"Token B ({token_b})")
-    
-    for i, (a, b) in enumerate(zip(log_prob_a_changes, log_prob_b_changes)):
-        plt.text(i, a.item(), f'{a.item():.2f}', ha='center', va='bottom', fontsize=8)
-        plt.text(i, b.item(), f'{b.item():.2f}', ha='center', va='bottom', fontsize=8)
-    
-    plt.xlabel('Number of Tokens Swapped')
-    plt.ylabel('Log Probability')
-    plt.title('Log Probability Changes Across Token Swaps')
-    plt.legend()
-    plt.xticks(range(len(x_labels)), x_labels)
-    plt.grid(True)
-    plt.savefig(f'../figures/two_after_patch_prediction_{timestamp}.png')
-    plt.show()
-
 
 def setup_model(args):
     model_name_or_path = args.model
@@ -242,8 +140,6 @@ def interfered_mse(multi_sys_ys, model, device, config):
         print(multi_sys_ys[0].shape[-2])
         
         I = np.take(multi_sys_ys[0], np.arange(multi_sys_ys[0].shape[-2] - 2), axis=-2)
-        
-        
         other_sys = np.take(multi_sys_ys[1], [multi_sys_ys[1].shape[-2] - 2], axis=-2)
         other_sys_2 = np.take(multi_sys_ys[0], [multi_sys_ys[0].shape[-2] - 2], axis=-2)
         I = np.concatenate([I, other_sys], axis=-2)
@@ -333,8 +229,8 @@ def interleaved_mse(multi_sys_ys, model, device, config):
         preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf], axis=-2)  # concatenate the predictions
         print("after concatenation:")
         print(preds_tf)
-        ground_truth_sys1 = np.take(multi_sys_ys[0], [8], axis=-2)
-        ground_truth_sys2 = np.take(multi_sys_ys[1], [8], axis=-2)
+        ground_truth_sys1 = np.take(multi_sys_ys[0], [9], axis=-2)
+        ground_truth_sys2 = np.take(multi_sys_ys[1], [9], axis=-2)
         
         ground_truth_last5_sys1 = ground_truth_sys1[..., -5:]  # shape: (batch, 1, 5)
         ground_truth_last5_sys2 = ground_truth_sys2[..., -5:]  # shape: (batch, 1, 5)
@@ -352,24 +248,67 @@ def interleaved_mse(multi_sys_ys, model, device, config):
         print(predicted_last)
         print("MSE between ground truth and prediction for system 1:", mse_sys1)
         print("MSE between ground truth and prediction for system 2:", mse_sys2)
-        
-        # Extract last 3 predicted timesteps (shape: (3, 5))
-        predicted_last3 = preds_tf[-3:, :]  # shape: (3, 5)
-        
-        for i in range(3):
-            mse = np.mean((predicted_last3[i] - ground_truth_last5_sys1) ** 2)
-            print(f"MSE for prediction {i} vs system 1 ground truth: {mse}")
+    return preds_tf
 
-        for i in range(3):
-            mse = np.mean((predicted_last3[i] - ground_truth_last5_sys2) ** 2)
-            print(f"MSE for prediction {i} vs system 2 ground truth: {mse}")
-
-        print("Predicted last 3 timesteps (3x5):")
-        print(predicted_last3)
+def one_after_mse(multi_sys_ys, model, device, config):
+    with torch.no_grad():  # no gradients
+        print(multi_sys_ys[0].shape[-2])
+        
+        I = np.take(multi_sys_ys[0], np.arange(61), axis=-2)
+        # I_back = np.take(multi_sys_ys[1], np.arange(13), axis=-2)
+        other_sys = np.take(multi_sys_ys[0], [61], axis=-2)
+        other_sys_2 = np.take(multi_sys_ys[0], [61], axis=-2)
+        I = np.concatenate([I, other_sys], axis=-2)
+        print("other_sys:")
+        print(other_sys)
         print("I:")
         print(I)
         
-
+        other_sys_1 = np.squeeze(other_sys, axis=-2)
+        other_sys_2 = np.squeeze(other_sys_2, axis=-2)
+        mse = np.mean((other_sys_1 - other_sys_2) ** 2)
+        print("MSE between systems:", mse)
+        
+        print("before model.predict_step()")
+        batch_shape = I.shape[:-2]
+        print("batch_shape:", batch_shape)
+        flattened_I = np.reshape(I, (int(np.prod(batch_shape)), *I.shape[-2:]))
+        print("flattened_I.shape:", flattened_I.shape)
+        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I), batch_size=config.test_batch_size)
+        preds_arr = []  # Store the predictions for all batches
+        for validation_batch in iter(validation_loader):
+            print("predicting...")
+            _, flattened_preds_tf = model.predict_step({"current": validation_batch.to(device)})  # predict using the model
+            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+        print(preds_arr)
+        print(len(preds_arr))
+        print(len(preds_arr[0]))
+        print(len(preds_arr[0][0]))
+        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                            (*batch_shape, 62, config.ny))  # Combine the predictions for all batches
+        print("preds_tf.shape:", preds_tf.shape)
+        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf], axis=-2)  # concatenate the predictions
+        print("after concatenation:")
+        print(preds_tf)
+        ground_truth_sys1 = np.take(multi_sys_ys[0], [62], axis=-2)
+        ground_truth_sys2 = np.take(multi_sys_ys[1], [62], axis=-2)
+        
+        ground_truth_last5_sys1 = ground_truth_sys1[..., -5:]  # shape: (batch, 1, 5)
+        ground_truth_last5_sys2 = ground_truth_sys2[..., -5:]  # shape: (batch, 1, 5)
+        
+        predicted_last = preds_tf[-1:, :]
+        
+        # Calculate mean squared error (MSE) over the last 5 features
+        mse_sys1 = np.mean((ground_truth_last5_sys1 - predicted_last) ** 2)
+        mse_sys2 = np.mean((ground_truth_last5_sys2 - predicted_last) ** 2)
+        print("Ground truth System 1 (last timestep, last 5 features):")
+        print(ground_truth_last5_sys1)
+        print("Ground truth System 2 (last timestep, last 5 features):")
+        print(ground_truth_last5_sys2)
+        print("Predicted last timestep (5 features):")
+        print(predicted_last)
+        print("MSE between ground truth and prediction for system 1:", mse_sys1)
+        print("MSE between ground truth and prediction for system 2:", mse_sys2)
     return preds_tf
 
 if __name__ == "__main__":
@@ -420,7 +359,7 @@ if __name__ == "__main__":
     # print(multi_sys_ys[0, 1, :, :])
     
     haystack_prompts = [
-        multi_sys_ys[1, 0, :, :],
+        multi_sys_ys[0, 0, :, :],
         multi_sys_ys[0, 1, :, :]
     ]
     
@@ -443,7 +382,7 @@ if __name__ == "__main__":
     #     print(f"Prediction for prompt {i} has shape:", pred.shape)
         
     
-    interleaved_mse(haystack_prompts, model, device, config)
+    one_after_mse(haystack_prompts, model, device, config)
     
     # token_a = tokenizer.convert_tokens_to_ids("") # what it should predict
     # token_b = tokenizer.convert_tokens_to_ids("") # what it should predict if swap interferes properly (all encodings on the same token)

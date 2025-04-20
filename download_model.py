@@ -3,11 +3,11 @@ import torch
 from huggingface_hub import hf_hub_download
 from safetensors.torch import save_file
 
-checkpoint_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ident_med_GPT2_experiment/snapshots/f94c23e0e6a3c5c36cc04e005356cfa3ee007072/checkpoints/step=16000.ckpt"
+checkpoint_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_experiment/snapshots/76bbc4fdd910adef1de36fc3e03828f23913f816/checkpoints/step=105000.ckpt"
 
 
-repo_id = "sultan-daniels/TFs_do_KF_ICL_ident_med_GPT2_experiment"
-filename = "checkpoints/step=16000.ckpt"
+repo_id = "sultan-daniels/TFs_do_KF_ICL_ortho_med_GPT2_experiment"
+filename = "checkpoints/step=105000.ckpt"
 custom_path = "/scratch/users/dhruvgautam/models"  
 
 if not os.path.exists(checkpoint_path):

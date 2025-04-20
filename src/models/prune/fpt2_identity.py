@@ -102,7 +102,6 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         self.skip_layer_loss_if_higher_sparsity = kwargs.pop('skip_layer_loss_if_higher_sparsity', False)
         self.device_count = torch.cuda.device_count()
         self.use_truncated_kl_loss = kwargs.pop('use_truncated_kl_loss', False)
-        self._train_acc_buffer = []
         super().__init__(*args, **kwargs)
 
     def get_current_edge_target_sparsity(self, global_step):
@@ -156,13 +155,9 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         end_idxes   = torch.repeat_interleave(end_idxes,   num_sys)
 
         # 2) split context vs. true‑next
-        print("input_ids:", input_ids[:, :L, :][0])
         context   = input_ids[:, :L-1, :]
-        print("context:", context[0])
-        true_full = input_ids[:, L-1, :]
-        print("true_full:", true_full[0])
+        true_full = input_ids[torch.arange(new_bsz, device=device), end_idxes, :]
         true_next = true_full[..., -5:]                           # (B⋅num_sys, 5)
-        print("true_next:", true_next[0])
 
         # 3) student forward pass
         _, out_dict  = model.predict_step({"current": context})
@@ -177,9 +172,6 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
 
         # 5) MSE on the payload dims
         true_next = true_next.to(device).float()
-        print("true_next:", true_next[0])
-        print("pred_next:", pred_next[0])
-        print("pred_next_ref:", pred_next_ref[0])
         mse_loss  = F.mse_loss(pred_next, true_next)
 
         # 6) KL‑divergence between student & teacher
@@ -214,13 +206,6 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
         true_classes = torch.argmax(true_next, dim=-1)           # (B⋅num_sys,)
         accuracy     = (pred_classes == true_classes).float().mean()
         out_dict["accuracy"] = accuracy
-        
-        # self._train_acc_buffer.append(accuracy.item())
-        # if self.state.global_step % self.args.logging_steps == 0 and self._train_acc_buffer:
-        #     avg_acc = sum(self._train_acc_buffer) / len(self._train_acc_buffer)
-        #     self._train_acc_buffer.clear()
-            
-        self._train_acc_buffer.append(accuracy.item())
 
         # 9) package everything for logging & HF Trainer
         out_dict.update({
@@ -238,22 +223,6 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
                 "lambda_edges_1","lambda_edges_2","lambda_nodes_1","lambda_nodes_2"):
             out_dict[k] = out_dict.get(k, -1)
 
-        # logs = {
-        #     "mse_loss":      mse_loss.item(),
-        #     "kl_loss":       kl_loss.item(),
-        #     "active_edges":  out_dict["active_edges"],
-        #     "total_edges":   out_dict["total_edges"],
-        #     "active_nodes":  out_dict["active_nodes"],
-        #     "total_nodes":   out_dict["total_nodes"],
-        #     "lambda_edges_1":out_dict["lambda_edges_1"],
-        #     "lambda_edges_2":out_dict["lambda_edges_2"],
-        #     "lambda_nodes_1":out_dict["lambda_nodes_1"],
-        #     "lambda_nodes_2":out_dict["lambda_nodes_2"],
-        #     "accuracy":      accuracy.item(),
-        #     "avg_accuracy":  avg_acc,
-        # }
-        # self.log(logs)
-        
         logs = {
             "mse_loss":      mse_loss.item(),
             "kl_loss":       kl_loss.item(),
@@ -265,15 +234,8 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
             "lambda_edges_2":out_dict["lambda_edges_2"],
             "lambda_nodes_1":out_dict["lambda_nodes_1"],
             "lambda_nodes_2":out_dict["lambda_nodes_2"],
-            "accuracy":      accuracy.item(),
+            "accuracy":      accuracy.item(),      # <— log it here
         }
-
-        # every logging_steps, compute & log average accuracy, then clear buffer
-        if self.state.global_step % self.args.logging_steps == 0 and self._train_acc_buffer:
-            avg_acc = sum(self._train_acc_buffer) / len(self._train_acc_buffer)
-            logs["avg_accuracy"] = avg_acc
-            self._train_acc_buffer.clear()
-
         self.log(logs)
 
         # (optional pretty‐table print, unchanged)
@@ -794,7 +756,7 @@ def main():
     #     "gpt2",
     #     with_embedding_nodes=data_args.with_embedding_nodes,
     # ).to("cuda")
-    model_name_or_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_experiment/snapshots/76bbc4fdd910adef1de36fc3e03828f23913f816/checkpoints/step=105000.ckpt"
+    model_name_or_path = "/scratch/users/dhruvgautam/models/models--sultan-daniels--TFs_do_KF_ICL_ortho_med_GPT2_checkpoints/snapshots/824c3034ec025999d7bc2923335142b19152ab71/step=42000.ckpt"
     config = Config()
     checkpoint = torch.load(model_name_or_path, map_location="cuda")
     model = GPT2.load_from_checkpoint(model_name_or_path, n_dims_in=config.n_dims_in, n_positions=250, n_embd=128,

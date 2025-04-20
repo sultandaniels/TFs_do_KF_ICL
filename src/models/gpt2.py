@@ -59,10 +59,20 @@ class GPT2(BaseModel):
     def predict_step(self, input_dict, batch_idx=None):
         current = input_dict["current"]
         embeds = self._read_in(current)
-        output = self._backbone(inputs_embeds=embeds).last_hidden_state
-        prediction = self._read_out(output)
+        output = self._backbone(inputs_embeds=embeds)
+        prediction = self._read_out(output.last_hidden_state)
         # predict only on xs
-        return input_dict, {"preds": prediction}
+        return input_dict, {
+            "preds":         prediction,
+            "active_edges":  output.active_edges,
+            "total_edges":   output.total_edges,
+            "active_nodes":  output.active_nodes,
+            "total_nodes":   output.total_nodes,
+            "lambda_edges_1": output.lambda_edges_1,
+            "lambda_edges_2": output.lambda_edges_2,
+            "lambda_nodes_1": output.lambda_nodes_1,
+            "lambda_nodes_2": output.lambda_nodes_2,
+        }
 
     def forward(
         self,

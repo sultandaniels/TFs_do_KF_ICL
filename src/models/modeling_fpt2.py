@@ -816,6 +816,15 @@ class FPT2ModelOutput(ModelOutput):
     model_node_sparsity: Optional[torch.FloatTensor] = None
     edge_loss: Optional[torch.FloatTensor] = None
     node_loss: Optional[torch.FloatTensor] = None
+    
+    active_edges: Optional[float] = None
+    active_nodes: Optional[float] = None
+    total_edges: Optional[float] = None
+    total_nodes: Optional[float] = None
+    lambda_edges_1: Optional[float] = None
+    lambda_edges_2: Optional[float] = None
+    lambda_nodes_1: Optional[float] = None
+    lambda_nodes_2: Optional[float] = None
 
 class FPT2Model(FPT2PreTrainedModel):
     def __init__(
@@ -1436,6 +1445,18 @@ class FPT2Model(FPT2PreTrainedModel):
             model_node_sparsity=model_node_sparsity,
             edge_loss=edge_loss,
             node_loss=node_loss,
+            active_edges=z_edges_sum.clone().detach().item(),
+            active_nodes=z_nodes_sum.clone().detach().item(),
+            total_edges=self.n_edges,
+            total_nodes=self.n_nodes,
+            lambda_edges_1=\
+                self.sparsity_lambda_edges_1.clone().detach().item(),
+            lambda_edges_2=\
+                self.sparsity_lambda_edges_2.clone().detach().item(),
+            lambda_nodes_1=\
+                self.sparsity_lambda_nodes_1.clone().detach().item(),
+            lambda_nodes_2=\
+                self.sparsity_lambda_nodes_2.clone().detach().item(),
         )
 
 @dataclass 
