@@ -47,9 +47,11 @@ from predictors import getMats, getSims
 
 
 # loops through all checkpoints in identity model
-def getPredsEx(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name="ident", max_step = 17600, debug=False):
+def getPredsEx(device, multi_sys_ys, seg_starts, nx=5, num_sys_haystack=2, trace_config=0, model_name="ident", max_step = 17600, debug=False):
     model_preds = []
-    ckpt_lst = []
+    train_ex = []
+    mags_ckpts = []
+    angs_ckpts = []
     for ckpt_step in range(100, max_step, 100):
         
         # init config, params
@@ -95,10 +97,16 @@ def getPredsEx(device, multi_sys_ys, nx=5, num_sys_haystack=2, model_name="ident
 
         preds_tf = tf_preds(multi_sys_ys, model, device, config)
 
+        tf_1af, true_1af, mat_avg, mat_avg_w_zero = getMats(trace_config, seg_starts, multi_sys_ys, preds_tf)
+        mags, angs = getSims(tf_1af, true_1af, mat_avg, mat_avg_w_zero)
+        mags_ckpts.append(mags)
+        angs_ckpts.append(angs)
+
+
         if debug:
             print(f"preds_tf[0,0,26,:] = {preds_tf[0,0,26,:]}")
         num_ex = ckpt_step*batch_size*num_gpu
         model_preds.append(copy.deepcopy(preds_tf))
-        ckpt_lst.append(num_ex)
+        train_ex.append(train_ex)
 
-    return np.asarray(model_preds), np.asarray(ckpt_lst)
+    return np.asarray(model_preds), np.asarray(train_ex), mags_ckpts, angs_ckpts
