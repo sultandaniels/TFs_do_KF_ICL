@@ -107,6 +107,6 @@ def getPredsEx(device, multi_sys_ys, seg_starts, nx=5, num_sys_haystack=2, trace
             print(f"preds_tf[0,0,26,:] = {preds_tf[0,0,26,:]}")
         num_ex = ckpt_step*batch_size*num_gpu
         model_preds.append(copy.deepcopy(preds_tf))
-        train_ex.append(train_ex)
+        train_ex.append(num_ex)
 
     return np.asarray(model_preds), np.asarray(train_ex), mags_ckpts, angs_ckpts
