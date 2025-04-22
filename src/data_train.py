@@ -1996,7 +1996,7 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
             print(f"err_lss_examples.pkl does not exist for non train conv at early stop ckpt")
             make_preds = True
 
-            ckpt_path = output_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
+            ckpt_path = ckpt_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
 
             ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
@@ -2429,7 +2429,7 @@ if __name__ == '__main__':
                         if desktop:
                             pred_ckpt_step = maxval_dict[model_name]
                         else:
-                            pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])
+                            pred_ckpt_step = int(get_last_checkpoint(ckpt_dir + "/checkpoints/").split("=")[1].split(".")[0])
 
                 if (num_sys == 19 and not abs_err) or paren_swap:
                     # #get the last checkpoint
@@ -2440,7 +2440,7 @@ if __name__ == '__main__':
 
                     if pred_ckpt_step is not None:
 
-                        ckpt_path = output_dir + "/checkpoints/step=" + str(pred_ckpt_step) + ".ckpt"
+                        ckpt_path = ckpt_dir + "/checkpoints/step=" + str(pred_ckpt_step) + ".ckpt"
 
                         print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 
