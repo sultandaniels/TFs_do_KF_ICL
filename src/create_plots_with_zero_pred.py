@@ -1633,9 +1633,9 @@ def tf_preds(multi_sys_ys, model, device, config):
 
         # print("before model.predict_step()")
         batch_shape = I.shape[:-2]
-        # print("batch_shape:", batch_shape)
+        print("batch_shape:", batch_shape)
         flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
-        # print("flattened_I.shape:", flattened_I.shape)
+        print("flattened_I.shape:", flattened_I.shape)
         validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
                                                         batch_size=config.test_batch_size)
         preds_arr = []  # Store the predictions for all batches
@@ -1645,7 +1645,7 @@ def tf_preds(multi_sys_ys, model, device, config):
             preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
         preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
                             (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
-        # print("preds_tf.shape:", preds_tf.shape)
+        print("preds_tf.shape:", preds_tf.shape)
         preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
                                 axis=-2)  # concatenate the predictions
         

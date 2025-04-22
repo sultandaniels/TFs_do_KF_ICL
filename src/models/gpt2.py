@@ -56,9 +56,14 @@ class GPT2(BaseModel):
 
     def predict_step(self, input_dict, batch_idx=None):
         current = input_dict["current"]
+        print(f"current shape: {current.shape}")
         embeds = self._read_in(current)
+        print(f"embeds shape: {embeds.shape}")
         output = self._backbone(inputs_embeds=embeds).last_hidden_state
+        print(f"output shape: {output.shape}")
         prediction = self._read_out(output)
+        print(f"prediction shape: {prediction.shape}")
+        print(f"prediction: {prediction[:,25,:]}")
         # predict only on xs
         return input_dict, {"preds": prediction}
 
