@@ -852,17 +852,17 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "ortho_haar_medium_single_gpu":
         minval = 1000
-        maxval = 115000
+        maxval = 182000
         train_int = 1000
 
-        phases = [minval, 10000, 27000, 70000, maxval]
+        phases = [minval, 8000, 30000, 80000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     elif model_name == "hyperparameter_sweep":
-        minval = 5#1000
-        maxval = 20#20000
-        train_int = 5#1000
+        minval = 1000
+        maxval = 20000
+        train_int = 1000
 
         phases = [minval, maxval]
 
@@ -2085,7 +2085,7 @@ def set_config_params(config, model_name):
         config.override("learning_rate", 1.584893192461114e-05)
 
 
-        experiment_name = "250407_133748.f39da8_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        experiment_name = "250418_125901.8d6b22_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
 
         output_dir = f"../outputs/{config.model_type}/{experiment_name}"
 
@@ -2110,7 +2110,7 @@ def set_config_params(config, model_name):
         config.override("changing", False)  # used only for plotting
         
         # Training settings
-        config.override("devices", [3])  # which GPU
+        #config.override("devices", [3])  # leave comented out for hyperparamter sweep, it is set in config
         config.override("train_steps", 20000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
         config.override("num_epochs", 1)  # minimum number of epochs to train for
         config.override("train_int",5)  #1000 number of steps between logging (train interval)
@@ -2297,7 +2297,7 @@ def plot_needles(config, num_sys, output_dir, model_dir, experiment, num_haystac
             print(f"err_lss_examples.pkl does not exist for non train conv at early stop ckpt")
             make_preds = True
 
-            ckpt_path = output_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
+            ckpt_path = ckpt_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
 
             ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
@@ -2690,7 +2690,7 @@ if __name__ == '__main__':
                             #         print(f"err_lss_examples.pkl does not exist for non train conv at last ckpt")
                             #         make_preds = True
 
-                            #         ckpt_path = output_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
+                            #         ckpt_path = ckpt_dir + f"/checkpoints/step={pred_ckpt_step}.ckpt"
 
                             #         ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
 
@@ -2749,7 +2749,7 @@ if __name__ == '__main__':
 
                     if pred_ckpt_step is not None:
 
-                        ckpt_path = output_dir + "/checkpoints/step=" + str(pred_ckpt_step) + ".ckpt"
+                        ckpt_path = ckpt_dir + "/checkpoints/step=" + str(pred_ckpt_step) + ".ckpt"
 
                         print(f"non train conv config.num_haystack_examples: {config.num_haystack_examples}")
 
@@ -2788,13 +2788,13 @@ if __name__ == '__main__':
                 predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
     
     elif multi_train:
-        train_steps = 20#000  #set this in set_config_params as well
+        #Multi-train parameters
+        train_steps = 20000  #set this in set_config_params as well
+        train_int = 1000
         parameter = "learning_rate"
-        sweep = [1e-2, 1e-3] #[1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
+        sweep = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
         model_name = "hyperparameter_sweep" #check this when running
 
-        config.override("train_steps", train_steps)
-        config_dict["train_steps"] = train_steps
 
         print(f"performing sweep over {parameter} with values {sweep}")
 
@@ -2803,7 +2803,28 @@ if __name__ == '__main__':
 
         for value in sweep:
             print(f"\n\nstarting training for {parameter} = {value}")
+
+
+
+            #Build new config object for each run
+            config = Config() # create a config object
+
             
+
+
+            if zero_cut:
+                config.override("multi_sys_trace", True)
+                config.override("zero_cut", zero_cut)
+                config.override("needle_in_haystack", False)
+
+            config_attributes = list(config_dict.keys())
+            for key in config_attributes:
+                config_dict[key] = config.__getattribute__(key)
+            
+            config.override("train_steps", train_steps)
+            config_dict["train_steps"] = train_steps
+            config.override("train_int", train_int)
+            config_dict["train_int"] = train_int
             config.override(parameter, value)
             config_dict[parameter] = value
 
@@ -2812,7 +2833,14 @@ if __name__ == '__main__':
         
             model.to(device)
         
+
+            config.override("ckpt_path", None)
+            config_dict["ckpt_path"] = None
+
+            
             output_dir, ckpt_dir, experiment_name = setup_train(model, train_mix_dist, train_mix_state_dim)
+            
+            
             # replace ckpt_path with the path to the checkpoint file
             config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
 
@@ -2825,6 +2853,7 @@ if __name__ == '__main__':
             print(f"\n\nstarting predictions for {parameter} = {value}")
 
             config.override("num_haystack_examples", num_haystack_examples)
+            config.override("num_sys_haystack", num_sys)
             
             _, _, _ = set_config_params(config, model_name) #Not sure if this matters
             steps_in = list(range(1,11))
@@ -2851,6 +2880,10 @@ if __name__ == '__main__':
 
             print(f"plotting train_conv convergence plots for haystack len {num_sys}")
             pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_dir, experiment_name, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+
+            # clean device for new run
+            del model
+            torch.cuda.empty_cache()
 
 
 

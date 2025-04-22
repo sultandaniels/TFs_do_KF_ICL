@@ -17,7 +17,7 @@ class Config(object, metaclass=Singleton):
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
-    num_val_tasks = 100 #number of test systems
+    num_val_tasks = 1 #number of test systems
     dataset_typ = "ortho_haar" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar"
     max_cond_num = 100
     distinct_cond_nums = 10
@@ -26,7 +26,7 @@ class Config(object, metaclass=Singleton):
     nx = 5
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 1000}
+    num_traces = {"train": 1, "val": 1}
     changing = False #used only for plotting
 
     #experiment settings
@@ -44,10 +44,10 @@ class Config(object, metaclass=Singleton):
 
     # Training settings
 
-    devices=[2] #which GPU
+    devices=[0] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
-    train_int = 5#1000 #number of steps between logging (train interval)
+    train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
     batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over

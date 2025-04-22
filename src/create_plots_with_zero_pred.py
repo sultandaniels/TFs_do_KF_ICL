@@ -1934,7 +1934,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     err_lss_all = {}
 
-    if True: # if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho")) and run_kf_ols:
+    if (not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar")) and run_kf_ols:
 
         if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
             num_trials = config.num_traces["val"]
@@ -1973,7 +1973,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         end = time.time()  # end the timer for needle predictions
         # print(f"time elapsed for tf needle predictions example {ex}:", (end - start), "sec")  # print the time elapsed for needle predictions
 
-        if True:# if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho") and run_kf_ols:
+        if not (config.val_dataset_typ == "ident" or config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar") and run_kf_ols:
             if ex == 0:
                 print("interleaving kf and OLS errors")
                 err_lss = interleave_kf_OLS_needle(config, ys, err_lss_all, real_seg_lens_per_config, sys_choices_per_config, seg_starts_per_config, sys_inds_per_config, max_ir_length=3, err_lss=err_lss)
