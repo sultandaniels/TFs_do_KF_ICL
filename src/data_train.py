@@ -26,7 +26,7 @@ from gen_pred_cktps import gen_pred_ckpts
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
 
-def wandb_train(config_dict, model, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False):
+def wandb_train(config, config_dict, model, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False):
 
     # 🐝 1️⃣ Start a new run to track this script
     run = wandb.init(
@@ -77,7 +77,7 @@ def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logsca
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                 n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb)
         
-        wandb_train(config_dict, model, ckpt_dir, train_mix_dist, train_mix_state_dim)
+        wandb_train(config, config_dict, model, ckpt_dir, train_mix_dist, train_mix_state_dim)
 
     # print(f"config.use_pos_emb: {config.use_pos_emb}")
     # print(f"in preds_thread: config.ckpt_path: {config.ckpt_path}")
@@ -2057,6 +2057,7 @@ if __name__ == '__main__':
     parser.add_argument('--ortho_haar', help='Boolean. use orthogonal haar systems for test', action='store_true')
     parser.add_argument('--ortho', help='Boolean. use orthogonal systems test', action='store_true')
     parser.add_argument('--only_beg', help='Boolean. only run the beginning evals', action='store_true')
+    parser.add_argument('--acc', help='Boolean. Using ACCESS server', action='store_true')
 
 
 
@@ -2126,6 +2127,8 @@ if __name__ == '__main__':
     ortho = args.ortho
     print("only_beg arg", args.only_beg)
     only_beg = args.only_beg
+    print("acc arg", args.acc)
+    acc = args.acc
 
 
 
@@ -2157,6 +2160,7 @@ if __name__ == '__main__':
 
     config = Config() # create a config object
     config.override("datasource", datasource) # set the datasource in the config object
+    config.override("acc", acc) # set the acc in the config object for using the ACCESS server
 
     # config.override("late_start", late_start) # set the late_start in the config object
     config.override("late_start", late_start)
@@ -2530,9 +2534,11 @@ if __name__ == '__main__':
         #     collect_data(config, output_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, train_mix_C=train_mix_C) # collect data
 
         # replace ckpt_path with the path to the checkpoint file
+        if config.acc:
+            ckpt_dir = f"../../{experiment_name}"
         config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
 
-        wandb_train(config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+        wandb_train(config, config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
 
         # create prediction plots
         run_preds = True #run the predictions evaluation

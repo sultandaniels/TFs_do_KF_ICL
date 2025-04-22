@@ -44,7 +44,7 @@ def pl_lr_finder(config, model, trainer, datamodule):
         file.close()
     return new_lr
 
-def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False): #input emd_dim as a parameter for the embed dim experiment plots
+def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False, acc=False): #input emd_dim as a parameter for the embed dim experiment plots
     # a function to train GPT2 model
 
     torch.set_float32_matmul_precision('high') #set the matmul performance for Tensor Cores (or 'medium' depending on your precision-performance trade-off preference)
@@ -56,8 +56,13 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
     print("context length:", config.n_positions)
     print("num_tasks:", config.num_tasks)
 
-    #for BLISS server
-    main_dir = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data"
+    
+    if config.acc:
+        #for ACCESS servers
+        main_dir = f"/../../train_and_test_data"
+    else:
+        #for BLISS server
+        main_dir = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data"
 
     val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
 

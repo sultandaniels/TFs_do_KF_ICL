@@ -33,7 +33,7 @@ def setup_train(model, train_mix_dist=False, train_mix_state_dim=False):
         output_dir = '../outputs/' + identifier + experiment_name
 
         #for BLISS server 
-        ckpt_dir = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/" + experiment_name
+        ckpt_dir = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/" + identifier + experiment_name
 
 
         if not os.path.isdir(output_dir):
