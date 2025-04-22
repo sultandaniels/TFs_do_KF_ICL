@@ -9,7 +9,7 @@ config = Config()
 
 
 class GPT2(BaseModel):
-    def __init__(self, n_dims_in, n_positions, n_embd, n_layer=12, n_head=8, n_dims_out=5, learning_rate=config.learning_rate, use_pos_emb=config.use_pos_emb):
+    def __init__(self, n_dims_in, n_positions, n_embd, n_layer=12, n_head=8, n_dims_out=5, learning_rate=config.learning_rate, use_pos_emb=config.use_pos_emb, output_hidden_states=False):
         super(GPT2, self).__init__(learning_rate=learning_rate)
         gpt_configuration = GPT2Config(
             use_pos_emb=use_pos_emb,
@@ -21,6 +21,7 @@ class GPT2(BaseModel):
             embd_pdrop=0.0,
             attn_pdrop=0.0,
             use_cache=False,
+            output_hidden_states=output_hidden_states,
         )
         
         # olmo_configuration = OlmoConfig(
