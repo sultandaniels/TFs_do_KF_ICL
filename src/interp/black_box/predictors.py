@@ -68,7 +68,6 @@ def getMats(trace_config, seg_starts, multi_sys, preds_tf):
 
 def getSims(transformer_1af, true_1af, mat_avg, mat_avg_w_zero, payload=None):
     #returns normalized magnitudes and angles of transformer output relative to the true ouput and average output
-    print("transformer_1af", transformer_1af)
     transformer_mags = np.linalg.norm(transformer_1af, axis = 1)
     true_mags = np.linalg.norm(true_1af, axis = 1)
     avg_mags = np.linalg.norm(mat_avg, axis = 1)
