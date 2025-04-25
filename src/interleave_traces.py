@@ -26,9 +26,9 @@ if __name__ == "__main__":
 
     #get val data from "../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
     path = "/scratch/users/dhruvgautam/TFs_do_KF_ICL/identity_data"
-    path = "/scratch/users/dhruvgautam/TFs_do_KF_ICL/ortho_data"
+    # path = "/scratch/users/dhruvgautam/TFs_do_KF_ICL/ortho_data"
 
-    valA = "ortho" #"ident", "ortho", "gaussA" #system family for linear systems
+    valA = "ident" #"ident", "ortho", "gaussA" #system family for linear systems
 
     if valA == "ortho" or valA == "ident":
         valC = "_ident_C"

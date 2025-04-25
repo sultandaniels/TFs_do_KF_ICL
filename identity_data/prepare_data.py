@@ -1,211 +1,134 @@
-import os
-import json
-import random
-from tqdm import tqdm
-import sys
-import argparse
-
+import pickle
 import numpy as np
-from datasets import load_dataset, DatasetDict, Dataset
-from transformers import AutoTokenizer
+import random
+from datasets import Dataset, DatasetDict
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    
-    parser.add_argument("--out-dir", "-o", default="identity_data/prune/")
-    parser.add_argument("--seed", "-s", type=int, default=42)
-    parser.add_argument("--start-size", "-n", type=int, default=300000) # Trim the dataset early to save time
-    parser.add_argument("--num_test_templates", "-nt", type=int, default=4) # Number of held-out templates
-    parser.add_argument("--train", "-t", type=int, default=200)
-    parser.add_argument("--validation", "-v", type=int, default=200)
-    parser.add_argument("--test", "-e", type=int, default=10000)
-    parser.add_argument("--names", "-nm", default="data/helper_files/names.json")
-    
-    args = parser.parse_args()
-    
-    args.names = json.load(open(args.names))
-    if "girls" in args.names:
-        args.names = args.names["boys"] + args.names["girls"]
-    
-    return args
+# =============================================================================
+# 1. Load the pickle file that contains your multi-system traces.
+# =============================================================================
+input_filename = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/identity_data/data/interleaved_traces_ident_ident_C_state_dim_5_num_sys_haystack_5.pkl'
+with open(input_filename, 'rb') as f:
+    file_dict = pickle.load(f)
 
-out_dir = "identity_data/prune/" if len(sys.argv) == 1 else sys.argv[1]
+# Keys: multi_sys_ys, tok_seg_lens_per_config, sys_choices_per_config
+multi_sys_ys = file_dict["multi_sys_ys"]
+tok_seg_lens_per_config = file_dict["tok_seg_lens_per_config"]
+sys_choices_per_config = file_dict["sys_choices_per_config"]
 
-baba_templates = [
-    "Then, {B} and {A} went to the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Then, {B} and {A} had a lot of fun at the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Then, {B} and {A} were working at the {PLACE}. {B} decided to give a {OBJECT} to {A}",
-    "Then, {B} and {A} were thinking about going to the {PLACE}. {B} wanted to give a {OBJECT} to {A}",
-    "Then, {B} and {A} had a long argument, and afterwards {B} said to {A}",
-    "After {B} and {A} went to the {PLACE}, {B} gave a {OBJECT} to {A}",
-    "When {B} and {A} got a {OBJECT} at the {PLACE}, {B} decided to give it to {A}",
-    "When {B} and {A} got a {OBJECT} at the {PLACE}, {B} decided to give the {OBJECT} to {A}",
-    "While {B} and {A} were working at the {PLACE}, {B} gave a {OBJECT} to {A}",
-    "While {B} and {A} were commuting to the {PLACE}, {B} gave a {OBJECT} to {A}",
-    "After the lunch, {B} and {A} went to the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Afterwards, {B} and {A} went to the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Then, {B} and {A} had a long argument. Afterwards {B} said to {A}",
-    "The {PLACE} {B} and {A} went to had a {OBJECT}. {B} gave it to {A}",
-    "Friends {B} and {A} found a {OBJECT} at the {PLACE}. {B} gave it to {A}",
-]
+# For example verification (optional):
+example_shape = np.array(multi_sys_ys[0, 0, :, :]).shape  # expected (73, 57)
+print("Shape of multi_sys_ys[0,0,:,:]:", example_shape)
+print("Number of segments (expected 73):", len(multi_sys_ys[0, 0, :, :]))
+print("Segment length (expected 57):", len(multi_sys_ys[0, 0, :, :][0]))
 
-abba_templates = [
-    "Then, {A} and {B} went to the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Then, {A} and {B} had a lot of fun at the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Then, {A} and {B} were working at the {PLACE}. {B} decided to give a {OBJECT} to {A}",
-    "Then, {A} and {B} were thinking about going to the {PLACE}. {B} wanted to give a {OBJECT} to {A}",
-    "Then, {A} and {B} had a long argument, and afterwards {B} said to {A}",
-    "After {A} and {B} went to the {PLACE}, {B} gave a {OBJECT} to {A}",
-    "When {A} and {B} got a {OBJECT} at the {PLACE}, {B} decided to give it to {A}",
-    "When {A} and {B} got a {OBJECT} at the {PLACE}, {B} decided to give the {OBJECT} to {A}",
-    "While {A} and {B} were working at the {PLACE}, {B} gave a {OBJECT} to {A}",
-    "While {A} and {B} were commuting to the {PLACE}, {B} gave a {OBJECT} to {A}",
-    "After the lunch, {A} and {B} went to the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Afterwards, {A} and {B} went to the {PLACE}. {B} gave a {OBJECT} to {A}",
-    "Then, {A} and {B} had a long argument. Afterwards {B} said to {A}",
-    "The {PLACE} {A} and {B} went to had a {OBJECT}. {B} gave it to {A}",
-    "Friends {A} and {B} found a {OBJECT} at the {PLACE}. {B} gave it to {A}",
-]
+# =============================================================================
+# 2. Rearrange configurations & split into training, validation, and test sets.
+#
+#    The original data is assumed to have shape: (num_systems, 1000, 73, 57).
+#    We transpose it so that each configuration (a sequence) is along axis 0.
+# =============================================================================
+multi_sys_ys = np.array(multi_sys_ys)  # ensure a NumPy array
+# Transpose: (num_systems, 1000, 73, 57) -> (1000, num_systems, 73, 57)
+config_data = np.transpose(multi_sys_ys, (1, 0, 2, 3))
+num_configs = config_data.shape[0]
+print("Total number of configurations (sequences):", num_configs)
+print("Full shape of config_data:", config_data.shape)
 
-def try_fit_template(string, template):
-    pieces_s, pieces_t = string.strip(), template.strip()
-    
-    mapping = {}
-    
-    for s, t in zip(pieces_s.split(), pieces_t.split()):
-        if s == t:
-            continue
-        if s[-1] == t[-1] and s[-1] in [',', '.']:
-            s, t = s[:-1], t[:-1]
-        if t not in ['{A}', '{B}', '{PLACE}', '{OBJECT}']:
-            return None
-        elif t[1:-1].lower() in mapping:
-            if mapping[t[1:-1].lower()] != s:
-                return None
-        else:
-            mapping[t[1:-1].lower()] = s
-    
-    if 'place' not in mapping:
-        mapping['place'] = None
-    if 'object' not in mapping:
-        mapping['object'] = None
-    
-    return mapping
+# Define split ratios:
+train_ratio = 0.8
+val_ratio = 0.1
+train_size = int(num_configs * train_ratio)
+val_size = int(num_configs * val_ratio)
+test_size = num_configs - train_size - val_size
+print("Train/Val/Test split sizes:", train_size, val_size, test_size)
 
-def find_template(string):
-    for template in baba_templates:
-        mapping = try_fit_template(string, template)
-        if mapping is not None:
-            mapping.update({
-                'template': template,
-                'order': 'baba'
-            })
-            return mapping
-    
-    for template in abba_templates:
-        mapping = try_fit_template(string, template)
-        if mapping is not None:
-            mapping.update({
-                'template': template,
-                'order': 'abba'
-            })
-            return mapping
-    return None
+# Split the configurations along the first axis.
+train_data = config_data[:train_size]      # shape: (train_size, num_systems, 73, 57)
+val_data   = config_data[train_size:train_size + val_size]
+test_data  = config_data[train_size + val_size:]
 
-def add_template(example, **kwargs):
-    example.update(find_template(example['ioi_sentences']))
-    return example
+# =============================================================================
+# 3. (Optional) Define a corruption function for a configuration.
+#
+# This function replaces one randomly chosen segment of one system with the
+# corresponding segment from another system (keeping the same shape).
+# =============================================================================
+def corrupt_configuration(config_array):
+    """
+    Given a configuration array with shape (num_systems, num_segments, feature_dim),
+    replace one randomly chosen segment from one system with the corresponding segment
+    from a different system.
+    """
+    corrupted = config_array.copy()
+    num_systems, num_segments, feature_dim = corrupted.shape
 
-def train_val_split_templates(data, val_templates):
-    val_indices = [i for i in tqdm(range(len(data))) if data[i]['template'] in val_templates]
-    train_indices = [i for i in tqdm(range(len(data))) if i not in val_indices]
-    
-    return data.select(train_indices), data.select(val_indices)
+    # Select a random system and segment
+    system_to_replace = random.randint(0, num_systems - 1)
+    segment_to_replace = random.randint(0, num_segments - 1)
 
-def main():
-    args = parse_args()
-    
-    if args.seed is not None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
-    
-    # Part 1 : Prepare the splits
-    
-    n_baba = args.num_test_templates // 2
-    n_abba = args.num_test_templates - n_baba
-    
-    val_templates = random.sample(baba_templates, n_baba) + random.sample(abba_templates, n_abba)
-    
-    data = load_dataset('fahamu/ioi')['train']
-    if args.start_size < len(data):
-        data = data.select(range(args.start_size))
-    data = data.map(add_template, num_proc=32)
-    
-    train, test = train_val_split_templates(data, val_templates)
-    
-    assert len(train) >= args.train + args.validation, f"Train size {len(train)} is too small"
-    assert len(test) >= args.test, f"Test size {len(test)} is too small"
-    
-    new_train = train.select(range(args.train))
-    val = train.select(range(args.train, args.train+args.validation))
-    test = test.select(range(args.test))
-    
-    data = DatasetDict({
-        "train": new_train,
-        "validation": val,
-        "test": test
-    })
-    
-    # Part 2: Prepare the corrupted (ABC) dataset
-    
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
-    
-    processed = {}
-    
-    for split in data:
-        processed[split] = []
-        for ex in tqdm(data[split]):
-            sentence = ex['ioi_sentences']
-            n_sent_tokens = len(tokenizer.tokenize(sentence))
-            sentence = sentence.split()
-            
-            # Sample four random names
-            new_a, new_b, name1, name2 = ex['a'], ex['b'], ex['a'], ex['b']
-            while True:
-                new_a, new_b, name1, name2 = random.sample(args.names, 4)
-                
-                if any(name in [ex['a'], ex['b']] for name in [new_a, new_b, name1, name2]):
-                    continue
-                
-                # The number of tokens before and after should be the same            
-                new_sentence = sentence.copy()
-                first_a = new_sentence.index(ex['a'])
-                first_b = new_sentence.index(ex['b'])
-                second_a = new_sentence.index(ex['a'], new_sentence.index(ex['a']) + 1)
-                second_b = new_sentence.index(ex['b'], new_sentence.index(ex['b']) + 1)
-                new_sentence[first_a] = new_a
-                new_sentence[first_b] = new_b
-                new_sentence[second_a] = name1
-                new_sentence[second_b] = name2
-                new_sentence = " ".join(new_sentence)
-                
-                if len(tokenizer.tokenize(new_sentence)) == n_sent_tokens:
-                    break
-            
-            ex['corr_a'] = new_a
-            ex['corr_b'] = new_b
-            ex['corr_c'] = name1          
-            ex['corr_d'] = name2
-            ex['corr_ioi_sentences'] = new_sentence
-            processed[split].append(ex)
-            
-    processed = DatasetDict({
-        k: Dataset.from_list(v) for k, v in processed.items()
-    })
-    
-    # Part 3: Save the datasets
-    
-    processed.save_to_disk(out_dir)
+    # Choose a replacement system (ensuring it’s different)
+    candidate_systems = list(range(num_systems))
+    candidate_systems.remove(system_to_replace)
+    replacement_system = random.choice(candidate_systems)
 
-if __name__ == '__main__':
-    main()
+    # Replace the segment
+    corrupted[system_to_replace, segment_to_replace, :] = config_array[replacement_system, segment_to_replace, :]
+    return corrupted
+
+# Create corrupted versions for each split.
+train_data_corr = np.array([corrupt_configuration(cfg) for cfg in train_data])
+val_data_corr   = np.array([corrupt_configuration(cfg) for cfg in val_data])
+test_data_corr  = np.array([corrupt_configuration(cfg) for cfg in test_data])
+
+# =============================================================================
+# 4. Convert each configuration (original and corrupted) into a dictionary format.
+#
+# Each example will have keys:
+#
+#   - "sequence"             : first 62 segments from the original configuration.
+#   - "1_after_prediction"   : the 63rd segment.
+#   - "2_after_prediction"   : the 64th segment.
+#   - "3_after_prediction"   : the 65th segment.
+#
+#   And similarly for the corrupted version (prefixed with "corr_").
+# =============================================================================
+def convert_config_to_dict(orig, corr):
+    """
+    Converts the original configuration and its corrupted version into a dictionary.
+    Uses the first 62 segments as the sequence and segments 63-65 as the targets.
+    """
+    return {
+        "sequence": orig[:, :62, :].tolist(),
+        "1_after_prediction": orig[:, 62, :].tolist(),
+        "2_after_prediction": orig[:, 63, :].tolist(),
+        "3_after_prediction": orig[:, 64, :].tolist(),
+        "corr_sequence": corr[:, :62, :].tolist(),
+        "corr_1_after_prediction": corr[:, 62, :].tolist(),
+        "corr_2_after_prediction": corr[:, 63, :].tolist(),
+        "corr_3_after_prediction": corr[:, 64, :].tolist()
+    }
+
+# Build lists of examples for each split.
+train_examples = [convert_config_to_dict(orig, corr)
+                  for orig, corr in zip(train_data, train_data_corr)]
+val_examples   = [convert_config_to_dict(orig, corr)
+                  for orig, corr in zip(val_data, val_data_corr)]
+test_examples  = [convert_config_to_dict(orig, corr)
+                  for orig, corr in zip(test_data, test_data_corr)]
+
+# =============================================================================
+# 5. Create a DatasetDict and save to disk.
+#
+# This step converts the dictionaries into HuggingFace Dataset objects and 
+# bundles them into a DatasetDict for later use in your training/evaluation.
+# =============================================================================
+processed = DatasetDict({
+    "train": Dataset.from_list(train_examples),
+    "validation": Dataset.from_list(val_examples),
+    "test": Dataset.from_list(test_examples)
+})
+
+# Specify the output directory where the processed dataset will be saved.
+out_dir = '/scratch/users/dhruvgautam/TFs_do_KF_ICL/identity_data/prune/'  # Change this path to your desired output directory.
+processed.save_to_disk(out_dir)
+print(f"Processed dataset saved to: {out_dir}")
