@@ -2536,6 +2536,7 @@ if __name__ == '__main__':
         # replace ckpt_path with the path to the checkpoint file
         if config.acc:
             ckpt_dir = f"../../{experiment_name}"
+
         config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
 
         wandb_train(config, config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
@@ -2547,19 +2548,20 @@ if __name__ == '__main__':
         shade = True
 
 
-        # get the sim objs for the validation data
-        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
-            sim_objs = pickle.load(f)
+        if not config.acc:
+            # get the sim objs for the validation data
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                sim_objs = pickle.load(f)
 
-        #set ys to be the validation data
-        with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
-            samples = pickle.load(f)
-            # for every 2000 entries in samples, get the observation values and append them to the ys list
-            ys = np.stack(
-                [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-            ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            #set ys to be the validation data
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+                samples = pickle.load(f)
+                # for every 2000 entries in samples, get the observation values and append them to the ys list
+                ys = np.stack(
+                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
+                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
 
-            gc.collect()  # Start the garbage collector
+                gc.collect()  # Start the garbage collector
 
-        print("ckpt_path", config.ckpt_path)
-        create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
+            print("ckpt_path", config.ckpt_path)
+            create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems=config.num_val_tasks, shade=shade, logscale=logscale, train_conv=train_conv, tf=tf, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
