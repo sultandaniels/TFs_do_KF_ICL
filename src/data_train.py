@@ -790,6 +790,15 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
+    elif model_name == "ortho_haar_medium_single_gpu":
+        minval = 1000
+        maxval = 182000
+        train_int = 1000
+
+        phases = [minval, 8000, 30000, 80000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
     return ckpt_pred_steps
 
 
