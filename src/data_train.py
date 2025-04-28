@@ -2058,6 +2058,7 @@ if __name__ == '__main__':
     parser.add_argument('--ortho', help='Boolean. use orthogonal systems test', action='store_true')
     parser.add_argument('--only_beg', help='Boolean. only run the beginning evals', action='store_true')
     parser.add_argument('--acc', help='Boolean. Using ACCESS server', action='store_true')
+    parser.add_argument('--ortho_sync', help='Boolean. use orthogonal systems test with sync', action='store_true')
 
 
 
@@ -2129,6 +2130,8 @@ if __name__ == '__main__':
     only_beg = args.only_beg
     print("acc arg", args.acc)
     acc = args.acc
+    print("ortho_sync arg", args.ortho_sync)
+    ortho_sync = args.ortho_sync
 
 
 
@@ -2247,7 +2250,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 1
+        last_haystack_len = 19
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
@@ -2260,6 +2263,9 @@ if __name__ == '__main__':
 
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
 
+        if ortho_sync: # run ortho sync test
+            config.override("val_dataset_typ", "ortho_sync")
+
         if multi_haystack:
         
             if ortho_haar:
@@ -2269,8 +2275,8 @@ if __name__ == '__main__':
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
-            # steps_in = [1,2,3,5,10]
-            steps_in = list(range(1,7))
+            steps_in = [1,2,3,5,10]
+            # steps_in = list(range(1,7))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         

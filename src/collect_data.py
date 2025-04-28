@@ -6,6 +6,7 @@ import pickle
 import os
 import numpy as np
 from models import GPT2
+from dyn_models.ortho_sync_data import gen_ortho_sync_data
 import argparse
 
 def mix_ind(i, total_number, labels, counts, max_ind=2):
@@ -73,60 +74,64 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
             print("cond_num:", cond_nums)
             #setup counters for each distinct cond_num
             cond_counts = np.zeros(config.distinct_cond_nums)
+
+        if (name == "train" and config.dataset_typ == "ortho_sync") or (name == "val" and config.val_dataset_typ == "ortho_sync"): #ortho sync data
+
+            context = config.n_positions + 1
+            sync_ind = 10 #index in traces where the vector is synchronized
+
+            samples, ortho_mats, sim_objs = gen_ortho_sync_data(num_tasks, config.nx, context, sync_ind, config.num_traces[name])
+
+        else:
         
-        for i in tqdm(range(num_tasks)):
-            if name == "train": 
-                if train_mix_dist:
-                    dist_index, dist_counts = mix_ind(i, num_tasks, A_dists, dist_counts)
-
-                    config.override("dataset_typ", A_dists[dist_index]) #override the dataset_typ
-                
-                if train_mix_state_dim:
+            for i in tqdm(range(num_tasks)):
+                if name == "train": 
                     if train_mix_dist:
-                        total_tasks = num_tasks/np.ceil(len(A_dists))
-                        ind = i
-                        while ind > total_tasks:
-                            ind -= total_tasks
-                    else:
-                        total_tasks = num_tasks
-                        ind = i
+                        dist_index, dist_counts = mix_ind(i, num_tasks, A_dists, dist_counts)
+
+                        config.override("dataset_typ", A_dists[dist_index]) #override the dataset_typ
                     
-                    state_index, state_counts = mix_ind(ind, total_tasks, nxs, state_counts)
-                    config.override("nx", nxs[state_index]) #override the nx
-                
-                if train_mix_C:
-                    C_index, C_counts = mix_ind(i, num_tasks, C_dists, C_counts)
-
-                    config.override("C_dist", C_dists[C_index]) #override the dataset_typ
-
-            if opposite_ortho and i > 0:
-                #get the A from sim_objs and negate it
-                fsim = sim_objs[0]
-                fsim.A = -fsim.A
-
-                specific_sim_objs = [fsim]
-                
-            fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None, specific_sim_obj=(specific_sim_objs[0] if opposite_ortho and specific_sim_objs else (specific_sim_objs[i] if specific_sim_objs else None)))
-
-            if (name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num"):
-                cond_counts[int(np.floor(config.distinct_cond_nums*i/num_tasks))] += 1
+                    if train_mix_state_dim:
+                        if train_mix_dist:
+                            total_tasks = num_tasks/np.ceil(len(A_dists))
+                            ind = i
+                            while ind > total_tasks:
+                                ind -= total_tasks
+                        else:
+                            total_tasks = num_tasks
+                            ind = i
+                        
+                        state_index, state_counts = mix_ind(ind, total_tasks, nxs, state_counts)
+                        config.override("nx", nxs[state_index]) #override the nx
                     
-            # repeated_A = np.repeat(sample["A"][np.newaxis,:,:], config.num_traces[name], axis=0) #repeat the A matrix for each trace
-            # sample["A"] = repeated_A #repeat the A matrix for each trace
+                    if train_mix_C:
+                        C_index, C_counts = mix_ind(i, num_tasks, C_dists, C_counts)
 
-            # repeated_C = np.repeat(sample["C"][np.newaxis,:,:], config.num_traces[name], axis=0) #repeat the C matrix for each trace
-            # sample["C"] = repeated_C #repeat the C matrix for each trace
+                        config.override("C_dist", C_dists[C_index]) #override the dataset_typ
 
-            #the samples are partioned by the number of traces for each system.
-            
-            samples.extend([{k: v[i] for k, v in sample.items()} for i in range(config.num_traces[name])])
-            # raise Exception("just checking fsim type umich_meta_output_predictor/src/collect_data.py")
-            if opposite_ortho:
-                print(f"fsim.A: {fsim.A}")
-            sim_objs.append(fsim)
+                if opposite_ortho and i > 0:
+                    #get the A from sim_objs and negate it
+                    fsim = sim_objs[0]
+                    fsim.A = -fsim.A
+
+                    specific_sim_objs = [fsim]
+                    
+                fsim, sample = generate_lti_sample(config.C_dist, config.dataset_typ if name == "train" else config.val_dataset_typ, config.num_traces[name], config.n_positions, config.nx, config.ny, sigma_w=1e-1, sigma_v=1e-1, n_noise=config.n_noise, cond_num=cond_nums[int(np.floor(config.distinct_cond_nums*i/num_tasks))] if ((name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num")) else None, specific_sim_obj=(specific_sim_objs[0] if opposite_ortho and specific_sim_objs else (specific_sim_objs[i] if specific_sim_objs else None)))
+
+                if (name == "train" and config.dataset_typ == "cond_num") or (name == "val" and config.val_dataset_typ == "cond_num"):
+                    cond_counts[int(np.floor(config.distinct_cond_nums*i/num_tasks))] += 1
+
+                #the samples are partioned by the number of traces for each system.
+                
+                samples.extend([{k: v[i] for k, v in sample.items()} for i in range(config.num_traces[name])])
+                # raise Exception("just checking fsim type umich_meta_output_predictor/src/collect_data.py")
+                if opposite_ortho:
+                    print(f"fsim.A: {fsim.A}")
+                sim_objs.append(fsim)
+
         print("Saving", len(samples), "samples for", name)
 
-        loc = f"{output_dir}/" + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "")
+        loc = f"{output_dir}/" + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + f"{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "") + (f"_sync_ind_{sync_ind}" if name == "train" and config.dataset_typ == "ortho_sync" or name == "val" and config.val_dataset_typ == "ortho_sync" else "")
 
         with open(loc + ".pkl", "wb") as f:
             pickle.dump(samples, f)

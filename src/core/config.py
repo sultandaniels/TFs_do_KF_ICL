@@ -16,17 +16,17 @@ class Config(object, metaclass=Singleton):
     fully_reproducible = False
 
     # Dataset settings
-    num_tasks = 2#40000 #number of training systems
-    num_val_tasks = 1#100 #number of test systems
-    dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar"
+    num_tasks = 40000 #number of training systems
+    num_val_tasks = 100 #number of test systems
+    dataset_typ = "ortho_sync"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
     max_cond_num = 100
     distinct_cond_nums = 10
-    val_dataset_typ = "ident" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar"
+    val_dataset_typ = "ortho_sync" #"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
     C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
     nx = 5
     ny = 5
     n_noise = 1
-    num_traces = {"train": 1, "val": 1}
+    num_traces = {"train": 1, "val": 1000}
     changing = False #used only for plotting
 
     #experiment settings

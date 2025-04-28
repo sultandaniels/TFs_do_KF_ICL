@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as lin
-from filtering_lti import gen_rand_ortho_haar_real, FilterSim
+from .filtering_lti import gen_rand_ortho_haar_real, FilterSim
 
 
 def gen_sync_powers(Q, sync_ind, context):
