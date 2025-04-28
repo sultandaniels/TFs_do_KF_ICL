@@ -2290,7 +2290,7 @@ if __name__ == '__main__':
                 num_sys_haystacks = list(range(2,5))
                 
             else:
-                num_sys_haystacks = [19] #list(range(1,last_haystack_len+1))
+                num_sys_haystacks = [2] #list(range(1,last_haystack_len+1))
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
