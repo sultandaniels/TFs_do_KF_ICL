@@ -1693,9 +1693,11 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
             #generate interleaved segments
             segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
-            print('\n\n\n')
-            for seg in seg_starts:
-                print(f"multi_sys_ys[{trace_config}, {trial}, {seg}] = {multi_sys_ys[trace_config, trial, seg]}\n")
+
+            #print first index of each segment
+            # print('\n\n\n')
+            # for seg in seg_starts:
+            #     print(f"multi_sys_ys[{trace_config}, {trial}, {seg+1}] = {multi_sys_ys[trace_config, trial, seg+1]}\n")
                 
         
         sys_choices_per_config.append(sys_choices)

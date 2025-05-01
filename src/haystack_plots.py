@@ -478,7 +478,7 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
                 fin_seg_start = seg_starts_per_conf[needle][-1]
                 beg_seg_start = seg_starts_per_conf[needle][0]
                 for step in steps_in:
-                    for key in ["MOP", "OLS_ir_1", "OLS_ir_2", "OLS_ir_3", "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]:
+                    for key in ["MOP"]: #, "OLS_ir_1", "OLS_ir_2", "OLS_ir_3", "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]:
                         if key not in  ["Zero", "Analytical_Simulation", "Kalman_rem", "Kalman", "Analytical_Kalman"]:
                             
                             y = quartiles[key][1, needle, fin_seg_start + step]
@@ -584,7 +584,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
-        if key == "OLS_analytical_ir_1" or key == "OLS_ir_1": #key == "MOP" or 
+        if key == "MOP": #key == "OLS_analytical_ir_1" or key == "OLS_ir_1": #key == "MOP" or 
             col_count = 0
             for step in steps:
 

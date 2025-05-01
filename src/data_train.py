@@ -1938,12 +1938,12 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
         print(f"getting test data from datasource {config.datasource}")
 
         # get the sim objs for the validation data
-        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "") + "_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the validation data
         print(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl")
-        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "") + ".pkl", "rb") as f:
             # samples = pickle.load(f)
             # # for every 2000 entries in samples, get the observation values and append them to the ys list
             # ys = np.stack(
@@ -2342,7 +2342,7 @@ if __name__ == '__main__':
                 num_sys_haystacks = list(range(2,5))
                 
             else:
-                num_sys_haystacks = [2] #list(range(1,last_haystack_len+1))
+                num_sys_haystacks = list(range(1,last_haystack_len+1))
 
             print("num_sys_haystacks:", num_sys_haystacks)
 

@@ -213,4 +213,4 @@ if __name__ == "__main__":
 
     config = Config()
     
-    collect_data(config, "/data/shared/ICL_Kalman_Experiments/train_and_test_data/ortho_haar", only, train_mix_dist, opposite_ortho=opposite_ortho)
+    collect_data(config, "/data/shared/ICL_Kalman_Experiments/train_and_test_data/ortho_sync", only, train_mix_dist, opposite_ortho=opposite_ortho)

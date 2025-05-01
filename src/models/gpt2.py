@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import GPT2Model, GPT2Config, TransfoXLConfig, TransfoXLModel
-from models import BaseModel
+from models.lightning_base_model import BaseModel
 from core import Config
 from linalg_helpers import print_matrix
 
