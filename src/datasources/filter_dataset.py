@@ -356,7 +356,16 @@ class FilterDataset(Dataset):
         #Currently the algorithm can choose the same system twice in a row
         if config.multi_sys_trace:
             segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
+
             entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+
+            if config.mem_suppress:
+                entry["sys_choices"] = sys_choices
+                entry["sys_inds"] = sys_inds
+                entry["seg_lens"] = seg_lens
+                entry["seg_starts"] = seg_starts
+                entry["real_seg_lens"] = real_seg_lens
+                entry["sys_dict"] = sys_dict
         else:
             # generate random entries
             entry = self.entries[idx % len(self.entries)].copy()
@@ -369,7 +378,14 @@ class FilterDataset(Dataset):
             else:
                 raise NotImplementedError(f"{config.dataset_typ} is not implemented")
 
-        torch_entry = dict([
-            (k, (torch.from_numpy(a) if isinstance(a, np.ndarray) else a).to(torch.float32))
-            for k, a in entry.items()])
+        if config.mem_suppress:
+            # Convert numpy arrays to PyTorch tensors
+            torch_entry = dict([
+                (k, (torch.from_numpy(a).to(torch.float32) if isinstance(a, np.ndarray) else (a if isinstance(a, list) or isinstance(a, dict) else a.to(torch.float32))))
+                for k, a in entry.items()])
+            
+        else:
+            torch_entry = dict([
+                (k, (torch.from_numpy(a) if isinstance(a, np.ndarray) else a).to(torch.float32))
+                for k, a in entry.items()])
         return torch_entry

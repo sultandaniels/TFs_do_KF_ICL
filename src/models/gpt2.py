@@ -4,6 +4,7 @@ from transformers import GPT2Model, GPT2Config, TransfoXLConfig, TransfoXLModel
 from models.lightning_base_model import BaseModel
 from core import Config
 from linalg_helpers import print_matrix
+import pickle
 
 config = Config()
 
@@ -37,6 +38,13 @@ class GPT2(BaseModel):
         self.n_dims_in = n_dims_in
         self.n_dims_out = n_dims_out
         self._read_in = nn.Linear(n_dims_in, n_embd)
+
+        if config.mem_suppress:
+            #load the sim_objs
+            with open(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.val_dataset_typ}/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl") as f:
+                sim_objs = pickle.load(f)
+                sim_objs.to(self.device)
+                self.sim_objs = sim_objs
 
         if config.model_type == "GPT2":
             self._backbone = GPT2Model(gpt_configuration)
@@ -79,6 +87,15 @@ class GPT2(BaseModel):
         
         # Calculate loss
         ys = input_dict["target"]
+
+        if config.mem_suppress:
+            print("input_dict keys:", input_dict.keys())
+            print("input_dict['sys_inds']:", input_dict["sys_inds"])
+            print("input_dict['sys_choices']:", input_dict["sys_choices"])
+            print("len of sim_objs:", len(self.sim_objs))
+
+
+            raise NotImplementedError("checking keys of input_dict")
 
         preds = intermediate_dict["preds"]
         res_sq = (preds - ys) ** 2 #residuals squared

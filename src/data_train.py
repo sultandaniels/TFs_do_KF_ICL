@@ -2544,6 +2544,7 @@ if __name__ == '__main__':
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print("\ndevice:", device)
+        torch.cuda.empty_cache()
         # instantiate gpt2 model
         model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                     n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb)
