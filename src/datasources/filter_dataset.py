@@ -326,6 +326,11 @@ class FilterDataset(Dataset):
         super(FilterDataset, self).__init__()
         self.load(path)
         self.use_true_len = use_true_len
+        if config.mem_suppress:
+            #load the sim_objs
+            with open(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.val_dataset_typ}/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+                sim_objs = pickle.load(f)
+                self.sim_objs = sim_objs
 
     def load(self, path):
         with open(path, "rb") as f:
@@ -357,15 +362,47 @@ class FilterDataset(Dataset):
         if config.multi_sys_trace:
             segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
 
-            entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
-
             if config.mem_suppress:
-                entry["sys_choices"] = sys_choices
-                entry["sys_inds"] = sys_inds
-                entry["seg_lens"] = seg_lens
-                entry["seg_starts"] = seg_starts
-                entry["real_seg_lens"] = real_seg_lens
-                entry["sys_dict"] = sys_dict
+                mask_idx = [] # initialize the mask index list
+                sys_appear = []
+                backstory_len = config.ny + 2 #for 5dm orthogonal systems, 6 transitions is sufficient for perfect prediction
+                if config.backstory:
+                    for i in range(len(seg_lens)):
+                        print(f"\n\n\n\nsegment {i}\n\n")
+                        if sys_choices[i] not in sys_appear:
+                            sys_appear.append(sys_choices[i])
+                            A = self.sim_objs[sys_choices[i]].A
+                            print_matrix(A, f"sys {sys_choices[i]} A")
+
+                            x0_ind = seg_starts[i] + 1
+                            print(f"x0_ind: {x0_ind}\n")
+                            x0 = segments[x0_ind, 2*config.max_sys_trace + 2:]
+                            print(f"x0: {x0}\n")
+                            backstory = []
+                            for j in range(backstory_len):
+                                if len(backstory) == 0:
+                                    backstory.append(A.T @ x0)
+                                else:
+                                    backstory.append(A.T @ backstory[-1])
+
+                            print(f"backstory: {backstory}\n\n\n")
+                            #reverse the order of the backstory
+                            backstory = backstory[::-1]
+                            backstory = np.array(backstory)
+                            print_matrix(backstory, f"backstory sys {sys_choices[i]}")
+
+                            raise Exception("checking backstory")
+                        
+                        print(f"sys_appear: {sys_appear}, sys_choices: {sys_choices}")
+                        raise Exception("checking sys_appear")
+                        
+                elif config.init_seg:
+                    pass
+
+                entry["mask_idx"] = mask_idx #add the mask indices to the entry dictionary
+            else:
+                entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+
         else:
             # generate random entries
             entry = self.entries[idx % len(self.entries)].copy()

@@ -39,13 +39,6 @@ class GPT2(BaseModel):
         self.n_dims_out = n_dims_out
         self._read_in = nn.Linear(n_dims_in, n_embd)
 
-        if config.mem_suppress:
-            #load the sim_objs
-            with open(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.val_dataset_typ}/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl") as f:
-                sim_objs = pickle.load(f)
-                sim_objs.to(self.device)
-                self.sim_objs = sim_objs
-
         if config.model_type == "GPT2":
             self._backbone = GPT2Model(gpt_configuration)
             self.name = f"gpt2_embd={n_embd}_layer={n_layer}_head={n_head}"
@@ -90,9 +83,7 @@ class GPT2(BaseModel):
 
         if config.mem_suppress:
             print("input_dict keys:", input_dict.keys())
-            print("input_dict['sys_inds']:", input_dict["sys_inds"])
-            print("input_dict['sys_choices']:", input_dict["sys_choices"])
-            print("len of sim_objs:", len(self.sim_objs))
+            print("input_dict['mask_idx']:", input_dict["mask_idx"])
 
 
             raise NotImplementedError("checking keys of input_dict")
