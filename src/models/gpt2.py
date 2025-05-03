@@ -56,23 +56,40 @@ class GPT2(BaseModel):
 
         self._read_out = nn.Linear(n_embd, n_dims_out)
 
-    def predict_step(self, input_dict, batch_idx=None):
+    def predict_step(self, input_dict, batch_idx=None, corr_x=None, target_edge_sparsity=None, target_node_sparsity=None):
+        """
+        input_dict:  { "current": Tensor[...] }
+        corr_x:      the teacher’s writer_states for the corrupted inputs (or None)
+        """
         current = input_dict["current"]
-        embeds = self._read_in(current)
-        output = self._backbone(inputs_embeds=embeds)
+        embeds = self._read_in(current)  
+
+        output = self._backbone(
+            inputs_embeds=embeds,
+            corr_x=corr_x,
+            target_edge_sparsity=target_edge_sparsity,
+            target_node_sparsity=target_node_sparsity
+        )
+
         prediction = self._read_out(output.last_hidden_state)
-        # predict only on xs
         return input_dict, {
-            "preds":         prediction,
-            "active_edges":  output.active_edges,
-            "total_edges":   output.total_edges,
-            "active_nodes":  output.active_nodes,
-            "total_nodes":   output.total_nodes,
+            "preds":          prediction,
+            "active_edges":   output.active_edges,
+            "total_edges":    output.total_edges,
+            "active_nodes":   output.active_nodes,
+            "total_nodes":    output.total_nodes,
             "lambda_edges_1": output.lambda_edges_1,
             "lambda_edges_2": output.lambda_edges_2,
             "lambda_nodes_1": output.lambda_nodes_1,
             "lambda_nodes_2": output.lambda_nodes_2,
+            "edge_loss":      output.edge_loss,
+            "node_loss":      output.node_loss,
+            "model_edge_sparsity": output.model_edge_sparsity,
+            "model_node_sparsity": output.model_node_sparsity,
+            "target_edge_sparsity": output.target_edge_sparsity,
+            "target_node_sparsity": output.target_node_sparsity,
         }
+
 
     def forward(
         self,

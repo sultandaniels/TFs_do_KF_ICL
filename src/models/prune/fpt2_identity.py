@@ -288,170 +288,162 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
     #         logger.info(f"\n{table}")
 
     #     return (total_loss, out_dict) if return_outputs else total_loss
-    
+
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         # 1) unpack and reshape
-        start_idxes = inputs.pop("start_idxes")     # (B,)
-        end_idxes   = inputs.pop("end_idxes")       # (B,)
-        _           = inputs.pop("labels")          # (B, L) -- ignored here
-        _           = inputs.pop("corr_input_ids")  # (B, L) -- not used
-        input_ids   = inputs.pop("input_ids")       # (B, num_sys, L, d_in=57)
+        start_idxes     = inputs.pop("start_idxes")     # (B,)
+        end_idxes       = inputs.pop("end_idxes")       # (B,)
+        _               = inputs.pop("labels")          # (B, L) -- ignored
+        corr_input_ids  = inputs.pop("corr_input_ids")  # (B, num_sys, L, d_in)
+        input_ids       = inputs.pop("input_ids")       # (B, num_sys, L, d_in)
 
         bsz, num_sys, L, d_in = input_ids.shape
-        input_ids = torch.from_numpy(input_ids).to(device).float()
-        input_ids = input_ids.view(bsz * num_sys, L, d_in)
-        new_bsz = input_ids.shape[0]
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        start_idxes = torch.from_numpy(start_idxes).to(device).long()
-        end_idxes   = torch.from_numpy(end_idxes).to(device).long()
-        start_idxes = torch.repeat_interleave(start_idxes, num_sys)
-        end_idxes   = torch.repeat_interleave(end_idxes,   num_sys)
+        # flatten both real and corrupted batches
+        input_ids      = torch.from_numpy(input_ids).to(device).float().view(bsz * num_sys, L, d_in)
+        corr_input_ids = torch.from_numpy(corr_input_ids).to(device).float().view(bsz * num_sys, L, d_in)
 
-        # 2) split context vs. true‑next
-        context    = input_ids[:, :L-1, :]
-        true_full  = input_ids[:, L-1, :]
-        true_next  = true_full[..., -5:]              # (B⋅num_sys, 5)
-
-        # 3) student forward pass
-        _, out_dict    = model.predict_step({"current": context})
-        preds_full     = out_dict["preds"]            # (B⋅num_sys, L-1, 5)
-        pred_next      = preds_full[:, -1, :]         # (B⋅num_sys, 5)
-
-        # 4) teacher forward (no grad)
-        with torch.no_grad():
-            _, out_dict_ref  = self.gpt2_model.predict_step({"current": context})
-            preds_full_ref   = out_dict_ref["preds"]
-        pred_next_ref = preds_full_ref[:, -1, :]
-
-        # 5) MSE on the payload dims
-        true_next = true_next.to(device).float()
-        mse_loss  = F.mse_loss(pred_next, true_next)
-
-        # 6) KL‑divergence between student & teacher
-        log_p_s = F.log_softmax(pred_next,    dim=-1)
-        log_p_t = F.log_softmax(pred_next_ref,dim=-1)
-        kl_full = F.kl_div(log_p_s, log_p_t, reduction="batchmean", log_target=True)
-
-        def truncated_kl(x, y, k=None):
-            if k is None:
-                k = min(5, y.size(-1))
-            _, idx = torch.topk(y, k=k, dim=-1)
-            x_k = x.gather(-1, idx)
-            y_k = y.gather(-1, idx)
-            return F.kl_div(
-                F.log_softmax(x_k, dim=-1),
-                F.log_softmax(y_k, dim=-1),
-                reduction="batchmean",
-                log_target=True
-            )
-
-        kl_loss = truncated_kl(pred_next, pred_next_ref) if self.use_truncated_kl_loss else kl_full
-
-        # 7) your sparsity regs
-        reg_edge = out_dict.get("edge_loss", 0) or 0
-        reg_node = out_dict.get("node_loss", 0) or 0
-
-        # ——— top‑k ranking loss on the 5‑dim outputs ———
-        def topk_ranking_loss(
-            logits_student: torch.Tensor,
-            logits_teacher: torch.Tensor,
-            k: int,
-            margin_set: float = 0.5,
-            margin_order: float = 0.0,
-            lambda_set: float = 1.0,
-            lambda_order: float = 1.0,
-            delta_kl: float = 0.0,
-        ):
-            B, V = logits_teacher.shape
-            device = logits_teacher.device
-
-            topk_idx = torch.topk(logits_teacher, k, dim=-1).indices  # (B, k)
-            pos      = logits_student.gather(-1, topk_idx)            # (B, k)
-
-            tail_mask = torch.ones_like(logits_teacher, dtype=torch.bool)
-            tail_mask.scatter_(-1, topk_idx, False)                   # False in head positions
-            neg = logits_student.masked_select(tail_mask).view(B, V - k)
-
-            set_margin = margin_set - (pos.unsqueeze(-1) - neg.unsqueeze(1))  # (B, k, V‑k)
-            loss_set   = torch.clamp(set_margin, min=0).mean()
-
-            diff       = pos.unsqueeze(2) - pos.unsqueeze(1)                 # (B, k, k)
-            rank_mask  = torch.triu(torch.ones(k, k, device=device, dtype=torch.bool), 1)
-            order_margin = margin_order - diff.masked_select(rank_mask)      # (B * k*(k‑1)/2)
-            loss_order   = torch.clamp(order_margin, min=0).mean()
-
-            total = lambda_set * loss_set + lambda_order * loss_order
-            if delta_kl:
-                kl = F.kl_div(
-                    F.log_softmax(logits_student,  dim=-1),
-                    F.log_softmax(logits_teacher, dim=-1),
-                    reduction='batchmean',
-                    log_target=True,
-                )
-                total = total + delta_kl * kl
-
-            return total, loss_set, loss_order
-
-        k_rank = min(self.k_for_truncated_kl, pred_next.size(-1))
-        ranking_loss, set_loss, order_loss = topk_ranking_loss(
-            pred_next,
-            pred_next_ref,
-            k=k_rank,
-            margin_set=self.margins['set'],
-            margin_order=self.margins['order'],
-            lambda_set=self.set_loss_lambda,
-            lambda_order=self.order_loss_lambda,
-            delta_kl=0.0,
+        # repeat indices to match flattened batch
+        start_idxes = torch.repeat_interleave(
+            torch.from_numpy(start_idxes).to(device).long(), num_sys
+        )
+        end_idxes   = torch.repeat_interleave(
+            torch.from_numpy(end_idxes).to(device).long(),   num_sys
         )
 
-        # 8) total loss
-        total_loss = mse_loss + kl_loss + reg_edge + reg_node + ranking_loss
+        # 2) build context vs next-token
+        context      = input_ids[:, :L-1, :]      # (B*num_sys, L-1, d_in)
+        corr_context = corr_input_ids[:, :L-1, :] # same shape for corrupted
 
-        # —— NEW: compute 5‑way classification accuracy —— 
-        pred_classes = torch.argmax(pred_next, dim=-1)
-        true_classes = torch.argmax(true_next, dim=-1)
-        accuracy     = (pred_classes == true_classes).float().mean()
-        out_dict["accuracy"] = accuracy
+        # 3) get the corrupted writer-states from teacher (no grad)
+        embeds_corr = self.gpt2_model._read_in(corr_context)  # [B⋅num_sys, L-1, emb_dim]
+
+        # 2) one no-grad forward *directly* through the backbone to grab writer_states
+        with torch.no_grad():
+            teacher_out = self.gpt2_model._backbone(
+                inputs_embeds=embeds_corr,
+                output_writer_states=True,   # this flag makes FPT2Model return writer_states
+                corr_x=None 
+            )
+            corr_x = teacher_out.writer_states
+
+        _, out_dict = model.predict_step(
+            {"current": context},
+            corr_x=corr_x,
+            target_edge_sparsity=self.get_current_edge_target_sparsity(self.state.global_step),
+            target_node_sparsity=self.get_current_layer_target_sparsity(self.state.global_step),
+        )
+        preds_full = out_dict["preds"]           # (B*num_sys, L-1, 5)
+        pred_next  = preds_full[:, -1, :]        # (B*num_sys, 5)
+
+        # 5) teacher forward on *real* context for KL target
+        with torch.no_grad():
+            _, out_dict_ref = self.gpt2_model.predict_step({"current": context})
+            preds_full_ref = out_dict_ref["preds"]
+        pred_next_ref = preds_full_ref[:, -1, :]
+
+        # 6) compute losses
+        true_next = input_ids[:, -1, -5:].to(device)   # the 5-dim payload
+        mse_loss  = F.mse_loss(pred_next, true_next)
+
+        # # KL or truncated KL
+        # log_p_s = F.log_softmax(pred_next,    dim=-1)
+        # log_p_t = F.log_softmax(pred_next_ref,dim=-1)
+        # kl_full = F.kl_div(log_p_s, log_p_t, reduction="batchmean", log_target=True)
+
+        # if self.use_truncated_kl_loss:
+        #     def truncated_kl(x, y, k=5):
+        #         _, idx = torch.topk(y, k=k, dim=-1)
+        #         xk, yk = x.gather(-1, idx), y.gather(-1, idx)
+        #         return F.kl_div(F.log_softmax(xk, dim=-1),
+        #                         F.log_softmax(yk, dim=-1),
+        #                         reduction="batchmean", log_target=True)
+        #     kl_loss = truncated_kl(pred_next, pred_next_ref)
+        # else:
+        #     kl_loss = kl_full
+
+        # sparsity regs
+        reg_edge = out_dict["edge_loss"]
         
+        if self.skip_layer_loss_if_higher_sparsity and out_dict["model_node_sparsity"] > out_dict["target_node_sparsity"]:
+            reg_node = 0
+        else:
+            reg_node = out_dict["node_loss"]
+        reg_loss = reg_edge + reg_node
+
+        # # top-k ranking loss
+        # def topk_ranking_loss(s_logits, t_logits, k, margins, lambdas, delta_kl=0.0):
+        #     B, V = t_logits.shape
+        #     topk_idx = torch.topk(t_logits, k, dim=-1).indices
+        #     pos = s_logits.gather(-1, topk_idx)
+        #     mask = torch.ones_like(t_logits, dtype=torch.bool)
+        #     mask.scatter_(-1, topk_idx, False)
+        #     neg = s_logits.masked_select(mask).view(B, V - k)
+
+        #     set_margin   = margins['set'] - (pos.unsqueeze(-1) - neg.unsqueeze(1))
+        #     loss_set     = torch.clamp(set_margin, min=0).mean()
+        #     diff         = pos.unsqueeze(2) - pos.unsqueeze(1)
+        #     rank_mask    = torch.triu(torch.ones(k, k, device=device, dtype=torch.bool), 1)
+        #     order_margin = margins['order'] - diff.masked_select(rank_mask)
+        #     loss_order   = torch.clamp(order_margin, min=0).mean()
+
+        #     total = lambdas['set'] * loss_set + lambdas['order'] * loss_order
+        #     if delta_kl:
+        #         total = total + delta_kl * F.kl_div(
+        #             F.log_softmax(s_logits, dim=-1),
+        #             F.log_softmax(t_logits, dim=-1),
+        #             reduction='batchmean', log_target=True
+        #         )
+        #     return total, loss_set, loss_order
+
+        # k_rank = min(self.k_for_truncated_kl, pred_next.size(-1))
+        # ranking_loss, set_loss, order_loss = topk_ranking_loss(
+        #     pred_next, pred_next_ref,
+        #     k=k_rank,
+        #     margins=self.margins,
+        #     lambdas={'set': self.set_loss_lambda, 'order': self.order_loss_lambda}
+        # )
+
+        # 7) total
+        total_loss = 10000 * mse_loss + reg_loss #+ ranking_loss + kl_loss
+
+        # 8) compute accuracy
+        pred_cls = pred_next.argmax(dim=-1)
+        true_cls = true_next.argmax(dim=-1)
+        accuracy = (pred_cls == true_cls).float().mean()
+        out_dict["accuracy"] = accuracy
         self._train_acc_buffer.append(accuracy.item())
 
-        # 9) package everything for logging & HF Trainer
+        # 9) assemble out_dict & logs
         out_dict.update({
-            "loss":           total_loss,
-            "mse_loss":       mse_loss,
-            "kl_loss":        kl_loss,
-            "kl_full":        kl_full,
-            "trunc_kl":       kl_loss if self.use_truncated_kl_loss else torch.tensor(0.0),
-            "edge_loss":      reg_edge,
-            "node_loss":      reg_node,
-            "ranking_loss":   ranking_loss,
-            "set_loss":       set_loss,
-            "order_loss":     order_loss,
+            "loss":         total_loss,
+            "mse_loss":     mse_loss,
+            # "kl_loss":      kl_loss,
+            # "kl_full":      kl_full,
+            "reg_loss":     reg_loss.detach().cpu().item(),
+            "edge_loss":    reg_edge.detach().cpu().item(),
+            "node_loss":    reg_node.detach().cpu().item(),
+            # "ranking_loss": ranking_loss,
+            # "set_loss":     set_loss,
+            # "order_loss":   order_loss,
         })
 
-        # carry forward sparsity metrics
-        for k in ("active_edges","total_edges","active_nodes","total_nodes",
-                "lambda_edges_1","lambda_edges_2","lambda_nodes_1","lambda_nodes_2"):
-            out_dict[k] = out_dict.get(k, -1)
-
-        # 10) logging
         logs = {
-            "mse_loss":      mse_loss.item(),
-            "kl_loss":       kl_loss.item(),
-            "ranking_loss":  ranking_loss.item(),
-            "set_loss":      set_loss.item(),
-            "order_loss":    order_loss.item(),
-            "active_edges":  out_dict["active_edges"],
-            "total_edges":   out_dict["total_edges"],
-            "active_nodes":  out_dict["active_nodes"],
-            "total_nodes":   out_dict["total_nodes"],
-            "lambda_edges_1":out_dict["lambda_edges_1"],
-            "lambda_edges_2":out_dict["lambda_edges_2"],
-            "lambda_nodes_1":out_dict["lambda_nodes_1"],
-            "lambda_nodes_2":out_dict["lambda_nodes_2"],
-            "accuracy":      accuracy.item(),
+            "mse_loss":     mse_loss.item(),
+            # "kl_loss":      kl_loss.item(),
+            # "ranking_loss": ranking_loss.item(),
+            # "set_loss":     set_loss.item(),
+            # "order_loss":   order_loss.item(),
+            "accuracy":     accuracy.item(),
+            "reg_loss":     reg_loss.detach().cpu().item(),
+            "edge_loss":    reg_edge.detach().cpu().item(),
+            "node_loss":    reg_node.detach().cpu().item(),
+            "active_edges": out_dict.get("active_edges", -1),
+            "total_edges":  out_dict.get("total_edges",  -1),
+            "active_nodes": out_dict.get("active_nodes", -1),
+            "total_nodes":  out_dict.get("total_nodes",  -1),
         }
-
         if self.state.global_step % self.args.logging_steps == 0 and self._train_acc_buffer:
             avg_acc = sum(self._train_acc_buffer) / len(self._train_acc_buffer)
             logs["avg_accuracy"] = avg_acc
@@ -459,14 +451,194 @@ class FPT2InfoTrainer(Seq2SeqTrainer):
 
         self.log(logs)
 
-        # optional pretty‐table print
+        # 10) pretty-table print
         table_data = [["Global Step", self.state.global_step]]
-        table_data += [[kk, f"{vv: .4f}"] for kk, vv in logs.items()]
-        table = tabulate(table_data, headers=["Metric", "Value"], tablefmt="pretty")
-        if self.accelerator is None or self.accelerator.is_main_process:
-            logger.info(f"\n{table}")
+        for k, v in logs.items():
+            table_data.append([k, f"{v: .4f}"])
+        if getattr(self, "accelerator", None) is None or self.accelerator.is_main_process:
+            logger.info("\n" + tabulate(table_data, headers=["Metric","Value"], tablefmt="pretty"))
 
         return (total_loss, out_dict) if return_outputs else total_loss
+
+
+    # def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+    #     # 1) unpack and reshape
+    #     start_idxes = inputs.pop("start_idxes")     # (B,)
+    #     end_idxes   = inputs.pop("end_idxes")       # (B,)
+    #     _           = inputs.pop("labels")          # (B, L) -- ignored here
+    #     _           = inputs.pop("corr_input_ids")  # (B, L) -- not used
+    #     input_ids   = inputs.pop("input_ids")       # (B, num_sys, L, d_in=57)
+
+    #     bsz, num_sys, L, d_in = input_ids.shape
+    #     input_ids = torch.from_numpy(input_ids).to(device).float()
+    #     input_ids = input_ids.view(bsz * num_sys, L, d_in)
+    #     new_bsz = input_ids.shape[0]
+
+    #     start_idxes = torch.from_numpy(start_idxes).to(device).long()
+    #     end_idxes   = torch.from_numpy(end_idxes).to(device).long()
+    #     start_idxes = torch.repeat_interleave(start_idxes, num_sys)
+    #     end_idxes   = torch.repeat_interleave(end_idxes,   num_sys)
+
+    #     # 2) split context vs. true‑next
+    #     context    = input_ids[:, :L-1, :]
+    #     true_full  = input_ids[:, L-1, :]
+    #     true_next  = true_full[..., -5:]              # (B⋅num_sys, 5)
+
+    #     # 3) student forward pass
+    #     _, out_dict    = model.predict_step({"current": context})
+    #     preds_full     = out_dict["preds"]            # (B⋅num_sys, L-1, 5)
+    #     pred_next      = preds_full[:, -1, :]         # (B⋅num_sys, 5)
+
+    #     # 4) teacher forward (no grad)
+    #     with torch.no_grad():
+    #         _, out_dict_ref  = self.gpt2_model.predict_step({"current": context})
+    #         preds_full_ref   = out_dict_ref["preds"]
+    #     pred_next_ref = preds_full_ref[:, -1, :]
+
+    #     # 5) MSE on the payload dims
+    #     true_next = true_next.to(device).float()
+    #     mse_loss  = F.mse_loss(pred_next, true_next)
+
+    #     # 6) KL‑divergence between student & teacher
+    #     log_p_s = F.log_softmax(pred_next,    dim=-1)
+    #     log_p_t = F.log_softmax(pred_next_ref,dim=-1)
+    #     kl_full = F.kl_div(log_p_s, log_p_t, reduction="batchmean", log_target=True)
+
+    #     def truncated_kl(x, y, k=None):
+    #         if k is None:
+    #             k = min(5, y.size(-1))
+    #         _, idx = torch.topk(y, k=k, dim=-1)
+    #         x_k = x.gather(-1, idx)
+    #         y_k = y.gather(-1, idx)
+    #         return F.kl_div(
+    #             F.log_softmax(x_k, dim=-1),
+    #             F.log_softmax(y_k, dim=-1),
+    #             reduction="batchmean",
+    #             log_target=True
+    #         )
+
+    #     kl_loss = truncated_kl(pred_next, pred_next_ref) if self.use_truncated_kl_loss else kl_full
+
+    #     # 7) your sparsity regs
+    #     reg_edge = out_dict.get("edge_loss", 0) or 0
+    #     reg_node = out_dict.get("node_loss", 0) or 0
+
+    #     # ——— top‑k ranking loss on the 5‑dim outputs ———
+    #     def topk_ranking_loss(
+    #         logits_student: torch.Tensor,
+    #         logits_teacher: torch.Tensor,
+    #         k: int,
+    #         margin_set: float = 0.5,
+    #         margin_order: float = 0.0,
+    #         lambda_set: float = 1.0,
+    #         lambda_order: float = 1.0,
+    #         delta_kl: float = 0.0,
+    #     ):
+    #         B, V = logits_teacher.shape
+    #         device = logits_teacher.device
+
+    #         topk_idx = torch.topk(logits_teacher, k, dim=-1).indices  # (B, k)
+    #         pos      = logits_student.gather(-1, topk_idx)            # (B, k)
+
+    #         tail_mask = torch.ones_like(logits_teacher, dtype=torch.bool)
+    #         tail_mask.scatter_(-1, topk_idx, False)                   # False in head positions
+    #         neg = logits_student.masked_select(tail_mask).view(B, V - k)
+
+    #         set_margin = margin_set - (pos.unsqueeze(-1) - neg.unsqueeze(1))  # (B, k, V‑k)
+    #         loss_set   = torch.clamp(set_margin, min=0).mean()
+
+    #         diff       = pos.unsqueeze(2) - pos.unsqueeze(1)                 # (B, k, k)
+    #         rank_mask  = torch.triu(torch.ones(k, k, device=device, dtype=torch.bool), 1)
+    #         order_margin = margin_order - diff.masked_select(rank_mask)      # (B * k*(k‑1)/2)
+    #         loss_order   = torch.clamp(order_margin, min=0).mean()
+
+    #         total = lambda_set * loss_set + lambda_order * loss_order
+    #         if delta_kl:
+    #             kl = F.kl_div(
+    #                 F.log_softmax(logits_student,  dim=-1),
+    #                 F.log_softmax(logits_teacher, dim=-1),
+    #                 reduction='batchmean',
+    #                 log_target=True,
+    #             )
+    #             total = total + delta_kl * kl
+
+    #         return total, loss_set, loss_order
+
+    #     k_rank = min(self.k_for_truncated_kl, pred_next.size(-1))
+    #     ranking_loss, set_loss, order_loss = topk_ranking_loss(
+    #         pred_next,
+    #         pred_next_ref,
+    #         k=k_rank,
+    #         margin_set=self.margins['set'],
+    #         margin_order=self.margins['order'],
+    #         lambda_set=self.set_loss_lambda,
+    #         lambda_order=self.order_loss_lambda,
+    #         delta_kl=0.0,
+    #     )
+
+    #     # 8) total loss
+    #     total_loss = 10000 * mse_loss #+ kl_loss + reg_edge + reg_node + ranking_loss
+
+    #     # —— NEW: compute 5‑way classification accuracy —— 
+    #     pred_classes = torch.argmax(pred_next, dim=-1)
+    #     true_classes = torch.argmax(true_next, dim=-1)
+    #     accuracy     = (pred_classes == true_classes).float().mean()
+    #     out_dict["accuracy"] = accuracy
+        
+    #     self._train_acc_buffer.append(accuracy.item())
+
+    #     # 9) package everything for logging & HF Trainer
+    #     out_dict.update({
+    #         "loss":           total_loss,
+    #         "mse_loss":       mse_loss,
+    #         "kl_loss":        kl_loss,
+    #         "kl_full":        kl_full,
+    #         "trunc_kl":       kl_loss if self.use_truncated_kl_loss else torch.tensor(0.0),
+    #         "edge_loss":      reg_edge,
+    #         "node_loss":      reg_node,
+    #         "ranking_loss":   ranking_loss,
+    #         "set_loss":       set_loss,
+    #         "order_loss":     order_loss,
+    #     })
+
+    #     # carry forward sparsity metrics
+    #     for k in ("active_edges","total_edges","active_nodes","total_nodes",
+    #             "lambda_edges_1","lambda_edges_2","lambda_nodes_1","lambda_nodes_2"):
+    #         out_dict[k] = out_dict.get(k, -1)
+
+    #     # 10) logging
+    #     logs = {
+    #         "mse_loss":      mse_loss.item(),
+    #         "kl_loss":       kl_loss.item(),
+    #         "ranking_loss":  ranking_loss.item(),
+    #         "set_loss":      set_loss.item(),
+    #         "order_loss":    order_loss.item(),
+    #         "active_edges":  out_dict["active_edges"],
+    #         "total_edges":   out_dict["total_edges"],
+    #         "active_nodes":  out_dict["active_nodes"],
+    #         "total_nodes":   out_dict["total_nodes"],
+    #         "lambda_edges_1":out_dict["lambda_edges_1"],
+    #         "lambda_edges_2":out_dict["lambda_edges_2"],
+    #         "lambda_nodes_1":out_dict["lambda_nodes_1"],
+    #         "lambda_nodes_2":out_dict["lambda_nodes_2"],
+    #         "accuracy":      accuracy.item(),
+    #     }
+
+    #     if self.state.global_step % self.args.logging_steps == 0 and self._train_acc_buffer:
+    #         avg_acc = sum(self._train_acc_buffer) / len(self._train_acc_buffer)
+    #         logs["avg_accuracy"] = avg_acc
+    #         self._train_acc_buffer.clear()
+
+    #     self.log(logs)
+
+    #     # optional pretty‐table print
+    #     table_data = [["Global Step", self.state.global_step]]
+    #     table_data += [[kk, f"{vv: .4f}"] for kk, vv in logs.items()]
+    #     table = tabulate(table_data, headers=["Metric", "Value"], tablefmt="pretty")
+    #     if self.accelerator is None or self.accelerator.is_main_process:
+    #         logger.info(f"\n{table}")
+
+    #     return (total_loss, out_dict) if return_outputs else total_loss
 
 
 
@@ -785,6 +957,10 @@ class DataCollatorGP:
             l = len(seq)
             one_pred = np.expand_dims(one_after_prediction, axis=1)
             corr_one_pred = np.expand_dims(corr_one_after_prediction, axis=1)
+            # two_pred = np.expand_dims(two_after_prediction, axis=1)
+            # corr_two_pred = np.expand_dims(corr_two_after_prediction, axis=1)
+            # three_pred = np.expand_dims(three_after_prediction, axis=1)
+            # corr_three_pred = np.expand_dims(corr_three_after_prediction, axis=1)
 
             input_ids = np.concatenate([seq, one_pred], axis=1)
             corr_input_ids = np.concatenate([corr_seq, corr_one_pred], axis=1)
@@ -801,7 +977,7 @@ class DataCollatorGP:
             end_idxes.append(l)
         
         return {
-            "input_ids":      np.stack(input_ids_all, axis=0),      # shape (batch, 63, feat)
+            "input_ids":      np.stack(input_ids_all, axis=0),      # shape (batch, 64, feat)
             "corr_input_ids": np.stack(corr_input_ids_all, axis=0),
             "labels":         np.stack(labels_all, axis=0),
             "start_idxes":    np.array(start_idxes, dtype=np.int64), # shape (batch,)
@@ -809,41 +985,41 @@ class DataCollatorGP:
         }       
 
 def eval_fn(eval_pred): 
-    logits, target_edge_sparsity, target_layer_sparsity, model_edge_sparsity, model_layer_sparsity, reg_edge_loss, reg_layer_loss, kl_loss = eval_pred.predictions
-    if len(model_edge_sparsity.shape) > 0:
-        model_edge_sparsity = model_edge_sparsity[0].item()
-        model_layer_sparsity = model_layer_sparsity[0].item()
-        target_edge_sparsity = target_edge_sparsity[0].item()
-        target_layer_sparsity = target_layer_sparsity[0].item()
-    else:
-        model_edge_sparsity = model_edge_sparsity.item()
-        model_layer_sparsity = model_layer_sparsity.item()
-        target_edge_sparsity = target_edge_sparsity.item()
-        target_layer_sparsity = target_layer_sparsity.item()
+    # logits, target_edge_sparsity, target_layer_sparsity, model_edge_sparsity, model_layer_sparsity, reg_edge_loss, reg_layer_loss, kl_loss = eval_pred.predictions
+    # if len(model_edge_sparsity.shape) > 0:
+    #     model_edge_sparsity = model_edge_sparsity[0].item()
+    #     model_layer_sparsity = model_layer_sparsity[0].item()
+    #     target_edge_sparsity = target_edge_sparsity[0].item()
+    #     target_layer_sparsity = target_layer_sparsity[0].item()
+    # else:
+    #     model_edge_sparsity = model_edge_sparsity.item()
+    #     model_layer_sparsity = model_layer_sparsity.item()
+    #     target_edge_sparsity = target_edge_sparsity.item()
+    #     target_layer_sparsity = target_layer_sparsity.item()
     
-    predictions = np.argmax(logits, axis=-1)[:, :-1]
-    labels = eval_pred.label_ids[:, 1:]
+    # predictions = np.argmax(logits, axis=-1)[:, :-1]
+    # labels = eval_pred.label_ids[:, 1:]
 
-    eval_mask = (labels != -100).astype(int)
-    predictions = predictions * eval_mask
-    labels = labels * eval_mask
+    # eval_mask = (labels != -100).astype(int)
+    # predictions = predictions * eval_mask
+    # labels = labels * eval_mask
     
-    correct = (predictions == labels).all(axis=1)
-    accuracy = correct.sum().item() / correct.shape[0]
+    # correct = (predictions == labels).all(axis=1)
+    # accuracy = correct.sum().item() / correct.shape[0]
     
-    kl_loss = kl_loss.mean().item()
-    reg_edge_loss = reg_edge_loss.mean().item()
-    reg_layer_loss = reg_layer_loss.mean().item()
+    # kl_loss = kl_loss.mean().item()
+    # reg_edge_loss = reg_edge_loss.mean().item()
+    # reg_layer_loss = reg_layer_loss.mean().item()
     
     return {
-        "eval_accuracy": accuracy,
-        "model_edge_sparsity": model_edge_sparsity,
-        "model_layer_sparsity": model_layer_sparsity,
-        "target_edge_sparsity": target_edge_sparsity,
-        "target_layer_sparsity": target_layer_sparsity,
-        "eval_kl_loss": kl_loss,
-        "eval_reg_edge_loss": reg_edge_loss,
-        "eval_reg_layer_loss": reg_layer_loss,
+        # "eval_accuracy": accuracy,
+        # "model_edge_sparsity": model_edge_sparsity,
+        # "model_layer_sparsity": model_layer_sparsity,
+        # "target_edge_sparsity": target_edge_sparsity,
+        # "target_layer_sparsity": target_layer_sparsity,
+        # "eval_kl_loss": kl_loss,
+        # "eval_reg_edge_loss": reg_edge_loss,
+        # "eval_reg_layer_loss": reg_layer_loss,
     }
 
 @torch.no_grad()
