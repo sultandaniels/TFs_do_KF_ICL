@@ -363,11 +363,15 @@ class FilterDataset(Dataset):
             segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
 
             if config.mem_suppress:
+                # print_matrix(segments[:,-6:], f"segments[:,-6:]")
                 mask_idx = [] # initialize the mask index list
                 sys_appear = []
                 backstory_len = config.ny + 2 #for 5dm orthogonal systems, 6 transitions is sufficient for perfect prediction
+                mask_budget = 10
                 if config.backstory:
-                    for i in range(len(seg_lens)):
+                    n_masks = 0
+                    i = 0
+                    while i < len(seg_lens) and n_masks < mask_budget:
                         print(f"\n\n\n\nsegment {i}\n\n")
                         if sys_choices[i] not in sys_appear:
                             sys_appear.append(sys_choices[i])
@@ -385,16 +389,48 @@ class FilterDataset(Dataset):
                                 else:
                                     backstory.append(A.T @ backstory[-1])
 
-                            print(f"backstory: {backstory}\n\n\n")
+                            # print(f"backstory: {backstory}\n\n\n")
+
                             #reverse the order of the backstory
                             backstory = backstory[::-1]
                             backstory = np.array(backstory)
-                            print_matrix(backstory, f"backstory sys {sys_choices[i]}")
+                            # print(f"backstory.shape: {backstory.shape}\n")
 
-                            raise Exception("checking backstory")
+                            # print(f"A@backstory[-1]: {A @ backstory[-1]}\n")
+
+                            # concatenate 1 columns of ones to the backstory
+                            ones = np.ones((backstory.shape[0], 1))
+                            backstory = np.concatenate((ones, backstory), axis=1)
+                            print_matrix(backstory, f"backstory after ones")
                         
-                        print(f"sys_appear: {sys_appear}, sys_choices: {sys_choices}")
-                        raise Exception("checking sys_appear")
+                            # concatenate 2*config.max_sys_trace + 1 columns of zeros to the backstory
+                            zeros = np.zeros((backstory.shape[0], 2*config.max_sys_trace + 1))
+                            backstory = np.concatenate((zeros, backstory), axis=1)
+                            # print(f"backstory.shape: {backstory.shape}\n")
+
+                            #create new_segments where it is everything from segments from x0_ind to the end is shifted to the right by backstory_len
+                            # print(f"segments.shape: {segments.shape}\n")
+                            new_segments = np.zeros((segments.shape[0] + backstory_len, config.ny + 2*config.max_sys_trace + 2))
+                            new_segments[:x0_ind, :] = segments[:x0_ind, :]
+                            new_segments[x0_ind + backstory_len:, :] = segments[x0_ind:, :]
+                            new_segments[x0_ind:x0_ind + backstory_len, :] = backstory
+                            segments = new_segments
+                            n_masks += 1
+
+                            # print(f"mask indices: {np.arange(x0_ind, x0_ind + backstory_len)}\n")
+                            mask_idx.extend(np.arange(x0_ind, x0_ind + backstory_len)) #add the mask indices to the list
+                            # print(f"mask_idx: {mask_idx}\n")
+
+                        i += 1
+
+                    # print_matrix(segments[:,-6:], f"segments[:,-6:]")
+                    # print(f"segments.shape: {segments.shape}\n")
+                    # print(f"len of sys_appear: {len(sys_appear)}\n")
+                    # print(f"len of sys_appear * backstory_len + 251: {len(sys_appear) * backstory_len + 251}\n")
+                    # print(f"sys_appear: {sys_appear}, sys_choices: {sys_choices}")
+
+                    # implement segments saving to a file
+                    raise Exception("checking sys_appear")
                         
                 elif config.init_seg:
                     pass
