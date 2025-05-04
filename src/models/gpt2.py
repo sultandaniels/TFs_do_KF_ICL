@@ -87,27 +87,17 @@ class GPT2(BaseModel):
         if config.multi_sys_trace:
 
             if config.mem_suppress:
-                #create a mask to identify rows of ys that are all zeros and also all indices from the list input_dict["mask_idx"]
-                # mask = torch.all(ys == 0, dim=-1, keepdim=True) & torch.all(ys[:, input_dict["mask_idx"],:] == 0, dim=-1, keepdim=True)
+                #create a mask to identify rows of ys that are all zeros and also all indices from the list of lists input_dict["mask_idx"]
                 #ys is of shape [batch_size, seq_len, dims]
                 mask_all_zeros = torch.all(ys == 0, dim=-1, keepdim=True)  # [batch_size, seq_len, 1]
-
+                
                 mask_selected_indices = torch.zeros_like(mask_all_zeros, dtype=torch.bool)
                 for b, idx_list in enumerate(input_dict["mask_idx"]):
                     mask_idx_minus_1 = [int(idx) - 1 for idx in idx_list]
                     mask_selected_indices[b, mask_idx_minus_1, :] = True #since the target has one less entry than the full seqment we need to subtract 1 from the index
 
-                mask_selected_indices[:, input_dict["mask_idx"], :] = True
+                mask = mask_all_zeros | mask_selected_indices #combine the two masks with a logical OR
 
-                mask = mask_all_zeros & mask_selected_indices
-
-                #give print statements to check if the mask is correct
-                print("mask_idx", input_dict["mask_idx"])
-                print("ys[:, input_dict['mask_idx']].shape", ys[:, input_dict["mask_idx"]].shape)
-                print("ys[:, input_dict['mask_idx']]", ys[:, input_dict["mask_idx"]])
-                print("mask", mask)
-
-                raise NotImplementedError("masking not implemented yet")
             else:
                 # Create a mask to identify rows of ys that are all zeros
                 mask = torch.all(ys == 0, dim=-1, keepdim=True)

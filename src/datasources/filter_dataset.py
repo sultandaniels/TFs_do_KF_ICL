@@ -379,7 +379,10 @@ class FilterDataset(Dataset):
                 train_data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.dataset_typ}/mem_suppress/"
                 os.makedirs(train_data_path, exist_ok=True)
                             
-                filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}"
+                worker_info = torch.utils.data.get_worker_info()
+                worker_id = worker_info.id if worker_info is not None else 0
+
+                filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_worker_{worker_id}_idx_{idx}.npz"
 
                 if config.masking:
                     orig_segments = segments #save the original segments for later use
@@ -389,7 +392,7 @@ class FilterDataset(Dataset):
                     #     pickle.dump(orig_segments, f)
 
                     #save orig_segments to a compressed npy file
-                    np.savez_compressed(f"{train_data_path}{filename}_orig_segments_train_ex_{config.train_ex}.npz", orig_segments=orig_segments)
+                    np.savez_compressed(f"{train_data_path}{filename}", orig_segments=orig_segments)
                     config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
 
                     # print_matrix(segments[:,-6:], f"segments[:,-6:]")
@@ -398,8 +401,8 @@ class FilterDataset(Dataset):
                     if config.backstory:
                         n_masks = 0 #number of sys that have been masked
                         i = 0 #segment number in interleaved segments
-                        while i < len(seg_lens) and n_masks < config.mask_budget:
-                            if sys_choices[i] not in sys_appear:
+                        while i < len(seg_starts) and n_masks < config.mask_budget:
+                            if sys_choices[i] not in sys_appear and real_seg_lens[i] > 0: #if the system has not appeared before and the segment length is greater than 0
                                 sys_appear.append(sys_choices[i])
                                 A = self.sim_objs[sys_choices[i]].A
 
@@ -443,6 +446,9 @@ class FilterDataset(Dataset):
                                 mask_idx.extend(np.arange(x0_ind, x0_ind + config.backstory_len)) #add the mask indices to the list
                                 # print(f"mask_idx: {mask_idx}\n")
 
+                                for j in range(i+1, len(seg_starts)):
+                                    seg_starts[j] += config.backstory_len #update the segment starts for the rest of the segments
+
                             i += 1
 
                         # print_matrix(segments[:,-6:], f"segments[:,-6:]")
@@ -470,7 +476,7 @@ class FilterDataset(Dataset):
 
                 else:
                     # load orig segments from npz file
-                    with np.load(f"{train_data_path}{filename}_orig_segments_train_ex_{config.train_ex}.npz") as data:
+                    with np.load(f"{train_data_path}{filename}") as data:
                         segments = data["orig_segments"]
                         config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
 
