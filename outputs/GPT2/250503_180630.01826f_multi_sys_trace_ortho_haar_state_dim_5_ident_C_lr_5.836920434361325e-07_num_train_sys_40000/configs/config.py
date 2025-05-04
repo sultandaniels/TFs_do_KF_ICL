@@ -31,13 +31,11 @@ class Config(object, metaclass=Singleton):
     changing = False #used only for plotting
 
     #mem_suppress experiment settings
-    mem_suppress = True #run the memory suppression experiment
-    masking = True #run the masking training run
+    mem_suppress = True
     backstory = True #use masked backstories
     init_seg = False #use masked initial segments
     backstory_len = ny + 2 #length of the backstory
     mask_budget = 10 #max # of systems that will be masked on first appearance
-    train_ex = 0 #train_ex index used for caching
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
@@ -58,16 +56,16 @@ class Config(object, metaclass=Singleton):
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 10 #8*40 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 1 #8*40 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
-    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
+    train_data_workers = 1 #128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
-    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 250  #500 for extended OLS #250 #context length
+    n_positions = 250 #500 for extended OLS #250 #context length
     n_embd = 128 #192 #288
     n_layer = 12 #24 #48
     n_head = 8 #12 #18

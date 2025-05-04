@@ -17,7 +17,7 @@ class BaseModel(pl.LightningModule):
         for k in output_dict:
             if "loss" in k or "metric" in k:
                 self.log(typ+"_"+k, output_dict[k], on_step=True, on_epoch=True,
-                         prog_bar=True, logger=True, sync_dist=True) #added sync_dist=True for distributed training
+                         prog_bar=True, logger=True, sync_dist=True, batch_size=config.batch_size) #added sync_dist=True for distributed training
 
         if hasattr(config, "loss_weighting_strategy") and config.loss_weighting_strategy in ["gradnorm", "my_gradnorm"] and typ == "train":
             for name, param in self.loss_weighting_strategy.lw_dict.items():

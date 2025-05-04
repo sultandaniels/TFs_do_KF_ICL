@@ -5,6 +5,7 @@ import torch
 import scipy.stats as stats
 import pickle
 from linalg_helpers import print_matrix
+import os
 
 
 config = Config()
@@ -99,6 +100,9 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
     context_len = config.n_positions + 1 #the length of the context is the number of positions plus 1 for the start token
 
+    if not test and config.mem_suppress:
+        context_len -= config.mask_budget*config.backstory_len #subtract the maximum number of indices that will be masked from the context length
+
 
     sys_names = np.arange(config.max_sys_trace) #system names
     #randomly shuffle the system names to assign to the system indices for the open and close tokens
@@ -110,9 +114,9 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
         sys_dict = {sys_inds[0]: sys_names[0]}
 
         if train_conv:
-            seg_lens = [int(config.n_positions/2 - 2)]*2
+            seg_lens = [int((context_len - 1)/2 - 2)]*2
         else:
-            seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
+            seg_lens = generate_seg_lens((context_len - 1), sys_in_trace)
 
     else:
 
@@ -166,9 +170,9 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
         else: #train or non needle in haystack test
             if config.zero_cut: #zero cut
-                seg_lens = [config.n_positions - 2]
+                seg_lens = [(context_len - 1) - 2]
             else:
-                seg_lens = generate_seg_lens(config.n_positions, sys_in_trace)
+                seg_lens = generate_seg_lens((context_len - 1), sys_in_trace)
 
     segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
     segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment
@@ -248,7 +252,15 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             tok_seg_lens.append(tok_seg_len)
             real_seg_lens.append(0)
 
-            segments[seg_start:seg_start + tok_seg_len, :] = np.concatenate([start_paren, end_paren], axis=0) #open paren, closed paren
+            
+            try:
+                segments[seg_start:seg_start + tok_seg_len, :] = np.concatenate([start_paren, end_paren], axis=0) #open paren, closed paren
+            except ValueError as e:
+                print(f"seg_start: {seg_start}, tok_seg_len: {tok_seg_len}, context_len: {context_len}")
+                print(f"segments[seg_start:seg_start + tok_seg_len, :].shape: {segments[seg_start:seg_start + tok_seg_len, :].shape}")
+                print(f"start_paren.shape: {start_paren.shape}, end_paren.shape: {end_paren.shape}")
+                print(f"seg_starts: {seg_starts}")
+                raise ValueError(e)
 
             if seg_start + tok_seg_len == context_len:
                 break
@@ -363,79 +375,108 @@ class FilterDataset(Dataset):
             segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
 
             if config.mem_suppress:
-                # print_matrix(segments[:,-6:], f"segments[:,-6:]")
-                mask_idx = [] # initialize the mask index list
-                sys_appear = []
-                backstory_len = config.ny + 2 #for 5dm orthogonal systems, 6 transitions is sufficient for perfect prediction
-                mask_budget = 10
-                if config.backstory:
-                    n_masks = 0
-                    i = 0
-                    while i < len(seg_lens) and n_masks < mask_budget:
-                        print(f"\n\n\n\nsegment {i}\n\n")
-                        if sys_choices[i] not in sys_appear:
-                            sys_appear.append(sys_choices[i])
-                            A = self.sim_objs[sys_choices[i]].A
-                            print_matrix(A, f"sys {sys_choices[i]} A")
 
-                            x0_ind = seg_starts[i] + 1
-                            print(f"x0_ind: {x0_ind}\n")
-                            x0 = segments[x0_ind, 2*config.max_sys_trace + 2:]
-                            print(f"x0: {x0}\n")
-                            backstory = []
-                            for j in range(backstory_len):
-                                if len(backstory) == 0:
-                                    backstory.append(A.T @ x0)
-                                else:
-                                    backstory.append(A.T @ backstory[-1])
+                train_data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.dataset_typ}/mem_suppress/"
+                os.makedirs(train_data_path, exist_ok=True)
+                            
+                filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}"
 
-                            # print(f"backstory: {backstory}\n\n\n")
+                if config.masking:
+                    orig_segments = segments #save the original segments for later use
+                    #save orig_segments to a file
 
-                            #reverse the order of the backstory
-                            backstory = backstory[::-1]
-                            backstory = np.array(backstory)
-                            # print(f"backstory.shape: {backstory.shape}\n")
+                    # with open(f"{train_data_path}{filename}_orig_segments_train_ex_{config.train_ex}.pkl", "ab") as f:
+                    #     pickle.dump(orig_segments, f)
 
-                            # print(f"A@backstory[-1]: {A @ backstory[-1]}\n")
-
-                            # concatenate 1 columns of ones to the backstory
-                            ones = np.ones((backstory.shape[0], 1))
-                            backstory = np.concatenate((ones, backstory), axis=1)
-                            print_matrix(backstory, f"backstory after ones")
-                        
-                            # concatenate 2*config.max_sys_trace + 1 columns of zeros to the backstory
-                            zeros = np.zeros((backstory.shape[0], 2*config.max_sys_trace + 1))
-                            backstory = np.concatenate((zeros, backstory), axis=1)
-                            # print(f"backstory.shape: {backstory.shape}\n")
-
-                            #create new_segments where it is everything from segments from x0_ind to the end is shifted to the right by backstory_len
-                            # print(f"segments.shape: {segments.shape}\n")
-                            new_segments = np.zeros((segments.shape[0] + backstory_len, config.ny + 2*config.max_sys_trace + 2))
-                            new_segments[:x0_ind, :] = segments[:x0_ind, :]
-                            new_segments[x0_ind + backstory_len:, :] = segments[x0_ind:, :]
-                            new_segments[x0_ind:x0_ind + backstory_len, :] = backstory
-                            segments = new_segments
-                            n_masks += 1
-
-                            # print(f"mask indices: {np.arange(x0_ind, x0_ind + backstory_len)}\n")
-                            mask_idx.extend(np.arange(x0_ind, x0_ind + backstory_len)) #add the mask indices to the list
-                            # print(f"mask_idx: {mask_idx}\n")
-
-                        i += 1
+                    #save orig_segments to a compressed npy file
+                    np.savez_compressed(f"{train_data_path}{filename}_orig_segments_train_ex_{config.train_ex}.npz", orig_segments=orig_segments)
+                    config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
 
                     # print_matrix(segments[:,-6:], f"segments[:,-6:]")
-                    # print(f"segments.shape: {segments.shape}\n")
-                    # print(f"len of sys_appear: {len(sys_appear)}\n")
-                    # print(f"len of sys_appear * backstory_len + 251: {len(sys_appear) * backstory_len + 251}\n")
-                    # print(f"sys_appear: {sys_appear}, sys_choices: {sys_choices}")
+                    mask_idx = [] # initialize the mask index list
+                    sys_appear = []
+                    if config.backstory:
+                        n_masks = 0 #number of sys that have been masked
+                        i = 0 #segment number in interleaved segments
+                        while i < len(seg_lens) and n_masks < config.mask_budget:
+                            if sys_choices[i] not in sys_appear:
+                                sys_appear.append(sys_choices[i])
+                                A = self.sim_objs[sys_choices[i]].A
 
-                    # implement segments saving to a file
-                    raise Exception("checking sys_appear")
-                        
-                elif config.init_seg:
-                    pass
+                                x0_ind = seg_starts[i] + 1
+                                x0 = segments[x0_ind, 2*config.max_sys_trace + 2:]
+                                backstory = []
+                                for j in range(config.backstory_len):
+                                    if len(backstory) == 0:
+                                        backstory.append(A.T @ x0)
+                                    else:
+                                        backstory.append(A.T @ backstory[-1])
 
-                entry["mask_idx"] = mask_idx #add the mask indices to the entry dictionary
+                                # print(f"backstory: {backstory}\n\n\n")
+
+                                #reverse the order of the backstory
+                                backstory = backstory[::-1]
+                                backstory = np.array(backstory)
+                                # print(f"backstory.shape: {backstory.shape}\n")
+
+                                # print(f"A@backstory[-1]: {A @ backstory[-1]}\n")
+
+                                # concatenate 1 columns of ones to the backstory
+                                ones = np.ones((backstory.shape[0], 1))
+                                backstory = np.concatenate((ones, backstory), axis=1)
+                            
+                                # concatenate 2*config.max_sys_trace + 1 columns of zeros to the backstory
+                                zeros = np.zeros((backstory.shape[0], 2*config.max_sys_trace + 1))
+                                backstory = np.concatenate((zeros, backstory), axis=1)
+                                # print(f"backstory.shape: {backstory.shape}\n")
+
+                                #create new_segments where it is everything from segments from x0_ind to the end is shifted to the right by config.backstory_len
+                                # print(f"segments.shape: {segments.shape}\n")
+                                new_segments = np.zeros((segments.shape[0] + config.backstory_len, config.ny + 2*config.max_sys_trace + 2))
+                                new_segments[:x0_ind, :] = segments[:x0_ind, :]
+                                new_segments[x0_ind + config.backstory_len:, :] = segments[x0_ind:, :]
+                                new_segments[x0_ind:x0_ind + config.backstory_len, :] = backstory
+                                segments = new_segments
+                                n_masks += 1
+
+                                # print(f"mask indices: {np.arange(x0_ind, x0_ind + config.backstory_len)}\n")
+                                mask_idx.extend(np.arange(x0_ind, x0_ind + config.backstory_len)) #add the mask indices to the list
+                                # print(f"mask_idx: {mask_idx}\n")
+
+                            i += 1
+
+                        # print_matrix(segments[:,-6:], f"segments[:,-6:]")
+                        # print(f"segments.shape before zero concat: {segments.shape}\n")
+                        # print(f"mask_idx before zero concat: {mask_idx}\n")
+                        # print(f"len of sys_appear: {len(sys_appear)}\n")
+                        # print(f"len of sys_appear * config.backstory_len + 251: {len(sys_appear) * config.backstory_len + 251}\n")
+                        # print(f"sys_appear: {sys_appear}, sys_choices: {sys_choices}\n")
+
+                        if segments.shape[0] <= config.n_positions:
+                            pre_concat_len = segments.shape[0] #the context len of segments before concatenation of zeros
+
+                            #concatenate config.n_positions - segments.shape[0] rows of zeros to the end of the segments
+                            zeros = np.zeros((config.n_positions + 1 - pre_concat_len, config.ny + 2*config.max_sys_trace + 2))
+                            segments = np.concatenate((segments, zeros), axis=0)
+
+                            #add the indices of the zeros to the mask_idx list
+                            mask_idx.extend(np.arange(pre_concat_len, config.n_positions + 1))                 
+                            
+                    elif config.init_seg:
+                        raise NotImplementedError("init_seg is not implemented yet")
+                    
+                    entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+                    entry["mask_idx"] = mask_idx #add the mask indices to the entry dictionary
+
+                else:
+                    # load orig segments from npz file
+                    with np.load(f"{train_data_path}{filename}_orig_segments_train_ex_{config.train_ex}.npz") as data:
+                        segments = data["orig_segments"]
+                        config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
+
+                    print(f"segments.shape: {segments.shape}\n")
+                    entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+
             else:
                 entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
 
