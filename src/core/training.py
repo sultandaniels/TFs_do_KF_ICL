@@ -120,6 +120,31 @@ def get_callbacks_and_loggers(output_dir, train_int): #add emb_dim as a paramete
     tb_logger = pl_loggers.TensorBoardLogger(output_dir)
     loggers = [tb_logger]
 
+
+    experiment_ind = 59
+
+    if config.mem_suppress: #create new dir for mem suppress checkpoints
+        if config.masking:
+            output_dir = f"{output_dir[:experiment_ind]}masked_{output_dir[experiment_ind :]}"
+        else:
+            output_dir = f"{output_dir[:experiment_ind]}unmasked_{output_dir[experiment_ind:]}"
+
+        print(f"output_dir: {output_dir}")
+        if config.backstory:
+            if config.init_seg:
+                raise ValueError("Cannot have both backstory and init_seg")
+            else:
+                output_dir = f"{output_dir[:experiment_ind]}backstory_{output_dir[experiment_ind:]}"
+        elif config.init_seg:
+            if config.backstory:
+                raise ValueError("Cannot have both backstory and init_seg")
+            else:
+                output_dir = f"{output_dir[:experiment_ind]}init_seg_{output_dir[experiment_ind:]}"
+        else:
+            raise ValueError("No backstory or init_seg specified")
+        
+        os.makedirs(output_dir, exist_ok=True)
+
     checkpoint_callback = pl_callbacks.ModelCheckpoint(
         dirpath=os.path.join(output_dir, "checkpoints"),
         filename="{step}", # for embed dim experiments: "emb_dim_" + str(emb_dim) + "_{step}",
