@@ -376,13 +376,13 @@ class FilterDataset(Dataset):
 
             if config.mem_suppress:
 
-                train_data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.dataset_typ}/mem_suppress/"
-                os.makedirs(train_data_path, exist_ok=True)
+                # train_data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.dataset_typ}/mem_suppress/"
+                # os.makedirs(train_data_path, exist_ok=True)
                             
-                worker_info = torch.utils.data.get_worker_info()
-                worker_id = worker_info.id if worker_info is not None else 0
+                # worker_info = torch.utils.data.get_worker_info()
+                # worker_id = worker_info.id if worker_info is not None else 0
 
-                filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_worker_{worker_id}_idx_{idx}.npz"
+                # filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_worker_{worker_id}_idx_{idx}.npz"
 
                 if config.masking:
                     orig_segments = segments #save the original segments for later use
@@ -391,9 +391,9 @@ class FilterDataset(Dataset):
                     # with open(f"{train_data_path}{filename}_orig_segments_train_ex_{config.train_ex}.pkl", "ab") as f:
                     #     pickle.dump(orig_segments, f)
 
-                    #save orig_segments to a compressed npy file
-                    np.savez_compressed(f"{train_data_path}{filename}", orig_segments=orig_segments)
-                    config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
+                    # #save orig_segments to a compressed npy file
+                    # np.savez_compressed(f"{train_data_path}{filename}", orig_segments=orig_segments)
+                    # config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
 
                     # print_matrix(segments[:,-6:], f"segments[:,-6:]")
                     mask_idx = [] # initialize the mask index list
@@ -472,16 +472,18 @@ class FilterDataset(Dataset):
                         raise NotImplementedError("init_seg is not implemented yet")
                     
                     entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+                    entry["orig_segments"] = orig_segments #add the original segments to the entry dictionary
                     entry["mask_idx"] = mask_idx #add the mask indices to the entry dictionary
 
                 else:
-                    # load orig segments from npz file
-                    with np.load(f"{train_data_path}{filename}") as data:
-                        segments = data["orig_segments"]
-                        config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
+                    raise NotImplementedError("non-masking backstory is not implemented yet")
+                    # # load orig segments from npz file
+                    # with np.load(f"{train_data_path}{filename}") as data:
+                    #     segments = data["orig_segments"]
+                    #     config.override("train_ex", config.train_ex + 1) #increment the train_ex number for the next training example
 
-                    print(f"segments.shape: {segments.shape}\n")
-                    entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
+                    # print(f"segments.shape: {segments.shape}\n")
+                    # entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
 
             else:
                 entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns

@@ -1,6 +1,8 @@
 import torch
 import pytorch_lightning as pl
 from core import Config
+import os
+import numpy as np
 
 config = Config()
 
@@ -26,7 +28,16 @@ class BaseModel(pl.LightningModule):
 
     def training_step(self, input_dict, batch_idx): 
         #Calls the model's forward method with the input data and batch index. The return_intermediate_dict=True argument indicates that the forward method should return both intermediate and final outputs. The intermediate dict holds the training predictions
-        
+
+        if config.masking:
+            train_data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.dataset_typ}/mem_suppress/"
+            os.makedirs(train_data_path, exist_ok=True)
+            filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_batch_idx_{batch_idx}.npz"
+
+            # save input_dict["orig_segments"] to a compressed npz file
+            np.savez_compressed(os.path.join(train_data_path, filename),
+                               orig_segments=input_dict["orig_segments"].cpu().numpy())
+
         intermediate_dict, output_dict = self(
             input_dict, batch_idx=batch_idx, return_intermediate_dict=True)
         self.log_output_dct(output_dict, "train")

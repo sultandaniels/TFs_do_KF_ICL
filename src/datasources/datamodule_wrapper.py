@@ -27,16 +27,27 @@ class DataModuleWrapper(pl.LightningDataModule):
     def train_dataloader(self):
 
         if config.mem_suppress:
-            return DataLoader(
-                self.train_ds,
-                batch_size=config.batch_size,
-                shuffle=True,
-                num_workers=config.train_data_workers,
-                persistent_workers=True,
-                pin_memory=True,
-                drop_last=False,
-                collate_fn=self.custom_collate_fn
-            )
+            if config.masking:
+                return DataLoader(
+                    self.train_ds,
+                    batch_size=config.batch_size,
+                    shuffle=True,
+                    num_workers=config.train_data_workers,
+                    persistent_workers=True,
+                    pin_memory=True,
+                    drop_last=False,
+                    collate_fn=self.custom_collate_fn
+                )
+            else:
+                return DataLoader(
+                    self.train_ds,
+                    batch_size=config.batch_size,
+                    shuffle=True,
+                    num_workers=config.train_data_workers,
+                    persistent_workers=True,
+                    pin_memory=True,
+                    drop_last=False
+                )
         else:
             return DataLoader(
                 self.train_ds,
