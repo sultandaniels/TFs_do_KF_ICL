@@ -22,6 +22,7 @@ import time
 from get_last_checkpoint import get_last_checkpoint, split_path, find_smallest_step_subdir
 from haystack_plots import haystack_plots, load_quartiles_ckpt_files, haystack_plots_train_conv_full, haystack_plots_needle_full
 from gen_pred_cktps import gen_pred_ckpts
+from core.training import mem_suppress_ckpt_path
 
 print("CUDA_VISIBLE_DEVICES:", os.environ.get("CUDA_VISIBLE_DEVICES"))
 os.environ["WANDB_SILENT"] = "true"
@@ -809,6 +810,15 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
         print(ckpt_pred_steps)
         print(len(ckpt_pred_steps))
+    
+    elif model_name == "ortho_haar_big_mask_backstory":
+        minval = 33000
+        maxval = 51000
+        train_int = 1000
+
+        ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
+
+
 
     return ckpt_pred_steps
 
@@ -2417,6 +2427,19 @@ if __name__ == '__main__':
         config.override("num_haystack_examples", num_haystack_examples)
 
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
+
+        if config.mem_suppress:
+            ckpt_dir = mem_suppress_ckpt_path(config, ckpt_dir)
+            print(f"\n\nmem_suppress ckpt_dir: {ckpt_dir}")
+
+            output_dir = mem_suppress_ckpt_path(config, output_dir, experiment_ind=16)
+            print(f"\n\nmem_suppress output_dir: {output_dir}")
+
+            experiment_name = mem_suppress_ckpt_path(config,experiment_name,experiment_ind=0)
+
+            print(f"\n\nmem_suppress experiment_name: {experiment_name}")
+        
+            os.makedirs(output_dir, exist_ok=True)
 
         if ortho_sync: # run ortho sync test
             config.override("val_dataset_typ", "ortho_sync")

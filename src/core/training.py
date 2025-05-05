@@ -115,6 +115,26 @@ def get_callbacks_and_loggers_new_eig(model, output_dir, emb_dim): #add emb_dim 
     callbacks = [checkpoint_callback, lr_monitor]
     return callbacks, loggers
 
+def mem_suppress_ckpt_path(config, output_dir, experiment_ind=59):
+    if config.masking:
+        output_dir = f"{output_dir[:experiment_ind]}masked_{output_dir[experiment_ind :]}"
+    else:
+        output_dir = f"{output_dir[:experiment_ind]}unmasked_{output_dir[experiment_ind:]}"
+
+    if config.backstory:
+        if config.init_seg:
+            raise ValueError("Cannot have both backstory and init_seg")
+        else:
+            output_dir = f"{output_dir[:experiment_ind]}backstory_{output_dir[experiment_ind:]}"
+    elif config.init_seg:
+        if config.backstory:
+            raise ValueError("Cannot have both backstory and init_seg")
+        else:
+            output_dir = f"{output_dir[:experiment_ind]}init_seg_{output_dir[experiment_ind:]}"
+    else:
+        raise ValueError("No backstory or init_seg specified")
+    return output_dir
+
 def get_callbacks_and_loggers(config, output_dir, train_int): #add emb_dim as a parameter
     lr_monitor = pl_callbacks.LearningRateMonitor(logging_interval='epoch')
     tb_logger = pl_loggers.TensorBoardLogger(output_dir)
@@ -124,24 +144,25 @@ def get_callbacks_and_loggers(config, output_dir, train_int): #add emb_dim as a 
     experiment_ind = 59
 
     if config.mem_suppress: #create new dir for mem suppress checkpoints
-        if config.masking:
-            output_dir = f"{output_dir[:experiment_ind]}masked_{output_dir[experiment_ind :]}"
-        else:
-            output_dir = f"{output_dir[:experiment_ind]}unmasked_{output_dir[experiment_ind:]}"
+        output_dir = mem_suppress_ckpt_path(config, output_dir, experiment_ind)
+        # if config.masking:
+        #     output_dir = f"{output_dir[:experiment_ind]}masked_{output_dir[experiment_ind :]}"
+        # else:
+        #     output_dir = f"{output_dir[:experiment_ind]}unmasked_{output_dir[experiment_ind:]}"
 
-        print(f"output_dir: {output_dir}")
-        if config.backstory:
-            if config.init_seg:
-                raise ValueError("Cannot have both backstory and init_seg")
-            else:
-                output_dir = f"{output_dir[:experiment_ind]}backstory_{output_dir[experiment_ind:]}"
-        elif config.init_seg:
-            if config.backstory:
-                raise ValueError("Cannot have both backstory and init_seg")
-            else:
-                output_dir = f"{output_dir[:experiment_ind]}init_seg_{output_dir[experiment_ind:]}"
-        else:
-            raise ValueError("No backstory or init_seg specified")
+        # print(f"output_dir: {output_dir}")
+        # if config.backstory:
+        #     if config.init_seg:
+        #         raise ValueError("Cannot have both backstory and init_seg")
+        #     else:
+        #         output_dir = f"{output_dir[:experiment_ind]}backstory_{output_dir[experiment_ind:]}"
+        # elif config.init_seg:
+        #     if config.backstory:
+        #         raise ValueError("Cannot have both backstory and init_seg")
+        #     else:
+        #         output_dir = f"{output_dir[:experiment_ind]}init_seg_{output_dir[experiment_ind:]}"
+        # else:
+        #     raise ValueError("No backstory or init_seg specified")
         
         os.makedirs(output_dir, exist_ok=True)
 
