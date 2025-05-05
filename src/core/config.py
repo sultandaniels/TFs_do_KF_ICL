@@ -36,8 +36,7 @@ class Config(object, metaclass=Singleton):
     backstory = True #use masked backstories
     init_seg = False #use masked initial segments
     backstory_len = ny + 2 #length of the backstory
-    mask_budget = 10 #max # of systems that will be masked on first appearance
-    train_ex = 0 #train_ex index used for caching
+    mask_budget = 10 #max # of systems that will be masked on first appearance (alpha)
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
@@ -53,12 +52,12 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[1] #which GPU
+    devices=[2,3] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
-    train_int = 1000 #number of steps between logging (train interval)
+    train_int = 1 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 10 #8*40 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 8*40 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 256
@@ -68,9 +67,9 @@ class Config(object, metaclass=Singleton):
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
     n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 250  #500 for extended OLS #250 #context length
-    n_embd = 128 #192 #288
-    n_layer = 12 #24 #48
-    n_head = 8 #12 #18
+    n_embd = 192 #128 #192 #288
+    n_layer = 24 #12 #24 #48
+    n_head = 12 #8 #12 #18
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 

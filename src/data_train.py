@@ -1947,7 +1947,7 @@ def set_config_params(config, model_name):
     elif model_name == "ortho_haar_big_mask_backstory":
         experiment_name = "250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000"
 
-        print("\n\nORTHO HAAR BIG MODEL\n\n")
+        print("\n\nORTHO HAAR BIG MASKED BACKSTORY MODEL\n\n")
 
         # Dataset settings
         config.override("num_tasks", 40000)  # number of training systems
@@ -1962,6 +1962,14 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", True) #run the memory suppression experiment
+        config.override("masking", True) #run the masking training run
+        config.override("backstory", True) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
         config.override("devices", [2,3])  # which GPU
@@ -2383,16 +2391,16 @@ if __name__ == '__main__':
 
     if (not (train_conv or multi_haystack)) and (make_preds or saved_preds or resume_train):
 
-        set_config_params(config, model_name)
+        output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
+        print(f"output_dir: {output_dir}")
         
-        ckpt_path = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=16000.ckpt"
-        output_dir = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=32000.ckpt"
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
         #"../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=141000.ckpt"
         
-        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist, train_mix_state_dim, output_dir=output_dir)
+        run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, output_dir=output_dir, ys=None, sim_objs=None, run_kf_ols=False)
         
     elif train_conv or multi_haystack:
 

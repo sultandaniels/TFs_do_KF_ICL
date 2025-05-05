@@ -32,7 +32,11 @@ class BaseModel(pl.LightningModule):
         if config.masking:
             train_data_path = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.dataset_typ}/mem_suppress/"
             os.makedirs(train_data_path, exist_ok=True)
-            filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_batch_idx_{batch_idx}.npz"
+
+            # Use global_rank if available (for DDP), else fallback to process id
+            process_id = getattr(self, "global_rank", os.getpid())
+
+            filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_batch_idx_{batch_idx}_proc_{process_id}.npz"
 
             # save input_dict["orig_segments"] to a compressed npz file
             np.savez_compressed(os.path.join(train_data_path, filename),
