@@ -86,7 +86,7 @@ class GPT2(BaseModel):
 
         if config.multi_sys_trace:
 
-            if config.mem_suppress:
+            if config.mem_suppress and config.masking:
                 #create a mask to identify rows of ys that are all zeros and also all indices from the list of lists input_dict["mask_idx"]
                 #ys is of shape [batch_size, seq_len, dims]
                 mask_all_zeros = torch.all(ys == 0, dim=-1, keepdim=True)  # [batch_size, seq_len, 1]

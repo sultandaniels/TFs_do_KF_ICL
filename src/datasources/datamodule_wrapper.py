@@ -27,7 +27,7 @@ class DataModuleWrapper(pl.LightningDataModule):
     def train_dataloader(self):
 
         if config.mem_suppress:
-            if config.masking:
+            if config.masking or not (config.cached_data or config.masking):
                 return DataLoader(
                     self.train_ds,
                     batch_size=config.batch_size,
@@ -38,7 +38,7 @@ class DataModuleWrapper(pl.LightningDataModule):
                     drop_last=False,
                     collate_fn=self.custom_collate_fn
                 )
-            else:
+            elif not config.masking and config.cached_data:
                 return DataLoader(
                     self.train_ds,
                     batch_size=config.batch_size,

@@ -384,7 +384,7 @@ class FilterDataset(Dataset):
 
                 # filename = f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_orig_segments_worker_{worker_id}_idx_{idx}.npz"
 
-                if config.masking:
+                if config.masking or not (config.cached_data or config.masking):
                     orig_segments = segments #save the original segments for later use
                     #save orig_segments to a file
 
@@ -399,6 +399,7 @@ class FilterDataset(Dataset):
                     mask_idx = [] # initialize the mask index list
                     sys_appear = []
                     if config.backstory:
+                    
                         n_masks = 0 #number of sys that have been masked
                         i = 0 #segment number in interleaved segments
                         while i < len(seg_starts) and n_masks < config.mask_budget:
@@ -475,8 +476,8 @@ class FilterDataset(Dataset):
                     entry["orig_segments"] = orig_segments #add the original segments to the entry dictionary
                     entry["mask_idx"] = mask_idx #add the mask indices to the entry dictionary
 
-                else:
-                    raise NotImplementedError("non-masking backstory is not implemented yet")
+                elif config.cached_data:
+                    raise NotImplementedError("cached_data is not implemented yet")
                     # # load orig segments from npz file
                     # with np.load(f"{train_data_path}{filename}") as data:
                     #     segments = data["orig_segments"]

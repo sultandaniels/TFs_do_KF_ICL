@@ -32,7 +32,8 @@ class Config(object, metaclass=Singleton):
 
     #mem_suppress experiment settings
     mem_suppress = True #run the memory suppression experiment
-    masking = True #run the masking training run
+    masking = False #run the masking training run
+    cached_data = False #use cached data
     backstory = True #use masked backstories
     init_seg = False #use masked initial segments
     backstory_len = ny + 2 #length of the backstory
@@ -52,7 +53,7 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[2,3] #which GPU
+    devices=[1] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 1 #number of steps between logging (train interval)
