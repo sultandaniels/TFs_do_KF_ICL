@@ -818,6 +818,13 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
 
+    elif model_name == "ortho_haar_big_unmask_backstory":
+        minval = 33000
+        maxval = 54000
+        train_int = 3000
+
+        ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
+
 
 
     return ckpt_pred_steps
