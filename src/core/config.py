@@ -61,8 +61,8 @@ class Config(object, metaclass=Singleton):
     batch_size = 8*40 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
-    test_batch_size = 256
-    test_data_workers = 1 #keep at 1
+    test_batch_size = 512
+    test_data_workers = 128 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
