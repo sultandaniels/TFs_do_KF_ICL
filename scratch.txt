@@ -33,3 +33,6 @@ find /home/ubuntu/gauss-NoPE-GH200/TFs_do_KF_ICL/outputs/GPT2/250125_210849.0920
 
 
 for i in {1,2,200}; do CUDA_VISIBLE_DEVICES=0 python data_train.py --make_preds --multi_haystack --model_name gauss --datasource train --late_start $i; done
+
+
+CUDA_VISIBLE_DEVICES=1 python data_train.py --multi_haystack --make_preds --model_name ortho_haar_big --datasource train

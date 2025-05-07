@@ -2485,7 +2485,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 1
+        last_haystack_len = 19
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
@@ -2493,7 +2493,7 @@ if __name__ == '__main__':
             num_haystack_examples = 1
         else:
             if config.datasource == "train":
-                num_haystack_examples = 500
+                num_haystack_examples = 40000
             else:
                 num_haystack_examples = 50 #number of haystack examples to use for testing
 
