@@ -820,7 +820,7 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "ortho_haar_big_unmask_backstory":
         minval = 33000
-        maxval = 54000
+        maxval = 57000
         train_int = 3000
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
@@ -1937,6 +1937,15 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
         config.override("devices", [2,3])  # which GPU
@@ -2463,7 +2472,9 @@ if __name__ == '__main__':
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
         print(f"output_dir: {output_dir}")
         
-        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=32000.ckpt"
+        # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=32000.ckpt" #normal training run
+
+        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_masked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=69000.ckpt" #masked_backstories
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
@@ -2474,14 +2485,17 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 19
+        last_haystack_len = 1
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
         elif config.opposite_ortho:
             num_haystack_examples = 1
         else:
-            num_haystack_examples = 50 #number of haystack examples to use for testing
+            if config.datasource == "train":
+                num_haystack_examples = 500
+            else:
+                num_haystack_examples = 50 #number of haystack examples to use for testing
 
         config.override("num_haystack_examples", num_haystack_examples)
 
@@ -2512,8 +2526,8 @@ if __name__ == '__main__':
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
-            steps_in = [1,2,3,5,10]
-            # steps_in = list(range(1,7))
+            # steps_in = [1,2,3,5,10]
+            steps_in = list(range(1,9))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         

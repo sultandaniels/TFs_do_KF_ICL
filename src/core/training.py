@@ -116,6 +116,9 @@ def get_callbacks_and_loggers_new_eig(model, output_dir, emb_dim): #add emb_dim 
     return callbacks, loggers
 
 def mem_suppress_ckpt_path(config, output_dir, experiment_ind=59):
+    if "mask" in output_dir or "backstory" in output_dir or "init_seg" in output_dir:
+        print("output_dir already has mask or backstory or init_seg")
+        return output_dir
     if config.masking:
         output_dir = f"{output_dir[:experiment_ind]}masked_{output_dir[experiment_ind :]}"
     else:
