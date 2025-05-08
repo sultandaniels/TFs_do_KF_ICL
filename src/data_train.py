@@ -813,7 +813,7 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
     
     elif model_name == "ortho_haar_big_mask_backstory":
         minval = 33000
-        maxval = 69000
+        maxval = 120000
         train_int = 3000
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
@@ -2089,7 +2089,7 @@ def get_entries(config, f):
             num_tasks = config.num_val_tasks
         else:
             num_tasks = config.num_tasks
-    elif config.datasource == "train":
+    elif config.datasource == "train" or config.datasource == "backstory_train":
         num_traces = config.num_traces["train"]
         num_tasks = config.num_tasks
     else:
@@ -2474,11 +2474,9 @@ if __name__ == '__main__':
         
         # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=32000.ckpt" #normal training run
 
-        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_masked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=69000.ckpt" #masked_backstories
+        # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_masked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=69000.ckpt" #masked_backstories
         
-        #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
-        
-        #"../outputs/GPT2/250114_202420.3c1184_multi_sys_trace_gaussA_state_dim_10_gauss_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=141000.ckpt"
+        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_unmasked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=59000.ckpt" #unmasked_backstories
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, output_dir=output_dir, ys=None, sim_objs=None, run_kf_ols=False)
         
@@ -2493,7 +2491,7 @@ if __name__ == '__main__':
             num_haystack_examples = 1
         else:
             if config.datasource == "train":
-                num_haystack_examples = 40000
+                num_haystack_examples = 500 #40000
             else:
                 num_haystack_examples = 50 #number of haystack examples to use for testing
 
