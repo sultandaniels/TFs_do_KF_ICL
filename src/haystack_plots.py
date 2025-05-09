@@ -584,7 +584,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
-        if key == "OLS_analytical_ir_1" or key == "OLS_ir_1": #key == "MOP" or 
+        if key == "MOP" or key == "OLS_analytical_ir_1" or key == "OLS_ir_1": #key == "MOP" or 
             col_count = 0
             for step in steps:
 

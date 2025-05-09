@@ -8,7 +8,6 @@ from utils import log_info
 from utils import Singleton
 from utils import set_seed
 import numpy as np
-import numpy as np
 
 # /checkpoints/step=10000.ckpt
 
@@ -54,7 +53,6 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[1] #which GPU
 
     devices=[1] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
