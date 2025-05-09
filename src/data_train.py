@@ -2134,7 +2134,7 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
 
             gc.collect()  # Start the garbage collector to free up memory
 
-    elif config.datasource == "train":
+    elif config.datasource == "train" or config.datasource == "backstory_train":
 
         print(f"getting test data from datasource {config.datasource}")
 
@@ -2490,7 +2490,7 @@ if __name__ == '__main__':
         elif config.opposite_ortho:
             num_haystack_examples = 1
         else:
-            if config.datasource == "train":
+            if config.datasource == "train" or config.datasource == "backstory_train":
                 num_haystack_examples = 500 #40000
             else:
                 num_haystack_examples = 50 #number of haystack examples to use for testing
@@ -2536,7 +2536,7 @@ if __name__ == '__main__':
                     # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
                     num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
-                num_sys_haystacks = list(range(2,5))
+                num_sys_haystacks = list(range(2,last_haystack_len+1))
                 
             else:
                 num_sys_haystacks = list(range(1,last_haystack_len+1))

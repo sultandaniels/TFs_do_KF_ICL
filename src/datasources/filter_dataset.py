@@ -91,7 +91,7 @@ def special_tokens(segment, sys_name, style):
     
     return start_token, end_token
 
-def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None, example=None):
+def populate_traces(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None, example=None, sim_objs=None):
 
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
@@ -102,8 +102,8 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
     if not test and config.mem_suppress:
         context_len -= config.mask_budget*config.backstory_len #subtract the maximum number of indices that will be masked from the context length
-    if test and config.mem_suppress and config.datasource == "backstory_train":
-        context_len -= config.mask_budget*config.backstory_len #tr
+    # if test and config.mem_suppress and config.datasource == "backstory_train":
+    #     context_len -= config.mask_budget*config.backstory_len #tr
 
 
     sys_names = np.arange(config.max_sys_trace) #system names
@@ -334,22 +334,24 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
 
     if test and config.datasource == "backstory_train":
         #add backstories to the segments
+        orig_seg_starts = seg_starts.copy() #save the original segment starts for later use
+
         sys_appear = []
         mask_idx = [] # initialize the mask index list
-        segments, mask_idx = add_backstories(config, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens)
+        segments, mask_idx = add_backstories(config, sim_objs, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens)
 
-        #THINK ABOUT HOW SEG_STARTS GET AFFECTED BY BACKSTORY
+        seg_starts = orig_seg_starts
         
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
 
-def add_backstories(self, config, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens):
+def add_backstories(config, sim_objs, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens):
     n_masks = 0 #number of sys that have been masked
     i = 0 #segment number in interleaved segments
     while i < len(seg_starts) and n_masks < config.mask_budget:
         if sys_choices[i] not in sys_appear and real_seg_lens[i] > 0: #if the system has not appeared before and the segment length is greater than 0
             sys_appear.append(sys_choices[i])
-            A = self.sim_objs[sys_choices[i]].A
+            A = sim_objs[sys_choices[i]].A
 
             x0_ind = seg_starts[i] + 1
             x0 = segments[x0_ind, 2*config.max_sys_trace + 2:]
@@ -439,7 +441,7 @@ class FilterDataset(Dataset):
     def __getitem__(self, idx):
 
         if config.multi_sys_trace:
-            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries)
+            segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.entries, sim_objs=self.sim_objs)
 
             if config.mem_suppress:
 
@@ -449,7 +451,7 @@ class FilterDataset(Dataset):
                     sys_appear = []
                     if config.backstory:
 
-                        segments, mask_idx = add_backstories(config, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens)
+                        segments, mask_idx = add_backstories(config, self.sim_objs, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens)
                     
                         # n_masks = 0 #number of sys that have been masked
                         # i = 0 #segment number in interleaved segments

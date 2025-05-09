@@ -476,6 +476,10 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
             x_values.append(x_value)
             for needle in range(1):
                 fin_seg_start = seg_starts_per_conf[needle][-1]
+                if config.datasource == "backstory_train":
+                    fin_seg_start += config.backstory_len*config.num_sys_haystack
+
+
                 beg_seg_start = seg_starts_per_conf[needle][0]
                 for step in steps_in:
                     for key in ["MOP"]: #, "OLS_ir_1", "OLS_ir_2", "OLS_ir_3", "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]:

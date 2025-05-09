@@ -22,7 +22,7 @@ from dyn_models import apply_kf
 from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
 from datasources import filter_dataset
-from datasources.filter_dataset import populate_traces, special_tokens
+from datasources.filter_dataset import populate_traces, special_tokens, add_backstories
 from collect_data import collect_data
 import linalg_helpers as la
 
@@ -1068,7 +1068,7 @@ def compute_errors_conv(config):
 
     return err_lss, irreducible_error
 
-def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_dict=None, tok_seg_lens=None, real_seg_lens=None):
+def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_dict=None, tok_seg_lens=None, real_seg_lens=None, seg_starts=None, sim_objs=None):
 
     # a function to populate the validation traces
 
@@ -1088,7 +1088,8 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
         seg_start = 1
         count = 0
         for sys in sys_choices:
-
+            
+            seg_starts.append(seg_start) #append the starting index for the segment to the seg_starts list
             #get obs from the system trace corresponding to sys_trace_ind
             sys_trace_obs = ys_trial[sys]
             tok_seg_len = tok_seg_lens[count]
@@ -1160,7 +1161,15 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
         if trial == 0:
             raise ValueError(f"first conditional malfunction since trial = {trial}")
         else:
-            raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")
+            raise ValueError(f"sys_dict is {sys_dict} when trial is {trial}")\
+
+
+
+    if config.datasource == "backstory_train":
+
+        mask_idx = []
+        sys_appear = []
+        segments, mask_idx = add_backstories(config, sim_objs, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens)
     return segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens
 
 def cycle_list(lst, shift):
@@ -1168,7 +1177,7 @@ def cycle_list(lst, shift):
     # a function to cycle a list to the right by shift amount
     return lst[-shift:] + lst[:-shift]
 
-def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, train_conv=False, ex=None):
+def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choices=None, sys_dict=None, tok_seg_lens=None, seg_starts=None, real_seg_lens=None, sys_inds = None, train_conv=False, ex=None, sim_objs=None):
     # a function to populate the validation traces
     # in order to narrow the error bars, there will be num_trials versions of the same test trace configuration (randomly configured by the leader trace) with different trace realizations
 
@@ -1179,12 +1188,12 @@ def populate_val_traces(config, trace_conf, trial, num_tasks, entries, sys_choic
             haystack = sys_choices[:-1] #get the haystack from the previous trial
             new_haystack = cycle_list(haystack, 1) #cycle the haystack to the left by 1
             sys_choices = new_haystack + [sys_choices[-1]] #set the new system choices
-            segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
+            segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens, seg_starts=seg_starts, sim_objs=sim_objs)
 
         else:
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv, trace_conf=trace_conf, example=ex)
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, num_tasks, ys_trial, test=True, train_conv=train_conv, trace_conf=trace_conf, example=ex, sim_objs=sim_objs) #populate the traces for the first trial
     else:
-        segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens)
+        segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens = populate_val_traces_helper(config, trial, ys_trial, sys_choices=sys_choices, sys_dict=sys_dict, tok_seg_lens=tok_seg_lens, real_seg_lens=real_seg_lens, seg_starts=seg_starts, sim_objs=sim_objs)
   
     return segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds
 
@@ -1640,7 +1649,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
     
     if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
-    elif config.datasource == "train":
+    elif config.datasource == "train" or config.datasource == "backstory_train":
         num_trials = config.num_traces["train"]
     else:
         raise ValueError(f"datasource {config.datasource} not recognized")
@@ -1668,7 +1677,13 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
     # print(f"\n err_lss does not exist yet for step {ckpt_steps}")
 
 
-    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+    multi_sys_ys_context_len = config.n_positions + 1
+
+    if config.datasource == "backstory_train":
+        multi_sys_ys_context_len += config.backstory_len*config.num_sys_haystack
+
+
+    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
         
 
     sys_choices_per_config = []
@@ -1691,7 +1706,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
         for trial in range(num_trials):
 
             #generate interleaved segments
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex, sim_objs=sim_objs) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
 
             #print first index of each segment
@@ -1728,7 +1743,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
                 {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
             preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
         preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
-                            (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
+                            (*batch_shape, multi_sys_ys_context_len - 1, config.ny))  # Combine the predictions for all batches
         # print("preds_tf.shape:", preds_tf.shape)
         preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
                                 axis=-2)  # concatenate the predictions
@@ -1798,7 +1813,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
 
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
-def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None):
+def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None, sim_objs=None):
     multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
         
 
@@ -1822,7 +1837,7 @@ def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None):
         for trial in range(num_trials):
 
             #generate interleaved segments
-            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex) # get the first trace  which will set the testing structure
+            segments, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds = populate_val_traces(config, trace_config, trial, config.num_val_tasks, ys, sys_choices, sys_dict, tok_seg_lens, seg_starts, real_seg_lens, sys_inds, ex=ex, sim_objs=sim_objs) # get the first trace  which will set the testing structure
             multi_sys_ys[trace_config, trial] = segments
         
         sys_choices_per_config.append(sys_choices)
