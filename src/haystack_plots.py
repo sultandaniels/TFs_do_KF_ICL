@@ -82,7 +82,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
         
     fig, ax = plt.subplots(num_axes, 1, sharex=True, figsize=(5, 3.5*num_axes)) #
 
-    print(f"real_steps: {real_steps}, real_steps_ext: {real_steps_ext}")
+    #print(f"real_steps: {real_steps}, real_steps_ext: {real_steps_ext}")
 
 
     for needle in range(haystack_len):
@@ -96,7 +96,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
 
                     key_label = "TF" if key == "MOP" else key
 
-                    print(f"needle: {needle}, step: {step}, real_step: {real_steps[step_count]}")
+                    #print(f"needle: {needle}, step: {step}, real_step: {real_steps[step_count]}")
 
                     y = quartiles[key][1, needle, real_steps[step_count]]
                     print(f"y: {y}")
@@ -418,7 +418,7 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
         errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{haystack_len}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
 
-        print(f"in compute quartiles ckpt errs_loc: {errs_loc}")
+        #print(f"in compute quartiles ckpt errs_loc: {errs_loc}")
 
         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
             print(f"loading errors for ckpt_step: {ckpt_step}")
