@@ -8,6 +8,7 @@ from utils import log_info
 from utils import Singleton
 from utils import set_seed
 import numpy as np
+import numpy as np
 
 # /checkpoints/step=10000.ckpt
 
@@ -54,11 +55,13 @@ class Config(object, metaclass=Singleton):
 
     # Training settings
     devices=[1] #which GPU
+
+    devices=[1] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #1000 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 512 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 1024 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
     train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 512
@@ -67,10 +70,10 @@ class Config(object, metaclass=Singleton):
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
-    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 250  #500 for extended OLS #250 #context length
-    n_embd = 192 #128 #192 #288
-    n_layer = 24 #12 #24 #48
-    n_head = 12 #8 #12 #18
+    n_positions = 250 #500 for extended OLS #250 #context length
+    n_embd = 96
+    n_layer = 6
+    n_head = 6
     n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
     n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
@@ -84,8 +87,8 @@ class Config(object, metaclass=Singleton):
     # same_length = True
     # clamp_len = 1000
 
-    # Optimizer parameters
-    learning_rate = np.sqrt((len(devices) * batch_size)/512)*(0.833333333)*1.584893192461114e-05 #1.9054607179632464e-05
+    # Optimizer parameters 
+    learning_rate = np.sqrt((len(devices) * batch_size)/512)*(2)*1.584893192461114e-05#1.584893192461114e-05 #1.9054607179632464e-05
     weight_decay = 1e-2
 
     # Gradient Clipping

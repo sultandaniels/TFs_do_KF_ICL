@@ -19,6 +19,8 @@ import gc
 import torch
 import shutil
 import time
+import subprocess
+import sys
 from get_last_checkpoint import get_last_checkpoint, split_path, find_smallest_step_subdir
 from haystack_plots import haystack_plots, load_quartiles_ckpt_files, haystack_plots_train_conv_full, haystack_plots_needle_full
 from gen_pred_cktps import gen_pred_ckpts
@@ -1017,7 +1019,7 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "hyperparameter_sweep":
         minval = 1000
-        maxval = 20000
+        maxval = 12000
         train_int = 1000
 
         phases = [minval, maxval]
@@ -2487,10 +2489,10 @@ def set_config_params(config, model_name):
         # Dataset settings
         config.override("num_tasks", 40000)  # number of training systems
         config.override("num_val_tasks", 100)  # number of test systems
-        config.override("dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
         config.override("max_cond_num", 100)
         config.override("distinct_cond_nums", 10)
-        config.override("val_dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("val_dataset_typ", "ident")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
         config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
         config.override("nx", 5)
         config.override("ny", 5)
@@ -2500,7 +2502,7 @@ def set_config_params(config, model_name):
         
         # Training settings
         #config.override("devices", [3])  # leave comented out for hyperparamter sweep, it is set in config
-        config.override("train_steps", 20000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("train_steps", 12000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
         config.override("num_epochs", 1)  # minimum number of epochs to train for
         config.override("train_int",5)  #1000 number of steps between logging (train interval)
         config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
@@ -2519,7 +2521,7 @@ def set_config_params(config, model_name):
         config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
         config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
         
-        config.override("learning_rate", 1.584893192461114e-05)
+        #config.override("learning_rate", 1.584893192461114e-05)
 
 
         experiment_name = None#"250407_133748.f39da8_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
@@ -2751,6 +2753,7 @@ if __name__ == '__main__':
     parser.add_argument('--ortho_sync', help='Boolean. use orthogonal systems test with sync', action='store_true')
 
     parser.add_argument('--multi_train', help='Boolean. Run multiple runs back to back for hyperparameter sweep', action='store_true')
+    parser.add_argument('--learning_rate', type=float, help='Override the default learning rate')
 
 
 
@@ -2828,6 +2831,8 @@ if __name__ == '__main__':
 
     print("multi_train arg", args.multi_train)
     multi_train = args.multi_train
+    print("learning_rate arg", args.learning_rate)
+    new_learning_rate = args.learning_rate
 
 
 
@@ -3207,7 +3212,93 @@ if __name__ == '__main__':
 
                 predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
     
+    elif new_learning_rate:
+
+        #Multi-train parameters
+        train_steps = 12000  #set this in set_config_params as well
+        train_int = 1000
+        model_name = "hyperparameter_sweep" #check this when running
+
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("\ndevice:", device)
+
+        
+        print(f"\n\nstarting training for learning rate = {new_learning_rate}")
+
+        
+        config.override("train_steps", train_steps)
+        config_dict["train_steps"] = train_steps
+        config.override("train_int", train_int)
+        config_dict["train_int"] = train_int
+        config.override("learning_rate", new_learning_rate)
+        config_dict["learning_rate"] = new_learning_rate
+
+        model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
+                n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head, use_pos_emb=config.use_pos_emb)
+    
+        model.to(device)
+        
+        model.learning_rate = config.learning_rate
+
+        output_dir, ckpt_dir, experiment_name = setup_train(model, train_mix_dist, train_mix_state_dim)
+        
+        
+        # replace ckpt_path with the path to the checkpoint file
+        config.override("ckpt_path", ckpt_dir + "/checkpoints/step=" + str(config.train_steps) + ".ckpt")
+
+        wandb_train(config_dict, model, ckpt_dir, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim) # train the model
+
+
+
+        #### perfomrm predictions for one needle ####
+        num_sys = 1
+        num_haystack_examples = 50
+
+        config.override("num_haystack_examples", num_haystack_examples)
+        config.override("num_sys_haystack", num_sys)
+        
+        _, _, _ = set_config_params(config, model_name) #Not sure if this matters
+        steps_in = list(range(1,11))
+
+        if ortho_haar:
+            config.override("val_dataset_typ", "ortho_haar")
+        
+        
+
+        ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
+
+        colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
+        config.override("needle_in_haystack", True)
+        config.override("needle_final_seg_extended", False)
+
+        ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
+
+        print(f"output dir: {output_dir}")
+        print(f"config.use_pos_emb: {config.use_pos_emb}")
+
+        print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
+
+        kal_step = predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name)
+
+        print(f"plotting train_conv convergence plots for haystack len {num_sys}")
+        pred_ckpt_step = haystack_plots_train_conv_full(config, model_name, num_sys, output_dir, ckpt_dir, experiment_name, ckpt_pred_steps, kal_step, steps_in, colors, compute_more=make_preds, abs_err=abs_err)
+
+
     elif multi_train:
+        #currently set for sweeping over learning rates
+        sweep = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7] #1e-1, 1e-2,
+
+        for lr in sweep:
+            command = [
+                sys.executable,  # This uses the current python interpreter
+                "data_train.py",
+                f"--learning_rate={lr}"
+            ]
+            subprocess.run(command)
+
+
+        '''
         #Multi-train parameters
         train_steps = 20000  #set this in set_config_params as well
         train_int = 1000
@@ -3304,8 +3395,7 @@ if __name__ == '__main__':
             # clean device for new run
             del model
             torch.cuda.empty_cache()
-
-
+            '''
 
 
 
