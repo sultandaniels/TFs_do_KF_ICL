@@ -2157,12 +2157,14 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
             ys = get_entries(config, f)
             gc.collect()  # Start the garbage collector
         
+        start_sys = 1000
+        print(f"start_sys: {start_sys}")
         print(f"len of sim_objs {len(sim_objs)}")
-        sim_objs = sim_objs[:max_num_sys]
+        sim_objs = sim_objs[start_sys:start_sys + max_num_sys]
         print(f"len of sim_objs {len(sim_objs)}")
 
         print(f"shape of ys: {ys.shape}")
-        ys = ys[:max_num_sys]
+        ys = ys[start_sys:start_sys + max_num_sys]
         print(f"shape of ys: {ys.shape}")
     
 
@@ -2483,7 +2485,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 19
+        last_haystack_len = 1
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1

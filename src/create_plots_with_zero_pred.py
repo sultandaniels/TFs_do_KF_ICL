@@ -1680,7 +1680,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
     multi_sys_ys_context_len = config.n_positions + 1
 
     if config.datasource == "backstory_train":
-        multi_sys_ys_context_len += config.backstory_len*config.num_sys_haystack
+        multi_sys_ys_context_len += config.backstory_len*min(config.num_sys_haystack,10)
 
 
     multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
