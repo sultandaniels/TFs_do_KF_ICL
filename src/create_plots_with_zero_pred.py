@@ -1088,8 +1088,7 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
         seg_start = 1
         count = 0
         for sys in sys_choices:
-            
-            seg_starts.append(seg_start) #append the starting index for the segment to the seg_starts list
+
             #get obs from the system trace corresponding to sys_trace_ind
             sys_trace_obs = ys_trial[sys]
             tok_seg_len = tok_seg_lens[count]
@@ -1762,6 +1761,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
         seg_count = 0
         for seg_start in seg_starts_per_config[trace_config]: #loop over the starting indices of the segments
             #set the errors of the end of the segment to be infinite
+            
             if real_seg_lens_per_config[trace_config][seg_count] < tok_seg_lens_per_config[trace_config][seg_count] - 1:
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
             if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
