@@ -200,7 +200,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
 
                 if valA != "gaussA":
                     ax.legend(fontsize = 8, columnspacing=0.25, loc="lower right", ncol=3) #loc="upper left")
-                    ax.set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
+                    ax.set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Liberation Serif")
                     ax.set_ylabel(("(" if valA== "gaussA" else "") + "Error" + (" Ratio - 1" if valA == "gaussA" else ""), fontsize=12)
                     ax.set_xlim(-3, haystack_len)
                     ax.grid(True)
@@ -229,7 +229,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
 
 
                     ax[step_count].legend(fontsize = 10, ncol=5, columnspacing=0.4, handletextpad=0.25, loc="lower left") #, loc="upper left")
-                    ax[step_count].set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Times New Roman")
+                    ax[step_count].set_xlabel("Needle Position from the End of the Haystack", fontsize=12, fontname="Liberation Serif")
                     ax[step_count].set_ylabel("Error" + (" Ratio - 1" if valA == "gaussA" else "") + f": {step} After Open", fontsize=12)
                     ax[step_count].set_xlim(-3, haystack_len)
                     ax[step_count].grid(True)
@@ -654,7 +654,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     ax.grid(True, which="both")
     ax.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left")
     ax.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
-    # ax.set_ylim([5e-2, 3e0])
+    ax.set_ylim([1e-3, 1.5e0])
     # ax.set_title(("Ortho" if valA == "ortho" else ("Gaussian" if valA == "gaussA" else "Identity")) + f" Haystack Length: {haystack_len} vs Training Examples")
 
     ax_len.set_xlabel("# of Training Examples", fontsize=14)
@@ -664,6 +664,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     ax_len.grid(True, which="both")
     ax_len.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left") #"center right" if valA == "ident" else 
     ax_len.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
+    ax_len.set_ylim([-0.1, 1.5e0])
 
     #add the date and time to the filename
     now = datetime.now()

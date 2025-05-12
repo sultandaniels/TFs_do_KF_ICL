@@ -2536,7 +2536,8 @@ if __name__ == '__main__':
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
             # steps_in = [1,2,3,5,10]
-            steps_in = list(range(1,9))
+            steps_in = [1,2,3,7,8]
+            # steps_in = list(range(1,9))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
@@ -2547,11 +2548,11 @@ if __name__ == '__main__':
                     # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
                     num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
-                # num_sys_haystacks = list(range(2,last_haystack_len+1))
-                num_sys_haystacks = [1,2,3,17,18,19]
+                num_sys_haystacks = list(range(2,last_haystack_len+1))
                 
             else:
-                num_sys_haystacks = list(range(1,last_haystack_len+1))
+                # num_sys_haystacks = list(range(1,last_haystack_len+1))
+                num_sys_haystacks = [1,2,3,17,18,19]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
