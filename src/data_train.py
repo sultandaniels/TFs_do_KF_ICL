@@ -1892,6 +1892,15 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
         config.override("devices", [3])  # which GPU

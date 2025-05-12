@@ -55,9 +55,9 @@ def load_quartiles(config, model_dir, experiment, ckpt_step):
     quartiles = None
     seg_ext_quartiles = None
 
-    quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "") + f"quartiles_step_{ckpt_step}.npz"
+    quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") + ("ortho_sync_" if config.val_dataset_typ == "ortho_sync" else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "") + f"quartiles_step_{ckpt_step}.npz"
 
-    seg_ext_quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") + ("fix_needle_" if config.fix_needle else "") +  ("paren_swap_" if config.paren_swap else "") + f"seg_ext_quartiles_step_{ckpt_step}.npz"
+    seg_ext_quartiles_file = model_dir + experiment + "/needles/" + (config.datasource + "_" if config.datasource != "val" else "") + ("ortho_sync_" if config.val_dataset_typ == "ortho_sync" else "") + ("fix_needle_" if config.fix_needle else "") +  ("paren_swap_" if config.paren_swap else "") + f"seg_ext_quartiles_step_{ckpt_step}.npz"
 
     if os.path.exists(quartiles_file):
         print(f"Loading quartiles from {quartiles_file}")
