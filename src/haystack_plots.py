@@ -30,7 +30,7 @@ def comp_quartiles(config, err_lss_examples, ratio=False, train_conv=False, kal_
             else:
                 rat = err_lss_examples[key]
 
-            print(f"rat shape: {rat.shape}")
+            #print(f"rat shape: {rat.shape}")
             num_sys_ex = rat.shape[0]
             if num_sys_ex > 1 or config.opposite_ortho:
                 med = np.median(rat, axis=2)

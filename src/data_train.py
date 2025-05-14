@@ -1015,6 +1015,33 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
+    elif model_name == "ortho_haar_small":
+        minval = 1000
+        maxval = 100000
+        train_int = 1000
+
+        phases = [minval, 20000, 50000, 70000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    elif model_name == "ortho_haar_tiny":
+        minval = 1000
+        maxval = 49000
+        train_int = 1000
+
+        phases = [minval, 20000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
+    elif model_name == "ortho_haar_40M":
+        minval = 1000
+        maxval = 102000
+        train_int = 1000
+
+        phases = [minval, 15000, 40000, 60000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+
     return ckpt_pred_steps
 
 
@@ -2287,7 +2314,7 @@ def set_config_params(config, model_name):
         config.override("changing", False)  # used only for plotting
         
         # Training settings
-        config.override("devices", [3])  # which GPU
+        config.override("devices", [1])  # which GPU
         config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
         config.override("num_epochs", 1)  # minimum number of epochs to train for
         config.override("train_int",1000)  # number of steps between logging (train interval)
@@ -3120,6 +3147,158 @@ def set_config_params(config, model_name):
 
         ckpt_dir = None #f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
+    elif model_name == "ortho_haar_small":
+        experiment_name = "250507_024037.72e4da_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_4.4827548953825996e-05_num_train_sys_40000"
+
+        print("\n\nORTHO HAAR SMALL MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
+        
+        # Training settings
+        config.override("devices", [1])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 1024)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 96)
+        config.override("n_layer", 6)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", np.sqrt((len(config.devices) * config.batch_size)/512)*(2)*1.584893192461114e-05) 
+    
+    elif model_name == "ortho_haar_tiny":
+        experiment_name = "250508_234147.a7058e_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_0.00012679145539688913_num_train_sys_40000"
+
+        print("\n\nORTHO HAAR TINY MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
+        
+        # Training settings
+        config.override("devices", [1])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 2048)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 72)
+        config.override("n_layer", 3)
+        config.override("n_head", 6)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", np.sqrt((len(config.devices) * config.batch_size)/512)*(4)*1.584893192461114e-05)
+
+    elif model_name == "ortho_haar_40M":
+        experiment_name = "250509_232740.d8a2db_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_4.765825198443491e-06_num_train_sys_40000"
+
+        print("\n\nORTHO HAAR 40M MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("max_cond_num", 100)
+        config.override("distinct_cond_nums", 10)
+        config.override("val_dataset_typ", "ortho_haar")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("C_dist", "_ident_C")  # "_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("n_noise", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
+        
+        # Training settings
+        config.override("devices", [1])  # which GPU
+        config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 96)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 250)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 288)
+        config.override("n_layer", 24)
+        config.override("n_head", 18)
+        config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", np.sqrt((len(config.devices) * config.batch_size)/512)*(0.8333333**2)*1.584893192461114e-05)
 
     else:
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
@@ -3552,8 +3731,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 19
-        last_haystack_len = 19
+        last_haystack_len = 1 #19 
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
@@ -3594,8 +3772,8 @@ if __name__ == '__main__':
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
-            # steps_in = [1,2,3,5,10]
-            steps_in = list(range(1,9))
+            steps_in = [1,2,3,7,8]
+            #steps_in = list(range(1,9))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
@@ -3605,6 +3783,8 @@ if __name__ == '__main__':
                 else:
                     # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
                     num_sys_haystacks = list(range(2,last_haystack_len+1))
+            elif ortho_sync:
+                num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
                 num_sys_haystacks = list(range(2,5))
                 
