@@ -2571,9 +2571,9 @@ if __name__ == '__main__':
 
             ckpt_pred_steps = gen_ckpt_pred_steps(model_name)
 
-            steps_in = [1,2,3,5,10]
+            # steps_in = [1,2,3,5,10]
             # steps_in = [1,2,3,7,8]
-            # steps_in = list(range(1,9))
+            steps_in = list(range(1,9))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
@@ -2778,8 +2778,7 @@ if __name__ == '__main__':
                 
                 # haystack_plots(config, num_sys, output_dir, pred_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
         else:
-
-            output_dir = "../outputs/GPT2_NoPE/250123_214343.0d4e0b_multi_sys_trace_ident_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000"
+            
             if make_preds:
 
                 ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
