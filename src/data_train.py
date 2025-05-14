@@ -803,6 +803,17 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
         phases = [minval, 3000, 27000, 50000, 100000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+    
+    #
+    #
+    elif model_name == "ortho_big_20k":
+        minval = 1000
+        maxval = 262000
+        train_int = 1000
+
+        phases = [minval, 3000, 27000, 50000, 100000, maxval]
+
+        ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
     elif model_name == "ortho_haar_medium_single_gpu":
         minval = 1000
@@ -833,7 +844,7 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "ortho_haar_big_unmask_backstory":
         minval = 33000
-        maxval = 57000
+        maxval = 112000
         train_int = 3000
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
@@ -869,12 +880,10 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "ortho_haar_big_unmask_backstory":
         minval = 33000
-        maxval = 57000
+        maxval = 112000
         train_int = 3000
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
-
-
 
     elif model_name == "ortho_big_4k":
         minval = 1000
@@ -1344,6 +1353,15 @@ def set_config_params(config, model_name):
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
 
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
+
         # Training settings
         config.override("devices", [0, 1])  # which GPU
         config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
@@ -1464,6 +1482,15 @@ def set_config_params(config, model_name):
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
 
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
+
         # Training settings
         config.override("devices", [0])  # which GPU
         config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
@@ -1583,6 +1610,15 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
 
         # Training settings
         config.override("devices", [0])  # which GPU
@@ -1830,6 +1866,15 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
         config.override("devices", [0])  # which GPU
@@ -2167,7 +2212,8 @@ def set_config_params(config, model_name):
         config.override("n_dims_in", int(config.ny + (2 * config.max_sys_trace) + 2) if config.multi_sys_trace else config.ny)  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
         config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
-        config.override("learning_rate", 4*1.584893192461114e-05) 
+        config.override("learning_rate", 4*1.584893192461114e-05)
+
 
     elif model_name == "ortho_big_20k":
         print("\n\nORTHO BIG MODEL 20K TRACES\n\n")
@@ -2295,7 +2341,7 @@ def set_config_params(config, model_name):
         config.override("n_dims_out", 5)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
         
         config.override("learning_rate", 0.833333*1.584893192461114e-05)
-    
+
     elif model_name == "ortho_haar_medium_single_gpu":
         print("\n\nORTHO HAAR MEDIUM MODEL 1 GPU\n\n")
 
@@ -2312,7 +2358,8 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
-        
+    
+
         # Training settings
         config.override("devices", [1])  # which GPU
         config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
@@ -2408,6 +2455,15 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)  # used only for plotting
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
         config.override("devices", [3])  # which GPU
@@ -3362,7 +3418,7 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
 
             gc.collect()  # Start the garbage collector to free up memory
 
-    elif config.datasource == "train":
+    elif config.datasource == "train" or config.datasource == "backstory_train":
 
         print(f"getting test data from datasource {config.datasource}")
 
@@ -3385,12 +3441,14 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
             ys = get_entries(config, f)
             gc.collect()  # Start the garbage collector
         
+        start_sys = 0
+        print(f"start_sys: {start_sys}")
         print(f"len of sim_objs {len(sim_objs)}")
-        sim_objs = sim_objs[:max_num_sys]
+        sim_objs = sim_objs[start_sys:start_sys + max_num_sys]
         print(f"len of sim_objs {len(sim_objs)}")
 
         print(f"shape of ys: {ys.shape}")
-        ys = ys[:max_num_sys]
+        ys = ys[start_sys:start_sys + max_num_sys]
         print(f"shape of ys: {ys.shape}")
     
 
@@ -3724,7 +3782,7 @@ if __name__ == '__main__':
         
         #"../outputs/GPT2/250112_043028.07172b_multi_sys_trace_ortho_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=105000.ckpt"
         
-        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_unmasked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=59000.ckpt" #unmasked_backstories
+        # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_unmasked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=59000.ckpt" #unmasked_backstories
         
         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, output_dir=output_dir, ys=None, sim_objs=None, run_kf_ols=False)
         
@@ -3738,7 +3796,7 @@ if __name__ == '__main__':
         elif config.opposite_ortho:
             num_haystack_examples = 1
         else:
-            if config.datasource == "train":
+            if config.datasource == "train" or config.datasource == "backstory_train":
                 num_haystack_examples = 500 #40000
             else:
                 num_haystack_examples = 50 #number of haystack examples to use for testing
@@ -3786,10 +3844,11 @@ if __name__ == '__main__':
             elif ortho_sync:
                 num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
-                num_sys_haystacks = list(range(2,5))
+                num_sys_haystacks = list(range(2,last_haystack_len+1))
                 
             else:
-                num_sys_haystacks = list(range(1,last_haystack_len+1))
+                # num_sys_haystacks = list(range(1,last_haystack_len+1))
+                num_sys_haystacks = [1,2,3,17,18,19]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
@@ -3826,7 +3885,7 @@ if __name__ == '__main__':
                                 if desktop:
                                     pred_ckpt_step = maxval_dict[model_name]
                                 else:
-                                    pred_ckpt_step = int(get_last_checkpoint(output_dir + "/checkpoints/").split("=")[1].split(".")[0])                            
+                                    pred_ckpt_step = int(get_last_checkpoint(ckpt_dir + "/checkpoints/").split("=")[1].split(".")[0])                            
 
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
                             print(f"pred_ckpt_step: {pred_ckpt_step}")
