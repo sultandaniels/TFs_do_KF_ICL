@@ -1089,8 +1089,16 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
         count = 0
         for sys in sys_choices:
 
-            #get obs from the system trace corresponding to sys_trace_ind
-            sys_trace_obs = ys_trial[sys]
+            if config.new_hay_insert and count == config.num_sys_haystack: #use an unseen systems sequence as the query sequence
+                # if trial == 1:
+                #     print(f"count: {count}, sys: {max(sys_choices) + 1}")
+                sys_trace_obs = ys_trial[max(sys_choices) + 1]
+            else:
+                #get obs from the system trace corresponding to sys_trace_ind
+                sys_trace_obs = ys_trial[sys]
+                # if trial == 1:
+                #     print(f"count: {count}, sys: {sys}")
+
             tok_seg_len = tok_seg_lens[count]
             seg_len = real_seg_lens[count]
 
@@ -1169,6 +1177,7 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
         mask_idx = []
         sys_appear = []
         segments, mask_idx = add_backstories(config, sim_objs, segments, mask_idx, sys_appear, sys_choices, seg_starts, real_seg_lens)
+
     return segments, sys_choices, sys_dict, tok_seg_lens, real_seg_lens
 
 def cycle_list(lst, shift):
@@ -1299,7 +1308,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     model = GPT2.load_from_checkpoint(config.ckpt_path,
                                       n_dims_in=config.n_dims_in, n_positions=config.n_positions,
                                       n_dims_out=config.n_dims_out, n_embd=config.n_embd,
-                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device, use_pos_embd=config.use_pos_embd).eval().to(
+                                      n_layer=config.n_layer, n_head=config.n_head, map_location=device, use_pos_embd=config.use_pos_emb).eval().to(
         device)  # load_from_checkpoint
 
     
@@ -1654,6 +1663,8 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
         raise ValueError(f"datasource {config.datasource} not recognized")
     
     num_test_traces_configs = config.num_test_traces_configs
+    if config.zero_cut:
+        print(f"num_test_traces_configs: {num_test_traces_configs}")
 
     
     # get the parent directory of the ckpt_path
@@ -1854,7 +1865,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
     print(f"config.num_haystack_examples: {config.num_haystack_examples}")
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"+ ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_" + ("new_hay_insert_" if config.new_hay_insert else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
     # if (config.datasource == "val"):
 
     #     print(f"getting test data from datasource {config.datasource}")
@@ -2028,29 +2039,29 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, out
         err_lss, irreducible_error = compute_errors_conv(config)
     elif train_conv and config.multi_sys_trace:
 
-        if not config.needle_in_haystack:
-            print(f"in train conv and multi sys trace")
-            print(f"config.single_system: {config.single_system}")
-            print(f"config.needle_in_haystack: {config.needle_in_haystack}")
+        # if not config.needle_in_haystack:
+        #     print(f"in train conv and multi sys trace")
+        #     print(f"config.single_system: {config.single_system}")
+        #     print(f"config.needle_in_haystack: {config.needle_in_haystack}")
 
-            run_OLS = run_kf_ols
-            run_kf = run_kf_ols
+        #     run_OLS = run_kf_ols
+        #     run_kf = run_kf_ols
 
-            err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=run_OLS, train_conv=train_conv, run_kf=run_kf)
+        #     err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, run_OLS=run_OLS, train_conv=train_conv, run_kf=run_kf)
 
-            #save the system indices, starting indices, and token segment lengths to pickle file
-            with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
-                pickle.dump({
-                    'sys_choices_per_config': sys_choices_per_config,
-                    'sys_dict_per_config': sys_dict_per_config,
-                    'tok_seg_lens_per_config': tok_seg_lens_per_config,
-                    'seg_starts_per_config': seg_starts_per_config
-                }, f)
-            return None
-        else:
+        #     #save the system indices, starting indices, and token segment lengths to pickle file
+        #     with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:
+        #         pickle.dump({
+        #             'sys_choices_per_config': sys_choices_per_config,
+        #             'sys_dict_per_config': sys_dict_per_config,
+        #             'tok_seg_lens_per_config': tok_seg_lens_per_config,
+        #             'seg_starts_per_config': seg_starts_per_config
+        #         }, f)
+        #     return None
+        # else:
 
-            needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=run_kf_ols)
-            return None
+        needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_dir, train_conv, ys, sim_objs, run_kf_ols=run_kf_ols)
+        return None
 
 
 

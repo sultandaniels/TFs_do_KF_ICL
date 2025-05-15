@@ -216,7 +216,12 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
         if test:
             #catch exception if the system index is not in the entries
             try:
-                sys_trace_obs = entries[sys_ind]
+                if config.new_hay_insert and len(seg_starts) == config.num_sys_haystack + 1: #use an unseen systems sequence as the query sequence
+                    # print(f"entry index new insert: {sys_inds[-1] + 1}\n\n")
+                    sys_trace_obs = entries[sys_inds[-1] + 1]
+                else:
+                    # print(f"entry index: {sys_ind}\n\n")
+                    sys_trace_obs = entries[sys_ind]
             except IndexError as e:
                 print(f"System index {sys_ind} is out of bounds from sys_inds: {sys_inds}")
                 raise IndexError(e)

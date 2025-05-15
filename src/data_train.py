@@ -835,7 +835,10 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
     kal_step = None
     if config.needle_in_haystack:
         # num_sys_haystack = 4
-        config.override("num_test_traces_configs", 1)
+        if config.zero_cut:
+            config.override("num_test_traces_configs", config.num_val_tasks)
+        else:
+            config.override("num_test_traces_configs", 1)
         # config.override("num_sys_haystack", num_sys_haystack)
         # config.override("len_seg_haystack", int(config.n_positions/(num_sys_haystack + 1)) - 2)
         # if config.num_sys_haystack == 1:
@@ -851,10 +854,13 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
         if not config.zero_cut:
             config.override("num_test_traces_configs", 1)
             config.override("single_system", True)
+        else:
+            config.override("num_test_traces_configs", config.num_val_tasks)
     filecount = 0
 
     
     ckpt_pred_steps = gen_ckpt_pred_steps(model_name) #generate specific ckpt steps to predict on
+    print(f"len of ckpt_pred_steps: {len(ckpt_pred_steps)}")
 
     run_kf_ols = True
     for filename in os.listdir(ckpt_dir + "/checkpoints/"):
@@ -865,7 +871,7 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
             filename_step = filename.split("=")[1].split(".")[0]
             filename_step = int(filename_step)
 
-            if config.needle_in_haystack and filename_step not in ckpt_pred_steps:
+            if (config.needle_in_haystack or config.zero_cut) and filename_step not in ckpt_pred_steps:
                 continue
 
 
@@ -2339,6 +2345,7 @@ if __name__ == '__main__':
     parser.add_argument('--only_beg', help='Boolean. only run the beginning evals', action='store_true')
     parser.add_argument('--acc', help='Boolean. Using ACCESS server', action='store_true')
     parser.add_argument('--ortho_sync', help='Boolean. use orthogonal systems test with sync', action='store_true')
+    parser.add_argument('--new_hay_insert', help='Boolean. new hay insertion experiment', action='store_true')
 
 
 
@@ -2412,6 +2419,8 @@ if __name__ == '__main__':
     acc = args.acc
     print("ortho_sync arg", args.ortho_sync)
     ortho_sync = args.ortho_sync
+    print("new_hay_insert arg", args.new_hay_insert)
+    new_hay_insert = args.new_hay_insert
 
 
 
@@ -2463,6 +2472,10 @@ if __name__ == '__main__':
     config.override("fix_needle", fix_needle) # set the fix_needle in the config object
     if config.fix_needle:
         print("Running fix needle experiment\n\n\n")
+
+    config.override("new_hay_insert", new_hay_insert) # set the new_hay_insert in the config object
+    if config.new_hay_insert:
+        print("Running new hay insertion experiment\n\n\n")
 
     config.override("opposite_ortho", opposite_ortho) # set the opposite_ortho in the config object
     if config.opposite_ortho:
@@ -2539,6 +2552,8 @@ if __name__ == '__main__':
         else:
             if config.datasource == "train" or config.datasource == "backstory_train":
                 num_haystack_examples = 500 #40000
+            elif config.zero_cut:
+                num_haystack_examples = 1
             else:
                 num_haystack_examples = 50 #number of haystack examples to use for testing
 
@@ -2577,7 +2592,7 @@ if __name__ == '__main__':
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
-            if config.paren_swap:
+            if config.paren_swap or config.new_hay_insert:
                 if fix_needle or opposite_ortho:
                     num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
                 else:
@@ -2587,8 +2602,8 @@ if __name__ == '__main__':
                 num_sys_haystacks = list(range(2,last_haystack_len+1))
                 
             else:
-                # num_sys_haystacks = list(range(1,last_haystack_len+1))
-                num_sys_haystacks = [1,2,3,17,18,19]
+                num_sys_haystacks = list(range(4,17))
+                # num_sys_haystacks = [1,2,3,17,18,19]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
@@ -2756,7 +2771,6 @@ if __name__ == '__main__':
                         config.override("num_test_traces_configs", num_sys)
                         run_preds, run_deg_kf_test, excess, shade = preds_thread(config, ckpt_path, make_preds, resume_train, train_conv=False, logscale=logscale, tf=tf, train_mix_dist=train_mix_dist, train_mix_state_dim=train_mix_state_dim, ys=ys, sim_objs=sim_objs, output_dir=output_dir)
 
-
                         #run no punctuation final segment
                         config.override("needle_final_seg_extended", True)
 
@@ -2778,7 +2792,7 @@ if __name__ == '__main__':
                 
                 # haystack_plots(config, num_sys, output_dir, pred_ckpt_step, kal_step, compute_more=make_preds, abs_err=abs_err)
         else:
-            
+
             if make_preds:
 
                 ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
