@@ -1,1 +1,0 @@
-first 3000 steps on 3 GPUs, rest on 2 GPUs.

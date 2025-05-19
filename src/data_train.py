@@ -799,6 +799,7 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
         phases = [minval, 8000, 30000, 80000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
+        # ckpt_pred_steps = [1000,2000]
 
     elif model_name == "ortho_haar_big":
         minval = 1000
@@ -2346,6 +2347,7 @@ if __name__ == '__main__':
     parser.add_argument('--acc', help='Boolean. Using ACCESS server', action='store_true')
     parser.add_argument('--ortho_sync', help='Boolean. use orthogonal systems test with sync', action='store_true')
     parser.add_argument('--new_hay_insert', help='Boolean. new hay insertion experiment', action='store_true')
+    parser.add_argument('--hard_coded_ckpt', type=int, help="Integer. hard-code what ckpt to use for needle plots", default=None)
 
 
 
@@ -2421,6 +2423,8 @@ if __name__ == '__main__':
     ortho_sync = args.ortho_sync
     print("new_hay_insert arg", args.new_hay_insert)
     new_hay_insert = args.new_hay_insert
+    print("hard_coded_ckpt arg", args.hard_coded_ckpt)
+    hard_coded_ckpt = args.hard_coded_ckpt
 
 
 
@@ -2532,9 +2536,9 @@ if __name__ == '__main__':
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
         print(f"output_dir: {output_dir}")
         
-        # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=32000.ckpt" #normal training run
+        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=135000.ckpt" #normal training run
 
-        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_masked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=139000.ckpt" #masked_backstories
+        # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_masked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=139000.ckpt" #masked_backstories
         
         # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_unmasked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=59000.ckpt" #unmasked_backstories
         
@@ -2596,14 +2600,15 @@ if __name__ == '__main__':
                 if fix_needle or opposite_ortho:
                     num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
                 else:
-                    # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
-                    num_sys_haystacks = list(range(2,last_haystack_len+1))
+                    num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
+                    # num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
-                num_sys_haystacks = list(range(2,last_haystack_len+1))
+                # num_sys_haystacks = list(range(2,last_haystack_len+1))
+                num_sys_haystacks = [2]
                 
             else:
-                num_sys_haystacks = list(range(4,17))
-                # num_sys_haystacks = [1,2,3,17,18,19]
+                num_sys_haystacks = list(range(1,last_haystack_len+1))
+                # num_sys_haystacks = [19]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
@@ -2663,7 +2668,7 @@ if __name__ == '__main__':
 
 
                         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
-                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")
+                        errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")  + ("new_hay_insert_" if config.new_hay_insert else "")
 
 
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
@@ -2760,6 +2765,9 @@ if __name__ == '__main__':
 
                     if paren_swap:
                         pred_ckpt_step = 27000
+
+                    if hard_coded_ckpt is not None:
+                        pred_ckpt_step = hard_coded_ckpt
 
                     if pred_ckpt_step is not None:
 
