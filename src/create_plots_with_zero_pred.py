@@ -1112,7 +1112,7 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
 
                 start_paren, end_paren = special_tokens(segment, sys_dict[swap_sys], style="zeros") #get the special tokens for the segment
 
-            elif config.needle_in_haystack and config.irrelevant_tokens and count == config.num_sys_haystack: #swap open token for query experiment
+            elif config.needle_in_haystack and config.irrelevant_tokens and count == config.num_sys_haystack: #swap open token with irrelevant open for query experiment
 
                 #find the index in sys_dict.keys() where sys is located
                 # index_of_sys = list(sys_dict.keys()).index(sys) #get the index of the system in the sys_dict

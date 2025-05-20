@@ -2600,7 +2600,7 @@ if __name__ == '__main__':
                 if fix_needle or opposite_ortho:
                     num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
                 else:
-                    num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
+                    num_sys_haystacks = [1] #only run for 2 systems in the haystack for the paren swap experiment
                     # num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
                 # num_sys_haystacks = list(range(2,last_haystack_len+1))

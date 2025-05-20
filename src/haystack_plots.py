@@ -590,6 +590,11 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     print(f"\n\n in haystack train conv plot valA: {valA}, abs_err: {abs_err}\n\n")
 
     for key in fin_quartiles_ckpt.keys():
+
+        beg_lab_suffix = f" into seg. 1" if config.irrelevant_tokens and config.new_hay_insert else " after initial"
+
+        final_lab_suffix = f" into seg. {config.num_sys_haystack + 1}" if config.irrelevant_tokens and config.new_hay_insert else " after final"
+
         if key == "MOP": #key == "OLS_analytical_ir_1" or key == "OLS_ir_1": #key == "MOP" or 
             col_count = 0
             for step in steps:
@@ -616,13 +621,13 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
                     # raise NotImplementedError("Check the early stop index")
                 
                 if not config.only_beg:
-                    ax.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
+                    ax.plot(x_values, qs[1], label=f"{key_lab}: {step}{final_lab_suffix}", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
                     # if not valA == "gaussA":
                     #     ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
                     ax.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
-                    ax_len.plot(x_values, qs[1], label=f"{key_lab}: {step} after final", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
+                    ax_len.plot(x_values, qs[1], label=f"{key_lab}: {step}{final_lab_suffix}", markersize=5, marker=".", zorder=5 if key == "MOP" else 0, color=colors[col_count], linewidth=2)
                     ax_len.fill_between(x_values, qs[0], qs[2], alpha=0.2, color=colors[col_count])
 
                     color = ax.get_lines()[-1].get_color()
@@ -633,15 +638,14 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
                 beg_qs = np.array(beg_quartiles_ckpt[key][step])
                 beg_qs = np.transpose(beg_qs)
                 #set the color to the same as the fin quartiles
-                ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS_ir" in key_lab else (":" if "OLS_analytical" in key_lab else "--"), linewidth=5 if "OLS_analytical" in key_lab else 2)
+                ax.plot(x_values, beg_qs[1], label=f"{key_lab}: {step}{beg_lab_suffix}", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS_ir" in key_lab else (":" if "OLS_analytical" in key_lab else "--"), linewidth=5 if "OLS_analytical" in key_lab else 2)
 
                 # if not valA == "gaussA":
                 #     ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
                 ax.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
-                ax_len.plot(x_values, beg_qs[1], label=f"{key_lab}: {step} after initial", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS_ir" in key_lab else (":" if "OLS_analytical" in key_lab else "--"), linewidth=5 if "OLS_analytical" in key_lab else 2)
-                # ax_len.plot(x_values, beg_qs[1], label=f"{step} into seg. 1", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS_ir" in key_lab else (":" if "OLS_analytical" in key_lab else "--"), linewidth=5 if "OLS_analytical" in key_lab else 2)
-                # ax_len.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
+                ax_len.plot(x_values, beg_qs[1], label=f"{key_lab}: {step}{beg_lab_suffix}", markersize=1 if "OLS" in key_lab else 5, marker="x", color=color, linestyle="-" if "OLS_ir" in key_lab else (":" if "OLS_analytical" in key_lab else "--"), linewidth=5 if "OLS_analytical" in key_lab else 2)
+                ax_len.fill_between(x_values, beg_qs[0], beg_qs[2], alpha=0.2, color=color)
 
                 col_count += 1
 
