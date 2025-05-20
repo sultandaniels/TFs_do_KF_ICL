@@ -886,7 +886,7 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
 
     # path to interleaved data file
 
-    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
 
 
     start = time.time()
@@ -932,9 +932,6 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
     with open(interleave_traces_dict_path, "wb") as f:
         pickle.dump(interleave_traces_dict, f)
     print(f"interleave_traces_dict saved to {interleave_traces_dict_path}")
-    raise ValueError("\n\ninterleave_traces_dict not implemented yet\n\n")
-
-
 
     
     ckpt_pred_steps = gen_ckpt_pred_steps(model_name) #generate specific ckpt steps to predict on
