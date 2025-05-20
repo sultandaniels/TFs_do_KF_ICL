@@ -1825,7 +1825,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
     return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
 
 
-def compute_errors_needle_or_multi_cut(config, model, errs_dir, errs_loc):
+def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_loc):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     
@@ -1887,47 +1887,39 @@ def compute_errors_needle_or_multi_cut(config, model, errs_dir, errs_loc):
         real_seg_lens_all_ex = interleave_traces_dict["real_seg_lens_per_config"]
         sys_inds_all_ex = interleave_traces_dict["sys_inds_per_config"]
 
-    multi_sys
-    with torch.no_grad():  # no gradients
-        I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+    #flatten axis 0 of orig_multi_sys_ys into axis 1 and call it multi_sys_ys
+    multi_sys_ys = np.reshape(orig_multi_sys_ys, (orig_multi_sys_ys.shape[0] * orig_multi_sys_ys.shape[1], orig_multi_sys_ys.shape[2], orig_multi_sys_ys.shape[3]))
 
-        # print("before model.predict_step()")
-        batch_shape = I.shape[:-2]
-        # print("batch_shape:", batch_shape)
-        flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
-        # print("flattened_I.shape:", flattened_I.shape)
-        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
-                                                        batch_size=config.test_batch_size)
-        preds_arr = []  # Store the predictions for all batches
-        for validation_batch in iter(validation_loader):
-            _, flattened_preds_tf = model.predict_step(
-                {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
-            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
-        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
-                            (*batch_shape, multi_sys_ys_context_len - 1, config.ny))  # Combine the predictions for all batches
-        # print("preds_tf.shape:", preds_tf.shape)
-        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
-                                axis=-2)  # concatenate the predictions
-        # print("preds_tf.shape:", preds_tf.shape)
-    # end = time.time()  # end the timer for transformer predictions
-    # print("time elapsed for MOP Pred:", (end - start), "sec")  # print the time elapsed for transformer predictions
+    print(f"multi_sys_ys shape: {multi_sys_ys.shape}, orig_multi_sys_ys shape: {orig_multi_sys_ys.shape}")
+
+
+    batched_preds_tf = tf_preds(multi_sys_ys, model, device, config)
+
+    #unflatten axis 0 of batched_preds_tf into axis 1 and call it preds_tf
+    preds_tf = np.reshape(batched_preds_tf, (orig_multi_sys_ys.shape[0], orig_multi_sys_ys.shape[1], batched_preds_tf.shape[2], batched_preds_tf.shape[3]))
+
+    print(f"preds_tf shape: {preds_tf.shape}, batched_preds_tf shape: {batched_preds_tf.shape}")
+
+
 
     #take the last config.ny columns of axis=-1 as the true test observations
-    multi_sys_ys_true = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-1] - config.ny, multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
+    multi_sys_ys_true = np.take(orig_multi_sys_ys, np.arange(orig_multi_sys_ys.shape[-1] - config.ny, orig_multi_sys_ys.shape[-1]), axis=-1) #get the true test observations
+
+    print(f"multi_sys_ys_true shape: {multi_sys_ys_true.shape}")
 
     errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
-    for trace_config in range(num_test_traces_configs):
+    for trace_config in range(errs_tf.shape[1]):
         #set the errors for the start token to be infinite
         errs_tf[trace_config, :, 0] = np.inf
         errs_tf[trace_config, :, 1] = np.inf
         seg_count = 0
-        for seg_start in seg_starts_per_config[trace_config]: #loop over the starting indices of the segments
+        for seg_start in seg_starts_all_ex[0][trace_config]: #loop over the starting indices of the segments
             #set the errors of the end of the segment to be infinite
             
-            if real_seg_lens_per_config[trace_config][seg_count] < tok_seg_lens_per_config[trace_config][seg_count] - 1:
-                errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
-            if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
-                errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count]] = np.inf
+            if real_seg_lens_all_ex[0][trace_config][seg_count] < tok_seg_lens_all_ex[0][trace_config][seg_count] - 1:
+                errs_tf[trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] - 1] = np.inf
+            if seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] <= config.n_positions:
+                errs_tf[trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count]] = np.inf
             seg_count += 1
 
 
@@ -1950,9 +1942,9 @@ def compute_errors_needle_or_multi_cut(config, model, errs_dir, errs_loc):
     err_lss["Zero"] = errs_zero
 
     if config.num_haystack_examples == 1:
-        for i in range(len(sys_choices_per_config)):
+        for i in range(len(sys_choices_all_ex[0])):
             print(f"trace config: {i}")
-            print(f"len of sys_choices: {len(sys_choices_per_config[i])}")
+            print(f"len of sys_choices: {len(sys_choices_all_ex[0][i])}")
             print("sum of zero err:", np.sum(errs_zero[i]))
 
     os.makedirs(errs_dir, exist_ok=True)
@@ -1966,14 +1958,39 @@ def compute_errors_needle_or_multi_cut(config, model, errs_dir, errs_loc):
 
     #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
     sim_objs_per_config = []
-    for trace_config in range(num_test_traces_configs):
+    for trace_config in range(errs_tf.shape[1]):
         sim_obj_conf = {}
-        for sys_ind in sys_inds_per_config[trace_config]:
+        for sys_ind in sys_inds_all_ex[0][trace_config]:
             sim_obj_conf[sys_ind] = sim_objs[sys_ind] 
 
         sim_objs_per_config.append(sim_obj_conf)  
 
-    return err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config, sim_objs_per_config
+    return err_lss, sim_objs_per_config
+
+
+def tf_preds(multi_sys_ys, model, device, config):
+    with torch.no_grad():  # no gradients
+        I = np.take(multi_sys_ys, np.arange(multi_sys_ys.shape[-2] - 1), axis=-2)  # get the inputs (observations without the last one)
+
+        # print("before model.predict_step()")
+        batch_shape = I.shape[:-2]
+        # print("batch_shape:", batch_shape)
+        flattened_I = np.reshape(I, (np.prod(batch_shape), *I.shape[-2:]))
+        # print("flattened_I.shape:", flattened_I.shape)
+        validation_loader = torch.utils.data.DataLoader(torch.from_numpy(flattened_I),
+                                                        batch_size=config.test_batch_size)
+        preds_arr = []  # Store the predictions for all batches
+        for validation_batch in iter(validation_loader):
+            _, flattened_preds_tf = model.predict_step(
+                {"current": validation_batch.to(device)})  # .float().to(device)})    # predict using the model
+            preds_arr.append(flattened_preds_tf["preds"].cpu().numpy())
+        preds_tf = np.reshape(np.concatenate(preds_arr, axis=0),
+                            (*batch_shape, config.n_positions, config.ny))  # Combine the predictions for all batches
+        # print("preds_tf.shape:", preds_tf.shape)
+        preds_tf = np.concatenate([np.zeros_like(np.take(preds_tf, [0], axis=-2)), preds_tf],
+                                axis=-2)  # concatenate the predictions
+        
+    return preds_tf
 
 def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None, sim_objs=None):
 
