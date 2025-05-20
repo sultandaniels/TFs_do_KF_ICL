@@ -845,8 +845,10 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
 
     if config.datasource == "train_systems" or config.datasource == "backstory_train" or config.datasource == "train":
         num_tasks = config.num_tasks
+        dataset_typ = config.dataset_typ
     elif config.datasource == "val":
         num_tasks = config.num_val_tasks
+        dataset_typ = config.val_dataset_typ
 
     
     if config.needle_in_haystack:
@@ -882,6 +884,11 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
     else:
         num_exs = 1
 
+    # path to interleaved data file
+
+    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+
+
     start = time.time()
     for ex in range(num_exs):
 
@@ -913,6 +920,18 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
             
     interleave_traces_dict["multi_sys_ys"] = np.stack(interleave_traces_dict["multi_sys_ys"], axis=0) # [num_exs, num_trace_configs, num_trialse, context_len, n_dims_in]
     print("multi_sys_ys shape:", interleave_traces_dict["multi_sys_ys"].shape)
+
+
+    if config.needle_in_haystack:
+        interleaving = f"haystack_len_{config.num_sys_haystack}"
+    else:
+        interleaving = f"multi_cut"
+    
+    #save the interleave_traces_dict to a file
+    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    with open(interleave_traces_dict_path, "wb") as f:
+        pickle.dump(interleave_traces_dict, f)
+    print(f"interleave_traces_dict saved to {interleave_traces_dict_path}")
     raise ValueError("\n\ninterleave_traces_dict not implemented yet\n\n")
 
 

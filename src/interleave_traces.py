@@ -65,6 +65,7 @@ if __name__ == "__main__":
     with open(val_path, 'rb') as f:
         ys = get_entries(config, f) #get the uninterleaved validation data
 
+    
     #get interleaved traces
     multi_sys_ys, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config = interleave_traces(config, ys, num_test_traces_configs=config.num_test_traces_configs, num_trials=config.num_traces["val"], ex=0)
 
