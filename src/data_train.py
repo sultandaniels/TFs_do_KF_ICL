@@ -4,7 +4,7 @@ from core import Config
 from train import train_gpt2
 from core import setup_train
 import os
-from create_plots_with_zero_pred import create_plots, convergence_plots, load_preds
+from create_plots_with_zero_pred import create_plots, convergence_plots, load_preds, interleave_traces
 import argparse
 import wandb
 import matplotlib.pyplot as plt
@@ -834,6 +834,21 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs, model_name):
         
     kal_step = None
+
+    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+        num_trials = config.num_traces["val"]
+    elif config.datasource == "train" or config.datasource == "backstory_train":
+        num_trials = config.num_traces["train"]
+    else:
+        raise ValueError(f"datasource {config.datasource} not recognized")
+    
+
+    if config.datasource == "train_systems" or config.datasource == "backstory_train" or config.datasource == "train":
+        num_tasks = config.num_tasks
+    elif config.datasource == "val":
+        num_tasks = config.num_val_tasks
+
+    
     if config.needle_in_haystack:
         # num_sys_haystack = 4
         if config.zero_cut:
@@ -852,12 +867,55 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
         # config.override("num_haystack_examples", num_haystack_examples)
 
     else:
-        if not config.zero_cut:
-            config.override("num_test_traces_configs", 1)
-            config.override("single_system", True)
-        else:
-            config.override("num_test_traces_configs", config.num_val_tasks)
+        config.override("num_test_traces_configs", num_tasks)
+
     filecount = 0
+
+    # interleave traces before predicting all checkpoints
+
+
+    #create a dictionary to store the outputs of the interleave_traces function for each ex
+    interleave_traces_dict = {}
+
+    if config.needle_in_haystack:
+        num_exs = config.num_haystack_examples
+    else:
+        num_exs = 1
+
+    start = time.time()
+    for ex in range(num_exs):
+
+        start_ex = time.time()
+        multi_sys_ys, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, real_seg_lens_per_config, sys_inds_per_config = interleave_traces(config, ys, num_test_traces_configs=config.num_test_traces_configs, num_trials=num_trials, ex=ex, sim_objs=sim_objs)
+
+        if interleave_traces_dict.get("multi_sys_ys") is None:
+            interleave_traces_dict["multi_sys_ys"] = [multi_sys_ys]
+            interleave_traces_dict["sys_choices_per_config"] = [sys_choices_per_config]
+            interleave_traces_dict["sys_dict_per_config"] = [sys_dict_per_config]
+            interleave_traces_dict["tok_seg_lens_per_config"] = [tok_seg_lens_per_config]
+            interleave_traces_dict["seg_starts_per_config"] = [seg_starts_per_config]
+            interleave_traces_dict["real_seg_lens_per_config"] = [real_seg_lens_per_config]
+            interleave_traces_dict["sys_inds_per_config"] = [sys_inds_per_config]
+        else:
+            interleave_traces_dict["multi_sys_ys"].append(multi_sys_ys)
+            interleave_traces_dict["sys_choices_per_config"].append(sys_choices_per_config)
+            interleave_traces_dict["sys_dict_per_config"].append(sys_dict_per_config)
+            interleave_traces_dict["tok_seg_lens_per_config"].append(tok_seg_lens_per_config)
+            interleave_traces_dict["seg_starts_per_config"].append(seg_starts_per_config)
+            interleave_traces_dict["real_seg_lens_per_config"].append(real_seg_lens_per_config)
+            interleave_traces_dict["sys_inds_per_config"].append(sys_inds_per_config)
+
+        end_ex = time.time()
+        print(f"interleave_traces took {end_ex - start_ex} seconds for ex {ex}")
+
+    end = time.time()
+    print(f"it took {(end - start)/60} minutes to interleave traces for {num_exs} examples")
+            
+    interleave_traces_dict["multi_sys_ys"] = np.stack(interleave_traces_dict["multi_sys_ys"], axis=0) # [num_exs, num_trace_configs, num_trialse, context_len, n_dims_in]
+    print("multi_sys_ys shape:", interleave_traces_dict["multi_sys_ys"].shape)
+    raise ValueError("\n\ninterleave_traces_dict not implemented yet\n\n")
+
+
 
     
     ckpt_pred_steps = gen_ckpt_pred_steps(model_name) #generate specific ckpt steps to predict on
@@ -2555,7 +2613,7 @@ if __name__ == '__main__':
             num_haystack_examples = 1
         else:
             if config.datasource == "train" or config.datasource == "backstory_train":
-                num_haystack_examples = 500 #40000
+                num_haystack_examples = 40000 - 25
             elif config.zero_cut:
                 num_haystack_examples = 1
             else:
@@ -2607,8 +2665,8 @@ if __name__ == '__main__':
                 num_sys_haystacks = [2]
                 
             else:
-                num_sys_haystacks = list(range(1,last_haystack_len+1))
-                # num_sys_haystacks = [19]
+                # num_sys_haystacks = list(range(1,last_haystack_len+1))
+                num_sys_haystacks = [19]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
