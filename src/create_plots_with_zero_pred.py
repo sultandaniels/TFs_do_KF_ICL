@@ -1887,8 +1887,9 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
         real_seg_lens_all_ex = interleave_traces_dict["real_seg_lens_per_config"]
         sys_inds_all_ex = interleave_traces_dict["sys_inds_per_config"]
 
+    print(f"orig_multi_sys_ys shape: {orig_multi_sys_ys.shape}")
     #flatten axis 0 of orig_multi_sys_ys into axis 1 and call it multi_sys_ys
-    multi_sys_ys = np.reshape(orig_multi_sys_ys, (orig_multi_sys_ys.shape[0] * orig_multi_sys_ys.shape[1], orig_multi_sys_ys.shape[2], orig_multi_sys_ys.shape[3]))
+    multi_sys_ys = np.reshape(orig_multi_sys_ys, (orig_multi_sys_ys.shape[0] * orig_multi_sys_ys.shape[1], orig_multi_sys_ys.shape[-3], orig_multi_sys_ys.shape[-2], orig_multi_sys_ys.shape[-1]))
 
     print(f"multi_sys_ys shape: {multi_sys_ys.shape}, orig_multi_sys_ys shape: {orig_multi_sys_ys.shape}")
 
@@ -1896,7 +1897,7 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
     batched_preds_tf = tf_preds(multi_sys_ys, model, device, config)
 
     #unflatten axis 0 of batched_preds_tf into axis 1 and call it preds_tf
-    preds_tf = np.reshape(batched_preds_tf, (orig_multi_sys_ys.shape[0], orig_multi_sys_ys.shape[1], batched_preds_tf.shape[2], batched_preds_tf.shape[3]))
+    preds_tf = np.reshape(batched_preds_tf, (orig_multi_sys_ys.shape[0], orig_multi_sys_ys.shape[1], batched_preds_tf.shape[1], batched_preds_tf.shape[2]))
 
     print(f"preds_tf shape: {preds_tf.shape}, batched_preds_tf shape: {batched_preds_tf.shape}")
 
@@ -1924,11 +1925,6 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
 
 
     err_lss["MOP"] = errs_tf
-
-
-    os.makedirs(errs_dir, exist_ok=True)
-    with open(errs_loc, 'wb') as f:
-            pickle.dump(err_lss, f)  
     
     del errs_tf
     del preds_tf
@@ -1947,25 +1943,21 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
             print(f"len of sys_choices: {len(sys_choices_all_ex[0][i])}")
             print("sum of zero err:", np.sum(errs_zero[i]))
 
-    os.makedirs(errs_dir, exist_ok=True)
-    with open(errs_loc, 'wb') as f:
-            pickle.dump(err_lss, f)
-
     del errs_zero
 
     torch.cuda.empty_cache()
     gc.collect() 
 
-    #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
-    sim_objs_per_config = []
-    for trace_config in range(errs_tf.shape[1]):
-        sim_obj_conf = {}
-        for sys_ind in sys_inds_all_ex[0][trace_config]:
-            sim_obj_conf[sys_ind] = sim_objs[sys_ind] 
+    # #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
+    # sim_objs_per_config = []
+    # for trace_config in range(errs_tf.shape[1]):
+    #     sim_obj_conf = {}
+    #     for sys_ind in sys_inds_all_ex[0][trace_config]:
+    #         sim_obj_conf[sys_ind] = sim_objs[sys_ind] 
 
-        sim_objs_per_config.append(sim_obj_conf)  
+    #     sim_objs_per_config.append(sim_obj_conf)  
 
-    return err_lss, sim_objs_per_config
+    return err_lss
 
 
 def tf_preds(multi_sys_ys, model, device, config):
@@ -2088,7 +2080,10 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
         # raise ValueError("Need to implement interleaving of KF and OLS errors")
 
 
+    err_lss_examples = compute_errors_needle_or_multi_cut(config, model, sim_objs, save_errs_dir, save_errs_loc)
 
+    print("err_lss_examples keys:", err_lss_examples.keys())
+    print("err_lss_examples['MOP'] shape:", err_lss_examples["MOP"].shape)
 
     with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)

@@ -885,8 +885,10 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
         num_exs = 1
 
     # path to interleaved data file
-
-    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    if config.needle_in_haystack:
+        interleaving = f"haystack_len_{config.num_sys_haystack}"
+    else:
+        interleaving = f"multi_cut"
 
 
     start = time.time()
@@ -922,10 +924,7 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
     print("multi_sys_ys shape:", interleave_traces_dict["multi_sys_ys"].shape)
 
 
-    if config.needle_in_haystack:
-        interleaving = f"haystack_len_{config.num_sys_haystack}"
-    else:
-        interleaving = f"multi_cut"
+
     
     #save the interleave_traces_dict to a file
     interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
@@ -1110,6 +1109,15 @@ def set_config_params(config, model_name):
         config.override("n_noise", 1)
         config.override("num_traces", {"train": 1, "val": 1000})
         config.override("changing", False)
+
+        #mem_suppress experiment settings
+        config.override("mem_suppress", False) #run the memory suppression experiment
+        config.override("masking", False) #run the masking training run
+        config.override("cached_data", False) #use masked backstories
+        config.override("backstory", False) #use masked backstories
+        config.override("init_seg", False) #use masked initial segments
+        config.override("backstory_len", config.ny + 2) #length of the backstory
+        config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
 
         # Training settings
         config.override("devices", [0, 1, 2])
