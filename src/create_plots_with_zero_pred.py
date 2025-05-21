@@ -1893,11 +1893,13 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
 
     print(f"multi_sys_ys shape: {multi_sys_ys.shape}, orig_multi_sys_ys shape: {orig_multi_sys_ys.shape}")
 
-
+    start = time.time()  # start the timer for transformer predictions
     batched_preds_tf = tf_preds(multi_sys_ys, model, device, config)
+    end = time.time()  # end the timer for transformer predictions
+    print("time elapsed for TF Pred:", (end - start) / 60, "min")  # print the time elapsed for transformer predictions
 
     #unflatten axis 0 of batched_preds_tf into axis 1 and call it preds_tf
-    preds_tf = np.reshape(batched_preds_tf, (orig_multi_sys_ys.shape[0], orig_multi_sys_ys.shape[1], batched_preds_tf.shape[1], batched_preds_tf.shape[2]))
+    preds_tf = np.reshape(batched_preds_tf, (orig_multi_sys_ys.shape[0], orig_multi_sys_ys.shape[1], batched_preds_tf.shape[-3], batched_preds_tf.shape[-2], batched_preds_tf.shape[-1]))
 
     print(f"preds_tf shape: {preds_tf.shape}, batched_preds_tf shape: {batched_preds_tf.shape}")
 
@@ -1911,16 +1913,16 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
     errs_tf = np.linalg.norm((multi_sys_ys_true - preds_tf), axis=-1) ** 2  # get the errors of transformer predictions
     for trace_config in range(errs_tf.shape[1]):
         #set the errors for the start token to be infinite
-        errs_tf[trace_config, :, 0] = np.inf
-        errs_tf[trace_config, :, 1] = np.inf
+        errs_tf[:, trace_config, :, 0] = np.inf
+        errs_tf[:, trace_config, :, 1] = np.inf
         seg_count = 0
         for seg_start in seg_starts_all_ex[0][trace_config]: #loop over the starting indices of the segments
             #set the errors of the end of the segment to be infinite
             
             if real_seg_lens_all_ex[0][trace_config][seg_count] < tok_seg_lens_all_ex[0][trace_config][seg_count] - 1:
-                errs_tf[trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] - 1] = np.inf
+                errs_tf[:, trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] - 1] = np.inf
             if seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] <= config.n_positions:
-                errs_tf[trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count]] = np.inf
+                errs_tf[:, trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count]] = np.inf
             seg_count += 1
 
 
@@ -2042,7 +2044,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
     print(f"config.num_haystack_examples: {config.num_haystack_examples}")
 
     save_errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "")+ ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_" + ("new_hay_insert_" if config.new_hay_insert else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "") 
+    save_errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("train_conv_" if train_conv else "")+ ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else f"mult_cut_{config.datasource}_") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_" + ("new_hay_insert_" if config.new_hay_insert else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "") 
     
 
     err_lss_all = {}
@@ -2087,7 +2089,9 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)
-    raise NotImplementedError("writing optimized version")
+
+    return None
+    # raise NotImplementedError("writing optimized version")
 
     err_lss_examples = {}
     for ex in range(config.num_haystack_examples):
@@ -2354,98 +2358,53 @@ def create_plots(config, model, run_preds, run_deg_kf_test, excess, num_systems,
         # print("config path:", config.ckpt_path)
         save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, output_dir, run_kf_ols=run_kf_ols)  # save the predictions to a file
 
+        print("in run_preds")
         if train_conv:
             return None
 
     # load the prediction errors from the file
-    if config.multi_sys_trace:
-        return None 
-        # get the parent directory of the ckpt_path
-        parent_dir = os.path.dirname(config.ckpt_path)
+    # if config.multi_sys_trace and not config.needle_in_haystack:
+    #     print("in multi_sys_trace")
+    #     fig, ax = plt.subplots(1, 1, figsize=(15, 7.5))
 
-        # get the parent directory of the parent directory
-        parent_parent_dir = os.path.dirname(parent_dir)
-        os.makedirs(parent_parent_dir + "/figures/multi_sys_trace/", exist_ok=True)
+    #     #load err_lss_examples
+    #     path = "../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/prediction_errors_ident_C_step=34000.ckpt/train_conv_ortho_haar_state_dim_5_err_lss_examples.pkl"
 
-        # get the step size from the ckpt_path
-        ckpt_steps = get_step_number(config.ckpt_path)
-        print("ckpt_steps:", ckpt_steps)
+    #     with open(path, 'rb') as f:
+    #         err_lss_load = pickle.load(f)
+    #         print("len(err_lss_load):", len(err_lss_load))
+    #         print("err_lss_load keys:", err_lss_load.keys())
 
-        print(f"\n\n config.val_dataset_typ: {config.val_dataset_typ} in create_plots")
+    #     tf_mse = err_lss_load["MOP"][0]
+    #     zero_mse = err_lss_load["Zero"][0]
+    #     print("tf_mse shape:", tf_mse.shape)
+    #     print("zero_mse shape:", zero_mse.shape)
 
-        errs_dir = parent_parent_dir + f"/prediction_errors{config.C_dist}_step={ckpt_steps}.ckpt"
-        errs_loc = errs_dir + f"/" + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_"
+    #     conf = 0
+    #     tf_mse_config = tf_mse[conf]
 
-        #load the system indices, starting indices, and token segment lengths from the pickle file
-        with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if config.needle_in_haystack else "") + ".pkl", 'rb') as f:
-            data = pickle.load(f)
-            sys_choices_per_config = data['sys_choices_per_config']
-            sys_dict_per_config = data['sys_dict_per_config']
-            tok_seg_lens_per_config = data['tok_seg_lens_per_config']
-            seg_starts_per_config = data['seg_starts_per_config']
+    #     zero_mse_config = zero_mse[conf]
 
-        #load the err_lss dict from the pkl file
-        with open(
-                errs_loc + "err_lss.pkl",
-                "rb") as f:
-            err_lss_load = pickle.load(f)
-
-        for trace_conf in range(len(seg_starts_per_config)):
-            fig = plt.figure(figsize=(40, 15)) # create a figure with a size of 15x15
-            ax = fig.add_subplot(111)
-
-            handles = plot_errs_multi_sys(trace_conf, err_lss_load, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config, ax=ax)
-
-            ax.legend(fontsize=16, loc="upper right", ncol=max(1, math.floor(len(handles) / 2)))
-            ax.set_xlabel("Context", fontsize=30)
-
-            ax.set_ylabel("MSE", fontsize=30)
-            # ax.set_ylabel("Err - Empirical KF Err" if logscale else "Prediction Error", fontsize=30)
-            # ax.set_ylabel("Median Error" if logscale else "Avg Error", fontsize=30)
-
-            ax.grid(which="both")
-            if logscale:
-                ax.set_yscale('log')
-                ax.set_xscale('log')
-
-            ax.set_title(("NoPE " if not config.use_pos_emb else "") + ("Gaussian Systems " if config.val_dataset_typ == "gaussA" else ("Orthogonal Systems " if config.val_dataset_typ == "ortho" or config.val_dataset_typ == "ortho_haar" else ("Identity Systems " if config.val_dataset_typ == "ident" else "")))   + f"MSE vs Context. Trace Configuration: {trace_conf}")
-            # ax.set_ylim([0,2])
-            # Set major and minor gridlines
-
-            ax.set_xlim(left=0, right=251)
-            # ax.set_ylim(bottom=0, top=5.5)  # set the y axis limits
+    #     mean_tf_mse = np.mean(tf_mse_config, axis=0)
+    #     mean_zero_mse = np.mean(zero_mse_config, axis=0)
 
 
-            # Optionally, customize major and minor ticks
-            ax.minorticks_on()
+    #     ax.scatter(np.arange(0, tf_mse_config.shape[-1]), mean_tf_mse, label="Transformer MSE", color="black", marker="x")
+    #     ax.scatter(np.arange(0, zero_mse_config.shape[-1]), mean_zero_mse, label="Zero MSE", color="blue")
+    #     ax.set_xlabel("Context", fontsize=30)
+    #     ax.set_ylabel("Error", fontsize=30)
+    #     ax.legend(fontsize=16, loc="upper right")
 
-            # Set minor vertical grid lines to be on intervals of 1
-            # Set major ticks on every interval of 50
-            ax.set_xticks(range(int(ax.get_xlim()[0]), int(ax.get_xlim()[1]) + 1, 50))
 
-            # Set minor vertical grid lines to be on intervals of 1
-            ax.set_xticks(range(int(ax.get_xlim()[0]), int(ax.get_xlim()[1]) + 1, 1), minor=True)
+    #     fig_path = f"../outputs/GPT2/250331_030338.010fdb_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.584893192461114e-05_num_train_sys_40000/figures/multi_sys_trace/mutli_cut/ortho_haar_n_embd_128_multi_cut_val_config_{conf}.pdf"
 
-            ax.tick_params(axis='both', which='major', length=7, width=1, labelsize=30)
-            ax.tick_params(axis='both', which='minor', length=4, width=0.5, labelsize=0)
-            ax.grid(which='major', linestyle='-', linewidth=1)
-            ax.grid(which='minor', linestyle='--', linewidth=0.5)
+    #     fig.tight_layout()
 
-            #add the date and time to the filename
-            now = datetime.now()
-            timestamp = now.strftime("%Y%m%d_%H%M%S")
+    #     os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+    #     fig.savefig(fig_path, format="pdf")
 
-            #get only the ckpt step from the ckpt_path
-            ckpt_step = config.ckpt_path.split("=")[1].split(".")[0]
-
-            #add a caption to the bottom of the figure
-            fig.text(0.5, 0.01, "step=" + ckpt_step + "_" + timestamp, ha='center', fontsize=30)
-            os.makedirs(parent_parent_dir + f"/figures/multi_sys_trace/"+ (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else ""), exist_ok=True)
-            fig.savefig(
-                parent_parent_dir + f"/figures/multi_sys_trace/" + (f"needle_in_haystack_example_0/{config.datasource}/" if config.needle_in_haystack else "") + ("fin_seg_ext_" if config.needle_in_haystack and config.needle_final_seg_extended else "") + ("NoPE_" if not config.use_pos_emb else "") + ("single_system_" if config.single_system else "") + f"{config.val_dataset_typ}{C_dist}_trace_conf_{trace_conf}" + (
-                    "_logscale" if logscale else "") + f"_step={ckpt_step}_" + timestamp) 
-        return None
-
+    #     return None
+        
 
     else:
         err_lss_load, irreducible_error_load, fir_bounds, rnn_errors, rnn_an_errors = load_preds(run_deg_kf_test, excess,
