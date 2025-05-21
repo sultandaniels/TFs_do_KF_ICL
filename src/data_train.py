@@ -945,7 +945,7 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
             filename_step = filename.split("=")[1].split(".")[0]
             filename_step = int(filename_step)
 
-            if (config.needle_in_haystack or config.zero_cut) and filename_step not in ckpt_pred_steps:
+            if filename_step not in ckpt_pred_steps:
                 continue
 
 
@@ -2217,7 +2217,7 @@ def set_config_params(config, model_name):
     return output_dir, ckpt_dir, experiment_name
 
 def get_entries(config, f):
-    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+    if (config.datasource == "val" or config.datasource == "train_systems"):
         num_traces = config.num_traces["val"]
         if config.datasource == "val":
             num_tasks = config.num_val_tasks
@@ -2225,6 +2225,7 @@ def get_entries(config, f):
             num_tasks = config.num_tasks
     elif config.datasource == "train" or config.datasource == "backstory_train":
         num_traces = config.num_traces["train"]
+        print(f"num_traces: {num_traces}")
         num_tasks = config.num_tasks
     else:
         raise ValueError(f"datasource {config.datasource} not recognized")

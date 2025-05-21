@@ -1296,7 +1296,7 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
 
     num_systems = config.num_val_tasks  # number of validation tasks
     
-    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+    if (config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
     elif config.datasource == "train":
         num_trials = config.num_traces["train"]
@@ -1655,7 +1655,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
 
     num_systems = config.num_val_tasks  # number of validation tasks
     
-    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+    if (config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
     elif config.datasource == "train" or config.datasource == "backstory_train":
         num_trials = config.num_traces["train"]
@@ -1829,7 +1829,7 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
     
-    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+    if (config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
     elif config.datasource == "train" or config.datasource == "backstory_train":
         num_trials = config.num_traces["train"]
@@ -1989,7 +1989,7 @@ def tf_preds(multi_sys_ys, model, device, config):
 def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None, sim_objs=None):
 
 
-    if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+    if (config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
     elif config.datasource == "train" or config.datasource == "backstory_train":
         num_trials = config.num_traces["train"]
@@ -2051,7 +2051,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
 
     if config.val_dataset_typ == "gaussA" and run_kf_ols:
 
-        if ((not config.needle_in_haystack) or config.datasource == "val" or config.datasource == "train_systems"):
+        if (config.datasource == "val" or config.datasource == "train_systems"):
             num_trials = config.num_traces["val"]
         elif config.datasource == "train":
             num_trials = config.num_traces["train"]
