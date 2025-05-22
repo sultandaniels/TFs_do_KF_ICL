@@ -1044,10 +1044,10 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "ortho_haar_40M":
         minval = 1000
-        maxval = 102000
+        maxval = 256000
         train_int = 1000
 
-        phases = [minval, 15000, 40000, 60000, maxval]
+        phases = [minval, 8000, 15000, 50000, 80000, maxval]
 
         ckpt_pred_steps = gen_pred_ckpts(minval, maxval, train_int, phases, hande_code_scale=False)
 
@@ -3232,7 +3232,7 @@ def set_config_params(config, model_name):
         config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
-        config.override("devices", [1])  # which GPU
+        config.override("devices", [3])  # which GPU
         config.override("train_steps", 1008000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
         config.override("num_epochs", 1)  # minimum number of epochs to train for
         config.override("train_int",1000)  # number of steps between logging (train interval)
@@ -3789,7 +3789,7 @@ if __name__ == '__main__':
     elif train_conv or multi_haystack:
 
         kal_step = None
-        last_haystack_len = 1 #19 
+        last_haystack_len = 19 
 
         if abs_err: #if we are not taking the ratios of the gauss errors
             num_haystack_examples = 1
@@ -3840,15 +3840,17 @@ if __name__ == '__main__':
                     num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
                 else:
                     # num_sys_haystacks = [2] #only run for 2 systems in the haystack for the paren swap experiment
-                    num_sys_haystacks = list(range(2,last_haystack_len+1))
+                    #num_sys_haystacks = list(range(2,last_haystack_len+1))
+                    num_sys_haystacks = [2,5]
             elif ortho_sync:
                 num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
-                num_sys_haystacks = list(range(2,last_haystack_len+1))
-                
+                #num_sys_haystacks = list(range(2,last_haystack_len+1))
+                num_sys_haystacks = [2,5]
             else:
-                # num_sys_haystacks = list(range(1,last_haystack_len+1))
-                num_sys_haystacks = [1,2,3,17,18,19]
+                num_sys_haystacks = list(range(1,last_haystack_len+1))
+                #num_sys_haystacks = [1,2,3,17,18,19]
+                #num_sys_haystacks = [2,5]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 

@@ -654,7 +654,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     ax.grid(True, which="both")
     ax.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left")
     ax.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
-    ax.set_ylim([1e-6, 1.5e0])
+    ax.set_ylim([1e-3, 1.5e0])
     # ax.set_title(("Ortho" if valA == "ortho" else ("Gaussian" if valA == "gaussA" else "Identity")) + f" Haystack Length: {haystack_len} vs Training Examples")
 
     ax_len.set_xlabel("# of Training Examples", fontsize=14)
@@ -662,9 +662,9 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     ax_len.set_yscale('linear')
     ax_len.set_xscale('log')
     ax_len.grid(True, which="both")
-    ax_len.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="center right") #"center right" if valA == "ident" else 
+    ax_len.legend(fontsize=10, ncol=2 if valA =="ident" else 1, loc="lower left") #"center right" if valA == "ident" else 
     ax_len.set_xlim(x_values[0] - 1e3, x_values[-1] + 1e3)
-    ax_len.set_ylim([-0.1, 1e0])
+    ax_len.set_ylim([-0.1, 1.2e0])
 
     #add the date and time to the filename
     now = datetime.now()
