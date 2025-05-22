@@ -2253,18 +2253,20 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
 
         print(f"getting test data from datasource {config.datasource}")
 
+        data_path = path + ("for_multi_cut_" if config.multi_cut_val else "") + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "")
+
+        #check if the data path exists
+        if not os.path.exists(data_path + "_sim_objs.pkl"):
+            print(f"data path {data_path} does not exist")
+            collect_data(config, path, "val", False, False, False) #collect the data if it does not exist
+
+
         # get the sim objs for the validation data
-        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "") + "_sim_objs.pkl", "rb") as f:
+        with open(data_path + "_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the validation data
-        print(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl")
-        with open(path + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "") + ".pkl", "rb") as f:
-            # samples = pickle.load(f)
-            # # for every 2000 entries in samples, get the observation values and append them to the ys list
-            # ys = np.stack(
-            #     [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-            # ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+        with open(data_path + ".pkl", "rb") as f:
             ys = get_entries(config, f)
 
             gc.collect()  # Start the garbage collector to free up memory
@@ -2431,6 +2433,7 @@ if __name__ == '__main__':
     parser.add_argument('--ortho_sync', help='Boolean. use orthogonal systems test with sync', action='store_true')
     parser.add_argument('--new_hay_insert', help='Boolean. new hay insertion experiment', action='store_true')
     parser.add_argument('--hard_coded_ckpt', type=int, help="Integer. hard-code what ckpt to use for needle plots", default=None)
+    parser.add_argument('--multi_cut_val', help='Boolean. run the multi cut validation experiment data gen', action='store_true')
 
 
 
@@ -2508,6 +2511,8 @@ if __name__ == '__main__':
     new_hay_insert = args.new_hay_insert
     print("hard_coded_ckpt arg", args.hard_coded_ckpt)
     hard_coded_ckpt = args.hard_coded_ckpt
+    print("multi_cut_val arg", args.multi_cut_val)
+    multi_cut_val = args.multi_cut_val
 
 
 
@@ -2540,6 +2545,8 @@ if __name__ == '__main__':
     config = Config() # create a config object
     config.override("datasource", datasource) # set the datasource in the config object
     config.override("acc", acc) # set the acc in the config object for using the ACCESS server
+
+    config.override("multi_cut_val", multi_cut_val) # set the multi_cut_val in the config object
 
     # config.override("late_start", late_start) # set the late_start in the config object
     config.override("late_start", late_start)
@@ -2638,15 +2645,22 @@ if __name__ == '__main__':
             num_haystack_examples = 1
         else:
             if config.datasource == "train" or config.datasource == "backstory_train":
-                num_haystack_examples = 40000 - 25
+                num_haystack_examples = config.num_tasks - config.max_sys_trace
             elif config.zero_cut:
                 num_haystack_examples = 1
             else:
-                num_haystack_examples = 50 #number of haystack examples to use for testing
+                if config.multi_cut_val:
+                    num_haystack_examples = config.num_val_tasks - config.max_sys_trace
+                else:
+                    num_haystack_examples = 50 #number of haystack examples to use for testing
 
         config.override("num_haystack_examples", num_haystack_examples)
 
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
+
+        if multi_cut_val: #set the validation data to be in the format of the training data
+            config.override("num_val_tasks", 40000)
+            config.override("num_traces", {"train": 1, "val": 1})
 
         if config.mem_suppress:
             ckpt_dir = mem_suppress_ckpt_path(config, ckpt_dir)
