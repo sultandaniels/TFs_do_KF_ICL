@@ -21,7 +21,6 @@ wandb
 *.gz
 *.zip
 *.dat
-*.sh
 
 #ignore runs directory
 data/runs
