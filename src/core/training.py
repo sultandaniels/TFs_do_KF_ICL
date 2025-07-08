@@ -4,7 +4,7 @@ import hashlib
 import os
 import numpy as np
 
-from core import Config
+from src.core import Config
 import os
 import glob
 from pytorch_lightning import callbacks as pl_callbacks

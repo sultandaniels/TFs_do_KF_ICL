@@ -4,9 +4,9 @@ import zipfile
 import argparse
 
 import coloredlogs
-from utils import log_info
-from utils import Singleton
-from utils import set_seed
+from src.utils import log_info
+from src.utils import Singleton
+from src.utils import set_seed
 import numpy as np
 
 # /checkpoints/step=10000.ckpt
