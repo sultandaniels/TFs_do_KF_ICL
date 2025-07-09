@@ -1,10 +1,10 @@
 from torch.utils.data import Dataset
-from dyn_models.filtering_lti import *
-from core import Config
+from src.dyn_models.filtering_lti import *
+from src.core import Config
 import torch
 import scipy.stats as stats
 import pickle
-from linalg_helpers import print_matrix
+from src.linalg_helpers import print_matrix
 import os
 
 

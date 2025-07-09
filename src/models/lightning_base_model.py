@@ -1,6 +1,6 @@
 import torch
-import pytorch_lightning as pl
-from core import Config
+import lightning.pytorch as pl
+from src.core import Config
 import os
 import numpy as np
 

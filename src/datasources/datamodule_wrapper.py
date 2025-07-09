@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from core import Config
+from src.core import Config
 from torch.utils.data import DataLoader
 import torch
 
