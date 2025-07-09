@@ -9,20 +9,42 @@ from src.models.gpt2 import GPT2
 from src.models.randomTransformer import RandomTransformerUnembedding
 from src.core import Config
 
-# Load the pre-computed activation dataset
-print("Loading activation dataset...")
-with open('activation_dataset.pkl', 'rb') as f:
-    activation_data = pickle.load(f)
+# Helper to load and preprocess data
+def load_data(pkl_path):
+    with open(pkl_path, 'rb') as f:
+        data = pickle.load(f)
+    multi_sys_ys = data['multi_sys_ys']
+    N = np.prod(multi_sys_ys.shape[:-2])
+    seq_len = multi_sys_ys.shape[-2]
+    inputs = multi_sys_ys.reshape(N, seq_len, 57)
+    targets = inputs[..., -5:]
+    return inputs, targets
 
-activations = activation_data['activations']
-targets = activation_data['targets']
-n_embd = activation_data['n_embd']
-n_dims_out = activation_data['n_dims_out']
+# Load train and val data
+print("Loading training data from train_interleaved_traces_ortho_haar_ident_C_multi_cut.pkl ...")
+train_inputs, train_targets = load_data('src/DataRandomTransformer/train_interleaved_traces_ortho_haar_ident_C_multi_cut.pkl')
+print(f"Loaded train inputs shape: {train_inputs.shape}")
+print(f"Loaded train targets shape: {train_targets.shape}")
 
-print(f"Loaded activations shape: {activations.shape}")
-print(f"Loaded targets shape: {targets.shape}")
-print(f"Embedding dimension: {n_embd}")
-print(f"Output dimension: {n_dims_out}")
+print("Loading validation data from val_interleaved_traces_ortho_haar_ident_C_haystack_len_1.pkl ...")
+val_inputs, val_targets = load_data('src/DataRandomTransformer/val_interleaved_traces_ortho_haar_ident_C_haystack_len_1.pkl')
+print(f"Loaded val inputs shape: {val_inputs.shape}")
+print(f"Loaded val targets shape: {val_targets.shape}")
+
+# Randomly sample 10% of samples for faster training
+np.random.seed(42)  # For reproducibility
+
+train_indices = np.random.choice(len(train_inputs), size=int(0.1 * len(train_inputs)), replace=False)
+val_indices = np.random.choice(len(val_inputs), size=int(0.1 * len(val_inputs)), replace=False)
+
+train_inputs = train_inputs[train_indices]
+train_targets = train_targets[train_indices]
+val_inputs = val_inputs[val_indices]
+val_targets = val_targets[val_indices]
+
+print(f"Using 10% of samples: {len(train_inputs)} training samples and {len(val_inputs)} validation samples")
+print(f"Final train inputs shape: {train_inputs.shape}")
+print(f"Final val inputs shape: {val_inputs.shape}")
 
 # Create dataset class for activations
 class ActivationDataset(Dataset):
@@ -37,16 +59,14 @@ class ActivationDataset(Dataset):
         return self.activations[idx], self.targets[idx]
 
 # Create datasets
-dataset = ActivationDataset(activations, targets)
-train_size = int(0.8 * len(dataset))
-test_size = len(dataset) - train_size
-train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
+train_dataset = ActivationDataset(train_inputs, train_targets)
+val_dataset = ActivationDataset(val_inputs, val_targets)
 
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+test_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
 print(f"Training samples: {len(train_dataset)}")
-print(f"Test samples: {len(test_dataset)}")
+print(f"Validation samples: {len(val_dataset)}")
 
 # Model 1: RandomTransformerUnembedding (only output layer trainable)
 def create_random_transformer_model(shared_weights=None):
@@ -67,21 +87,18 @@ def create_random_transformer_model(shared_weights=None):
         n_dims_out=n_dims_out
     )
     if shared_weights is not None:
-        # Copy weights for embedding and backbone
         model._read_in.load_state_dict(shared_weights['embedding'])
         model._backbone.load_state_dict(shared_weights['backbone'])
     return model
 
-# Model 2: Full GPT2 model (all layers trainable)
 def create_gpt2_model(shared_weights=None):
     config = Config()
-    n_dims_in = 57  # 5 + (2*25) + 2
+    n_dims_in = 57
     n_positions = 250
     n_embd = 128
     n_layer = 12
     n_head = 8
     n_dims_out = 5
-    
     model = GPT2(
         n_dims_in=n_dims_in,
         n_positions=n_positions,
@@ -91,14 +108,11 @@ def create_gpt2_model(shared_weights=None):
         n_dims_out=n_dims_out
     )
     if shared_weights is not None:
-        # Copy weights for embedding and backbone
         model._read_in.load_state_dict(shared_weights['embedding'])
         model._backbone.load_state_dict(shared_weights['backbone'])
     return model
 
-# Initialize shared random weights
 print("Initializing shared random weights for embedding and backbone...")
-# Create a temp RandomTransformerUnembedding to get random weights
 _temp_model = RandomTransformerUnembedding(
     n_dims_in=57, n_positions=250, n_embd=128, n_layer=12, n_head=8, n_dims_out=5
 )
