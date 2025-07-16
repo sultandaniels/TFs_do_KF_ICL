@@ -413,6 +413,7 @@ class FilterDataset(Dataset):
         super(FilterDataset, self).__init__()
         self.load(path)
         self.use_true_len = use_true_len
+        self.sim_objs = None
         if config.mem_suppress:
             #load the sim_objs
             with open(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{config.val_dataset_typ}/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:

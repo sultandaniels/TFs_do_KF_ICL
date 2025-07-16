@@ -6,6 +6,7 @@ from pytorch_lightning.strategies import DDPStrategy
 from core import Config, training
 from models import GPT2
 from datasources import FilterDataset, DataModuleWrapper
+from datasources.linear_dataset import LinearDataset
 import os
 import time
 import pickle
@@ -47,6 +48,10 @@ def pl_lr_finder(config, model, trainer, datamodule):
 def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_dim=False): #input emd_dim as a parameter for the embed dim experiment plots
     # a function to train GPT2 model
 
+    # Ensure float32 is used for MPS compatibility
+    if torch.backends.mps.is_available():
+        torch.set_default_dtype(torch.float32)
+    
     torch.set_float32_matmul_precision('high') #set the matmul performance for Tensor Cores (or 'medium' depending on your precision-performance trade-off preference)
 
     logger = logging.getLogger(__name__)
@@ -59,16 +64,16 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
     
 
     #for BLISS server
-    main_dir = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data"
+    main_dir = f"./data/train_and_test_data"
 
     val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
 
-    datamodule = DataModuleWrapper(config, FilterDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
+    datamodule = DataModuleWrapper(config, LinearDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
 
     # Define model
     # output_dir = training.setup_train(model)
 
-    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl")
+    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl")
 
     
     callbacks, loggers = training.get_callbacks_and_loggers(config, ckpt_dir, config.train_int)
@@ -86,9 +91,24 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
     # )
 
     wandb_logger = WandbLogger(log_model="all")
+    
+    # Determine the appropriate strategy based on available accelerators
+    if torch.cuda.is_available():
+        # Use DDP strategy for CUDA (multi-GPU training)
+        strategy = DDPStrategy(find_unused_parameters=True)
+        accelerator = "gpu"
+    elif torch.backends.mps.is_available():
+        # Use default strategy for MPS (Apple Silicon)
+        strategy = "auto"
+        accelerator = "mps"
+    else:
+        # Use default strategy for CPU
+        strategy = "auto"
+        accelerator = "cpu"
+    
     trainer = pl.Trainer(
         fast_dev_run=False,
-        accelerator="gpu",
+        accelerator=accelerator,
         devices=config.devices,
         callbacks=callbacks,
         logger=wandb_logger,
@@ -99,7 +119,7 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
         max_steps=-1 if config.use_true_len else config.train_steps,
         accumulate_grad_batches=config.acc_grad_batch,
         # max_epochs=config.num_epochs,
-        strategy=DDPStrategy(find_unused_parameters=True) #only for BLISS GPUs
+        strategy=strategy
     )
 
     if config.learning_rate == 0.0:
@@ -109,7 +129,7 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
 
     # time how long it takes to train the model
     time_start = time.time()
-    if not os.path.exists(ckpt_path):
+    if ckpt_path is None or not os.path.exists(ckpt_path):
         print(f"Checkpoint file {ckpt_path} does not exist.")
         # os.makedirs(ckpt_path, exist_ok=True)
         # Handle the situation, e.g., by aborting the program, loading a different checkpoint, etc. 
@@ -143,9 +163,4 @@ if __name__ == '__main__':
     config = Config()
     model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                  n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
-    train_gpt2(model, config)
-    
-
-
-
-
+    train_gpt2(model, config, ckpt_dir="./models")

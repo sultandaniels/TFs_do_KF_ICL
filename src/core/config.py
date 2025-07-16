@@ -12,26 +12,26 @@ import numpy as np
 # /checkpoints/step=10000.ckpt
 
 class Config(object, metaclass=Singleton):
-    ckpt_path = ""
+    ckpt_path = "" #"./models/checkpoints/step=10000.ckpt"
     seed = 0
     fully_reproducible = False
 
     # Dataset settings
     num_tasks = 40000 #number of training systems
     num_val_tasks = 100 #number of test systems
-    dataset_typ = "ortho_haar"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
+    dataset_typ = "linear"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
     max_cond_num = 100
     distinct_cond_nums = 10
-    val_dataset_typ = "ortho_haar"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
+    val_dataset_typ = "linear"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
     C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
-    nx = 5
-    ny = 5
+    nx = 20
+    ny = 1
     n_noise = 1
     num_traces = {"train": 1, "val": 1}
     changing = False #used only for plotting
 
     #mem_suppress experiment settings
-    mem_suppress = True #run the memory suppression experiment
+    mem_suppress = False #run the memory suppression experiment
     masking = False #run the masking training run
     cached_data = False #use cached data
     backstory = True #use masked backstories
@@ -41,7 +41,7 @@ class Config(object, metaclass=Singleton):
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
-    max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
+    max_sys_trace = min(1, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
     zero_cut = False #no cuts in the trace interleaving
     needle_in_haystack = False #run needle in haystack tests
@@ -53,26 +53,26 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[1] #which GPU
+    devices=[0] #which GPU
     train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
-    train_int = 1 #number of steps between logging (train interval)
+    train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 8*40 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 64 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
-    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
+    train_data_workers = 10 #set to 1 (check if it changes the speed of the training process)
     test_batch_size = 512
     test_data_workers = 128 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
-    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 250  #500 for extended OLS #250 #context length
-    n_embd = 192 #128 #192 #288
-    n_layer = 24 #12 #24 #48
-    n_head = 12 #8 #12 #18
-    n_dims_in = int(ny + (2*max_sys_trace) + 2) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
-    n_dims_out = 5  #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 40  #500 for extended OLS #250 #context length
+    n_embd = 256 #128 #192 #288
+    n_layer = 12 #12 #24 #48
+    n_head = 8 #8 #12 #18
+    n_dims_in = (int(ny + (2*max_sys_trace) + 2) if not dataset_typ == "linear" else int(nx + ny + (2*max_sys_trace) + 3)) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+    n_dims_out = 5 if not dataset_typ == "linear" else ny #(IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
 
 
     #transfoXL specific
@@ -85,12 +85,17 @@ class Config(object, metaclass=Singleton):
     # clamp_len = 1000
 
     # Optimizer parameters
-    learning_rate = np.sqrt((len(devices) * batch_size)/512)*(0.833333333)*1.584893192461114e-05 #1.9054607179632464e-05
+    learning_rate = 1e-4 #np.sqrt((len(devices) * batch_size)/512)*(0.833333333)*1.584893192461114e-05 #1.9054607179632464e-05
     weight_decay = 1e-2
 
     # Gradient Clipping
     gradient_clip_algorithm = 'norm'  # 'norm' or 'value'
     gradient_clip_val = 1.0
+
+    multi_cut_val = False  # set to True for multi-cut validation experiments
+    #irrelevant_tokens = False #set to True for irrelevant tokens experiments
+    #same_tokens = False #set to True for same tokens experiments
+    #late_start = False #set to True for late start experiments
 
     def __new__(cls):
         __instance = super().__new__(cls)

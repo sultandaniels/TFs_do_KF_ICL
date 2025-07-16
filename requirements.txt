@@ -1,0 +1,14 @@
+pytorch_lightning
+coloredlogs
+matplotlib
+transformers
+scipy==1.15.3
+tensordict
+dimarray
+filterpy
+control
+pandas
+wandb
+statsmodels
+netCDF4
+tensorboard
