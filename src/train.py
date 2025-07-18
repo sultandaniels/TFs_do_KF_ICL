@@ -68,12 +68,12 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
 
     val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
 
-    datamodule = DataModuleWrapper(config, LinearDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
+    datamodule = DataModuleWrapper(config, LinearDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + f"_n_pos_{config.n_positions}" + ".pkl"), val_dset)
 
     # Define model
     # output_dir = training.setup_train(model)
 
-    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl")
+    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + f"_n_pos_{config.n_positions}" + ".pkl")
 
     
     callbacks, loggers = training.get_callbacks_and_loggers(config, ckpt_dir, config.train_int)
@@ -163,4 +163,6 @@ if __name__ == '__main__':
     config = Config()
     model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                  n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
-    train_gpt2(model, config, ckpt_dir="./models")
+
+    ckpt_dir = "./models/linear"
+    train_gpt2(model, config, ckpt_dir=ckpt_dir)

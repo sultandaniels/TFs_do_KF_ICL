@@ -24,10 +24,10 @@ class Config(object, metaclass=Singleton):
     distinct_cond_nums = 10
     val_dataset_typ = "linear"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
     C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
-    nx = 20
+    nx = 5
     ny = 1
     n_noise = 1
-    num_traces = {"train": 1, "val": 1}
+    num_traces = {"train": 1, "val": 1000}
     changing = False #used only for plotting
 
     #mem_suppress experiment settings
@@ -41,20 +41,20 @@ class Config(object, metaclass=Singleton):
 
     #experiment settings
     multi_sys_trace = True #have multiple systems in a single trace
-    max_sys_trace = min(1, num_tasks) #maximum number of systems in a trace
+    max_sys_trace = min(25, num_tasks) #maximum number of systems in a trace
     single_system = False #only use a single system in the test trace
     zero_cut = False #no cuts in the trace interleaving
     needle_in_haystack = False #run needle in haystack tests
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #1 #2 #3 #4 #9 #14 #19 #number of systems in the haystack
-    len_seg_haystack = 10 #123 #82 #61 #48 #23 #15 #10 #length of a haystack segment
+    len_seg_haystack = 18 #123 #82 #61 #48 #23 #15 #10 #length of a haystack segment
     num_haystack_examples = 200 #number of haystack examples to generate
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
     devices=[0] #which GPU
-    train_steps = 1008000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
+    train_steps = 1000000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1000 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
@@ -67,8 +67,8 @@ class Config(object, metaclass=Singleton):
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
     use_pos_emb = True #use positional embeddings
-    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 40  #500 for extended OLS #250 #context length
-    n_embd = 256 #128 #192 #288
+    n_positions = 250 - mask_budget*backstory_len if mem_suppress and not masking else 500  #500 for extended OLS #250 #context length
+    n_embd = 128 #128 #192 #288
     n_layer = 12 #12 #24 #48
     n_head = 8 #8 #12 #18
     n_dims_in = (int(ny + (2*max_sys_trace) + 2) if not dataset_typ == "linear" else int(nx + ny + (2*max_sys_trace) + 3)) if multi_sys_trace else ny #input dimension is the observation dimension #input dimension is the observation dimension + special token parentheses + special start token + payload identifier

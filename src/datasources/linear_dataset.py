@@ -25,7 +25,7 @@ def generate_seg_lens(n_positions, sys_in_trace):
     return diffs - 2
 
 
-def populate_traces(config, num_tasks, entries):
+def populate_traces(config, num_tasks, entries, test=False, example=None):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -37,15 +37,25 @@ def populate_traces(config, num_tasks, entries):
     #randomly shuffle the system names to assign to the system indices for the open and close tokens
     np.random.shuffle(sys_names)
 
-    sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
-    rng = np.random.default_rng()
-    sys_inds = rng.choice(num_tasks, sys_in_trace, replace=False).tolist()
+    if config.needle_in_haystack:
+        sys_in_trace = config.num_sys_haystack #number of systems to include in the context
+    else:
+        sys_in_trace = generate_zipfian_integer(config.max_sys_trace, 1.5) #number of systems to include in the context
+
+    if config.needle_in_haystack and test:
+        sys_inds = np.arange(example, example + sys_in_trace)
+    else:
+        rng = np.random.default_rng()
+        sys_inds = rng.choice(num_tasks, sys_in_trace, replace=False).tolist()
 
     sys_dict = {}
     for i in range(len(sys_inds)):
         sys_dict[sys_inds[i]] = sys_names[i]
 
-    seg_lens = generate_seg_lens((context_len - 1), sys_in_trace)
+    if config.needle_in_haystack:
+        seg_lens = [config.len_seg_haystack]*config.num_sys_haystack + [context_len - (1 + config.num_sys_haystack*(config.len_seg_haystack + 2) + 2)]
+    else:
+        seg_lens = generate_seg_lens((context_len - 1), sys_in_trace)
 
     segments = np.zeros((context_len, config.nx + config.ny + 2*config.max_sys_trace + 3))
     segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment

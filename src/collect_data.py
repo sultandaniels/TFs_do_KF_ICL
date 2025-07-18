@@ -85,7 +85,7 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
 
         if (name == "train" and config.dataset_typ == "linear") or (name == "val" and config.val_dataset_typ == "linear"):
             for i in tqdm(range(num_tasks)):
-                sample = generate_linear_sample(int(np.floor(config.n_positions/2)), config.nx, config.ny)
+                sample = generate_linear_sample(int(np.floor(config.n_positions/2)), config.nx, config.ny, config.num_traces[name])
                 samples.append(sample)
 
         else:
@@ -137,7 +137,7 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
 
         print("Saving", len(samples), "samples for", name)
 
-        loc = f"{output_dir}/"  + ("for_multi_cut_" if config.multi_cut_val else "") + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + (f"{config.C_dist}" if name == "train" and not config.dataset_typ == "linear" or name == "val" and not config.val_dataset_typ == "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "") + (f"_sync_ind_{sync_ind}" if name == "train" and config.dataset_typ == "ortho_sync" or name == "val" and config.val_dataset_typ == "ortho_sync" else "")
+        loc = f"{output_dir}/"  + ("for_multi_cut_" if config.multi_cut_val else "") + ("opposite_ortho_" if opposite_ortho else "") + ("train_systems_" if specific_sim_objs and not opposite_ortho else "") +f"{name}_" + (f"{config.dataset_typ}" if name == "train" else f"{config.val_dataset_typ}") + (f"{config.C_dist}" if name == "train" and not config.dataset_typ == "linear" or name == "val" and not config.val_dataset_typ == "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist and name == "train" else "") + ("_state_dim_mix" if train_mix_state_dim and name == "train" else "") + (f"_sync_ind_{sync_ind}" if name == "train" and config.dataset_typ == "ortho_sync" or name == "val" and config.val_dataset_typ == "ortho_sync" else "") + f"_n_pos_{config.n_positions}"
 
         with open(loc + ".pkl", "wb") as f:
             pickle.dump(samples, f)
