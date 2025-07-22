@@ -66,7 +66,7 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
     #for BLISS server
     main_dir = f"./data/train_and_test_data"
 
-    val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
+    val_dset = LinearDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
 
     datamodule = DataModuleWrapper(config, LinearDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + f"_n_pos_{config.n_positions}" + ".pkl"), val_dset)
 
@@ -164,5 +164,5 @@ if __name__ == '__main__':
     model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                  n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
 
-    ckpt_dir = "./models/linear"
+    ckpt_dir = "./models/linear_context_500"
     train_gpt2(model, config, ckpt_dir=ckpt_dir)

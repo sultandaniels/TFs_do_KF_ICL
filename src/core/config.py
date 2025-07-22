@@ -48,14 +48,14 @@ class Config(object, metaclass=Singleton):
     needle_final_seg_extended = False #extend the final segment of the needle in haystack test
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #1 #2 #3 #4 #9 #14 #19 #number of systems in the haystack
-    len_seg_haystack = 18 #123 #82 #61 #48 #23 #15 #10 #length of a haystack segment
+    len_seg_haystack = 20 #123 #82 #61 #48 #23 #15 #10 #length of a haystack segment
     num_haystack_examples = 200 #number of haystack examples to generate
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
     devices=[0] #which GPU
     train_steps = 1000000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
-    num_epochs = 1000 #minimum number of epochs to train for
+    num_epochs = 1 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
     batch_size = 64 #usually 512 (~35GB) tune this to fit into GPU memory

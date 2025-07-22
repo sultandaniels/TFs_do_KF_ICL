@@ -85,8 +85,8 @@ def collect_data(config, output_dir, only="", train_mix_dist=False, train_mix_st
 
         if (name == "train" and config.dataset_typ == "linear") or (name == "val" and config.val_dataset_typ == "linear"):
             for i in tqdm(range(num_tasks)):
-                sample = generate_linear_sample(int(np.floor(config.n_positions/2)), config.nx, config.ny, config.num_traces[name])
-                samples.append(sample)
+                sample = generate_linear_sample(config.n_positions, config.nx, config.ny, config.num_traces[name])
+                samples.extend([{k: v[i] for k, v in sample.items()} for i in range(config.num_traces[name])])
 
         else:
         

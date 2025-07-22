@@ -66,11 +66,25 @@ def populate_traces(config, num_tasks, entries, test=False, example=None):
     seg_count = 0
     for seg_len in seg_lens:
         seg_starts.append(seg_start)
-        sys_ind = np.random.choice(sys_inds)
+
+        if config.needle_in_haystack:
+            ind = seg_count % len(sys_inds)
+            sys_ind = sys_inds[ind]
+        else:
+            sys_ind = np.random.choice(sys_inds)
+
         sys_choices.append(sys_ind)
 
-        sys_trace_obs_x = entries[sys_ind]["x"]
-        sys_trace_obs_y = entries[sys_ind]["y"]
+        if test:
+            try:
+                sys_trace_obs_x = entries[sys_ind]["x"]
+                sys_trace_obs_y = entries[sys_ind]["y"]
+            except IndexError as e:
+                print(f"System index {sys_ind} is out of bounds from sys_inds: {sys_inds}")
+                raise IndexError(e)
+        else:
+            sys_trace_obs_x = entries[sys_ind]["x"]
+            sys_trace_obs_y = entries[sys_ind]["y"]
 
         if seg_len == -2: #two closed parens on top of each other
             tok_seg_lens.append(0)
