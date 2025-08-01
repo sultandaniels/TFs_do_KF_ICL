@@ -12,7 +12,7 @@ import numpy as np
 # /checkpoints/step=10000.ckpt
 
 class Config(object, metaclass=Singleton):
-    ckpt_path = "" #"./models/checkpoints/step=10000.ckpt"
+    ckpt_path = "" #"./data/model_checkpoints/GPT2/250722_144731.5c4971_multi_sys_trace_linear_state_dim_5_lr_1.0e-04_num_train_sys_40000/checkpoints/step=120000.ckpt" #"./models/checkpoints/step=10000.ckpt"
     seed = 0
     fully_reproducible = False
 
@@ -34,7 +34,7 @@ class Config(object, metaclass=Singleton):
     mem_suppress = False #run the memory suppression experiment
     masking = False #run the masking training run
     cached_data = False #use cached data
-    backstory = True #use masked backstories
+    backstory = False #use masked backstories
     init_seg = False #use masked initial segments
     backstory_len = ny + 2 #length of the backstory
     mask_budget = 10 #max # of systems that will be masked on first appearance (alpha)
@@ -49,7 +49,7 @@ class Config(object, metaclass=Singleton):
     datasource="val" #"val" #"train" #"train_systems" #which dataset to use for the needle in haystack tests
     num_sys_haystack = 19 #1 #2 #3 #4 #9 #14 #19 #number of systems in the haystack
     len_seg_haystack = 20 #123 #82 #61 #48 #23 #15 #10 #length of a haystack segment
-    num_haystack_examples = 200 #number of haystack examples to generate
+    num_haystack_examples = 50 #number of haystack examples to generate
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
@@ -61,8 +61,8 @@ class Config(object, metaclass=Singleton):
     batch_size = 64 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
     train_data_workers = 10 #set to 1 (check if it changes the speed of the training process)
-    test_batch_size = 512
-    test_data_workers = 128 #keep at 1
+    test_batch_size = 64
+    test_data_workers = 1 #keep at 1
 
     # Model settings
     model_type = "GPT2" #"GPT2" #"transfoXL" #"olmo"
@@ -93,9 +93,9 @@ class Config(object, metaclass=Singleton):
     gradient_clip_val = 1.0
 
     multi_cut_val = False  # set to True for multi-cut validation experiments
-    #irrelevant_tokens = False #set to True for irrelevant tokens experiments
-    #same_tokens = False #set to True for same tokens experiments
-    #late_start = False #set to True for late start experiments
+    irrelevant_tokens = False #set to True for irrelevant tokens experiments
+    same_tokens = False #set to True for same tokens experiments
+    late_start = False #set to True for late start experiments
 
     def __new__(cls):
         __instance = super().__new__(cls)

@@ -44,7 +44,11 @@ def generate_seg_lens(n_positions, sys_in_trace):
     num_cut = rng.poisson(lam) # number of cuts in the trace
 
     # generate num_cut random cut positions in trace distributed uniformly over the entire context
-    positions = rng.integers(0, n_positions, size=num_cut) #positions are the index of the closed paren (and start token)
+    if config.dataset_typ == "linear":
+        rel_positions = rng.integers(0, int(n_positions/2), size=num_cut)
+        positions = rel_positions*2
+    else:
+        positions = rng.integers(0, n_positions, size=num_cut) #positions are the index of the closed paren (and start token)
     if not 0 in positions:
         positions = np.append(positions, 0)
     positions = np.append(positions, n_positions)
@@ -176,7 +180,10 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
             else:
                 seg_lens = generate_seg_lens((context_len - 1), sys_in_trace)
 
-    segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
+    if not config.dataset_typ == "linear":
+        segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
+    else:
+        segments = np.zeros((context_len, config.nx + config.ny + 2*config.max_sys_trace + 3)) #initialize the segments array
     segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
     #initialize a dictionary to hold the next starting index for each system trace
@@ -287,10 +294,11 @@ def populate_traces(config, num_tasks, entries, test=False, train_conv=False, tr
                 segment = sys_trace_obs[next_start[sys_ind]:next_start[sys_ind] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
             # concatenate 1 columns of ones to the segment
-            ones = np.ones((segment.shape[0], 1))
-            segment = np.concatenate((ones, segment), axis=1)
+            if not config.dataset_typ == "linear":
+                ones = np.ones((segment.shape[0], 1))
+                segment = np.concatenate((ones, segment), axis=1)
         
-            # concatenate 2*config.max_sys_trace + 1 columns of zeros to the segment
+            # concatenate columns of zeros to the segment
             zeros = np.zeros((segment.shape[0], 2*config.max_sys_trace + 1))
             segment = np.concatenate((zeros, segment), axis=1)
 
@@ -530,6 +538,8 @@ class FilterDataset(Dataset):
                     # print(f"segments.shape: {segments.shape}\n")
                     # entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
 
+            elif config.dataset_typ == "linear":
+                entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + config.nx + 3:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
             else:
                 entry = {"current": segments[:-1, :], "target": segments[1:, 2*config.max_sys_trace + 2:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
 

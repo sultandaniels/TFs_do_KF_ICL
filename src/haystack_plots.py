@@ -253,7 +253,7 @@ def plot_needle_position(config, experiment, datasource, state_dim, ckpt_step, v
     now = datetime.now()
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
-    figure_dir = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens/" if config.irrelevant_tokens else "") + ("same_tokens/" if config.same_tokens else "") + ("paren_swap/" if config.paren_swap else "") + ("new_hay_insert/" if config.new_hay_insert else "")
+    figure_dir = f"./outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens/" if config.irrelevant_tokens else "") + ("same_tokens/" if config.same_tokens else "") + ("paren_swap/" if config.paren_swap else "") + ("new_hay_insert/" if config.new_hay_insert else "")
 
     os.makedirs(figure_dir, exist_ok=True)
     fig.savefig(figure_dir + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + f"error_ratios_{valA}_embd_dim_{config.n_embd}_state_dim_{state_dim}{valC}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
@@ -359,7 +359,7 @@ def plot_steps_after_open_token(config, haystack_len, quartiles, seg_ext_quartil
     plt.tight_layout()
 
     
-    figure_dir = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens/" if config.irrelevant_tokens else "") + ("same_tokens/" if config.same_tokens else "") + ("paren_swap/" if config.paren_swap else "") + ("new_hay_insert/" if config.new_hay_insert else "")
+    figure_dir = f"./outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/needle_in_haystack_examples/{datasource}/" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens/" if config.irrelevant_tokens else "") + ("same_tokens/" if config.same_tokens else "") + ("paren_swap/" if config.paren_swap else "") + ("new_hay_insert/" if config.new_hay_insert else "")
 
     os.makedirs(figure_dir, exist_ok=True)
     fig.savefig(figure_dir + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + f"last_seg_context_{valA}_embd_dim_{config.n_embd}_step_{ckpt_step}_haystack_len_{haystack_len}_{timestamp}.pdf", transparent=True)
@@ -448,6 +448,9 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
                 assert ("paren_swap" if config.paren_swap else "") in errs_loc, f"Error: paren_swap not in {errs_loc}"
                 err_lss_examples = pickle.load(f)
 
+            # Debug: print available keys
+            print(f"Available keys in err_lss_examples: {list(err_lss_examples.keys())}")
+
             if OLS_errs is not None:
                 for key in OLS_errs.keys():
                     err_lss_examples[key] = OLS_errs[key]
@@ -486,6 +489,11 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
                     for key in ["MOP"]: #, "OLS_ir_1", "OLS_ir_2", "OLS_ir_3", "OLS_analytical_ir_1", "OLS_analytical_ir_2", "OLS_analytical_ir_3"]:
                         if key not in  ["Zero", "Analytical_Simulation", "Kalman_rem", "Kalman", "Analytical_Kalman"]:
                             
+                            # Check if key exists in quartiles
+                            if key not in quartiles:
+                                print(f"Warning: Key '{key}' not found in quartiles. Available keys: {list(quartiles.keys())}")
+                                continue
+                            
                             y = quartiles[key][1, needle, fin_seg_start + step]
                             
                             y_err = [
@@ -494,24 +502,24 @@ def compute_quartiles_ckpt(config, model_name, steps_in, model_dir, experiment, 
                             ]
 
                             if needle == 0:
-                                if len(pred_ckpts) == 0:
-                                    if step == 1:
-                                        ys[key] = {}
-                                        y_errs[key] = {}
-                                        fin_quartiles_ckpt[key] = {}
-                                        beg_quartiles_ckpt[key] = {}
+                                # Initialize dictionaries for the key if they don't exist
+                                if key not in ys:
+                                    ys[key] = {}
+                                    y_errs[key] = {}
+                                    fin_quartiles_ckpt[key] = {}
+                                    beg_quartiles_ckpt[key] = {}
+                                
+                                # Initialize step if it doesn't exist
+                                if step not in ys[key]:
+                                    ys[key][step] = []
+                                    y_errs[key][step] = []
+                                    fin_quartiles_ckpt[key][step] = []
+                                    beg_quartiles_ckpt[key][step] = []
 
-                                    ys[key][step] = [y]
-                                    y_errs[key][step] = [y_err]
-                                    fin_quartiles_ckpt[key][step] = [quartiles[key][:, needle, fin_seg_start + step]]
-                                    beg_quartiles_ckpt[key][step] = [quartiles[key][:, needle, beg_seg_start + step]]
-
-                                else:
-
-                                    ys[key][step].append(y)
-                                    y_errs[key][step].append(y_err)
-                                    fin_quartiles_ckpt[key][step].append(quartiles[key][:, needle, fin_seg_start + step])
-                                    beg_quartiles_ckpt[key][step].append(quartiles[key][:, needle, beg_seg_start + step])
+                                ys[key][step].append(y)
+                                y_errs[key][step].append(y_err)
+                                fin_quartiles_ckpt[key][step].append(quartiles[key][:, needle, fin_seg_start + step])
+                                beg_quartiles_ckpt[key][step].append(quartiles[key][:, needle, beg_seg_start + step])
 
 
             pred_ckpts.append(ckpt_step)
@@ -676,7 +684,7 @@ def plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_c
     timestamp = now.strftime("%Y%m%d_%H%M%S")
 
 
-    figure_dir = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + (f"{config.datasource}/" if config.datasource != "val" else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens/" if config.irrelevant_tokens else "") + ("same_tokens/" if config.same_tokens else "") + ("paren_swap/" if config.paren_swap else "") 
+    figure_dir = f"./outputs/GPT2" + ("_NoPE" if nope else "") + f"/{experiment}/figures/multi_sys_trace/" + (f"{config.datasource}/" if config.datasource != "val" else "") + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens/" if config.irrelevant_tokens else "") + ("same_tokens/" if config.same_tokens else "") + ("paren_swap/" if config.paren_swap else "") 
     os.makedirs(figure_dir, exist_ok=True)
     print(figure_dir + (f"late_start_{config.late_start}_" if config.late_start is not None else "") + ("abs_err_" if abs_err else "") + f"{valA}_train_conv_haystack_len_{haystack_len}_{timestamp}_logscale.pdf")
 
@@ -726,8 +734,15 @@ def haystack_plots_train_conv_full(config, model_name, haystack_len, output_dir,
     early_stop_ind = plot_haystack_train_conv(config, colors, fin_quartiles_ckpt, beg_quartiles_ckpt, x_values, config.val_dataset_typ, haystack_len, experiment, steps_in, not config.use_pos_emb, abs_err)
 
     print(f"len(pred_ckpt_steps): {len(pred_ckpt_steps)}, early_stop_ind: {early_stop_ind}")
-    ckpt_step = pred_ckpt_steps[early_stop_ind] #get the ckpt_step for the early stopping index
     print("pred_ckpt_steps: ", pred_ckpt_steps)
+    
+    # Handle the case where early_stop_ind is out of bounds for pred_ckpt_steps
+    if early_stop_ind >= len(pred_ckpt_steps):
+        print(f"Warning: early_stop_ind ({early_stop_ind}) is out of bounds for pred_ckpt_steps (length {len(pred_ckpt_steps)}). Using last available checkpoint.")
+        ckpt_step = pred_ckpt_steps[-1]  # Use the last available checkpoint
+    else:
+        ckpt_step = pred_ckpt_steps[early_stop_ind]  # get the ckpt_step for the early stopping index
+    
     print(f"ckpt_step: {ckpt_step}")
     # raise NotImplementedError("Check the ckpt_step")
 

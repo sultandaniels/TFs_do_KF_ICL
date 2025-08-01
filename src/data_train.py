@@ -56,7 +56,12 @@ def wandb_train(config, config_dict, model, ckpt_dir, train_mix_dist=False, trai
 
 def preds_thread(config, ckpt_path, make_preds, resume_train, train_conv, logscale, tf, output_dir, ys=None, sim_objs=None, train_mix_dist=False, train_mix_state_dim=False, run_kf_ols=True):
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
 
     # create prediction plots
     run_preds = make_preds # run the predictions evaluation
@@ -826,7 +831,12 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
 
+    elif model_name == "linear_medium":
+        minval = 1000
+        maxval = 120000
+        train_int = 1000
 
+        ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
 
     return ckpt_pred_steps
 
@@ -927,7 +937,8 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
 
     
     #save the interleave_traces_dict to a file
-    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    #interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    interleave_traces_dict_path = os.path.join(f"./data/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}_{interleaving}.pkl")
     with open(interleave_traces_dict_path, "wb") as f:
         pickle.dump(interleave_traces_dict, f)
     print(f"interleave_traces_dict saved to {interleave_traces_dict_path}")
@@ -936,7 +947,7 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
     ckpt_pred_steps = gen_ckpt_pred_steps(model_name) #generate specific ckpt steps to predict on
     print(f"len of ckpt_pred_steps: {len(ckpt_pred_steps)}")
 
-    run_kf_ols = True
+    run_kf_ols = config.val_dataset_typ != "linear"
     for filename in os.listdir(ckpt_dir + "/checkpoints/"):
 
         if filename.endswith(".ckpt") == False:
@@ -2175,12 +2186,11 @@ def set_config_params(config, model_name):
         config.override("changing", False)  # used only for plotting
 
         #mem_suppress experiment settings
-        config.override("mem_suppress", True) #run the memory suppression experiment
+        config.override("mem_suppress", False) #run the memory suppression experiment
         config.override("masking", False) #run the masking training run
-        config.override("backstory", True) #use masked backstories
+        config.override("backstory", False) #use masked backstories
         config.override("cached_data", False) #use masked backstories
         config.override("init_seg", False) #use masked initial segments
-        config.override("backstory_len", config.ny + 2) #length of the backstory
         config.override("mask_budget", 10) #max # of systems that will be masked on first appearance (alpha)
         
         # Training settings
@@ -2206,13 +2216,50 @@ def set_config_params(config, model_name):
         
         config.override("learning_rate", np.sqrt((len(config.devices) * config.batch_size)/512)*(0.833333333)*1.584893192461114e-05)
 
+    elif model_name == "linear_medium":
+        experiment_name = "250722_144731.5c4971_multi_sys_trace_linear_state_dim_5_lr_1.0e-04_num_train_sys_40000"
+
+        print("\n\nLINEAR MEDIUM MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "linear")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("val_dataset_typ", "linear")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("nx", 5)
+        config.override("ny", 1)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0])  # which GPU
+        config.override("train_steps", 1000000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 64)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 10)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 64)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 500)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.nx + config.ny + (2*config.max_sys_trace) + 3))  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", 1)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", 1e-4)
     else:
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
 
-    output_dir = f"../outputs/{config.model_type}/{experiment_name}"
+    output_dir = f"./outputs/{config.model_type}/{experiment_name}"
 
-    ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
-
+    #ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
+    ckpt_dir = f"./data/model_checkpoints/{config.model_type}/{experiment_name}"
 
     return output_dir, ckpt_dir, experiment_name
 
@@ -2230,17 +2277,19 @@ def get_entries(config, f):
     else:
         raise ValueError(f"datasource {config.datasource} not recognized")
     samples = pickle.load(f)
+
+    dim = config.ny if config.dataset_typ != "linear" else config.nx + config.ny + 2
+    context_len = config.n_positions + 1 if config.dataset_typ != "linear" else config.n_positions
     if config.late_start is not None:
         ys = np.stack(
             [entry["obs"] for entry in samples], axis=0
-        ).reshape((num_tasks, num_traces, 251, config.ny)).astype(np.float32)
+        ).reshape((num_tasks, num_traces, 251, dim)).astype(np.float32)
     else:
         ys = np.stack(
-            [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-        ).reshape((num_tasks, num_traces, config.n_positions + 1, config.ny)).astype(np.float32)
+            [entry["obs"][:context_len] for entry in samples], axis=0
+        ).reshape((num_tasks, num_traces, context_len, dim)).astype(np.float32)
     gc.collect()  # Start the garbage collector
     return ys
-
     
 def get_test_data(config, experiment_name, num_haystack_ex=50):
     # load the validation data
@@ -2254,7 +2303,7 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
         print(f"getting test data from datasource {config.datasource}")
 
         data_path = path + ("for_multi_cut_" if config.multi_cut_val else "") + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "")
-
+        
         #check if the data path exists
         if not os.path.exists(data_path + "_sim_objs.pkl"):
             print(f"data path {data_path} does not exist")
@@ -2332,6 +2381,28 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
         raise ValueError("Datasource not recognized. Please choose from the following: val, train, train_systems")
 
     return ys, sim_objs
+
+def get_test_data_linear(config, experiment_name):
+    # load the validation data
+
+    path = "./data/train_and_test_data"
+    if config.datasource == "val":
+        path = path + f"/{config.val_dataset_typ}/"
+
+        print(f"getting test data from datasource {config.datasource}")
+
+        data_path = path + f"val_{config.val_dataset_typ}_state_dim_{config.nx}"
+
+        #check if the data path exists
+        if not os.path.exists(data_path + ".pkl"):
+            print(f"data path {data_path} does not exist")
+            collect_data(config, path, "val", False, False, False) #collect the data if it does not exist
+
+        with open(data_path + ".pkl", "rb") as f:
+            entries = get_entries(config, f)
+            gc.collect()  # Start the garbage collector to free up memory
+
+    return entries, None
 
 def get_kal_step(output_dir, model_name):
     #get kal_step
@@ -2689,7 +2760,8 @@ if __name__ == '__main__':
 
             # steps_in = [1,2,3,5,10]
             # steps_in = [1,2,3,7,8]
-            steps_in = list(range(1,9))
+            steps_in = [2,4,6,8,10,12,14]
+            #steps_in = list(range(1,9))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
         
@@ -2704,8 +2776,8 @@ if __name__ == '__main__':
                 num_sys_haystacks = [2]
                 
             else:
-                # num_sys_haystacks = list(range(1,last_haystack_len+1))
-                num_sys_haystacks = [19]
+                num_sys_haystacks = list(range(7,last_haystack_len+1))
+                #num_sys_haystacks = [1]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
@@ -2834,11 +2906,13 @@ if __name__ == '__main__':
                 if opposite_ortho:
                     config.override("num_val_tasks", 2)
 
-                ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)
-
                 print(f"output dir: {output_dir}")
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
 
+                if not config.val_dataset_typ == "linear":
+                    ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)           
+                else:
+                    ys, sim_objs = get_test_data_linear(config, output_dir)
                 print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
 
                 if not only_needle_pos:

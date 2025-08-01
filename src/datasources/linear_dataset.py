@@ -25,7 +25,7 @@ def generate_seg_lens(n_positions, sys_in_trace):
     return diffs - 2
 
 
-def populate_traces(config, num_tasks, entries, test=False, example=None):
+def populate_traces_linear(config, num_tasks, entries, test=False, train_conv=False, trace_conf=None, example=None):
     sys_choices = [] #list that will hold the order of the system choices for the trace
     seg_starts = []
     tok_seg_lens = []
@@ -189,7 +189,7 @@ class LinearDataset:
         
 
     def __getitem__(self, idx):
-        segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces(config, config.num_tasks, self.data)
+        segments, sys_choices, sys_dict, seg_lens, seg_starts, real_seg_lens, sys_inds = populate_traces_linear(config, config.num_tasks, self.data)
         entry = {"current": segments[:-1, :], "target": segments[1:, config.nx + 2*config.max_sys_trace + 3:]} #create the entry dictionary with the current and target segments, where the target segment has only the config.ny columns
         torch_entry = dict([
                 (k, (torch.from_numpy(a) if isinstance(a, np.ndarray) else a).to(torch.float32))

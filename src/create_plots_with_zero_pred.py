@@ -23,6 +23,7 @@ from models import GPT2, CnnKF
 from utils import RLS, plot_errs, plot_errs_conv, plot_errs_multi_sys
 from datasources import filter_dataset
 from datasources.filter_dataset import populate_traces, special_tokens, add_backstories
+from datasources.linear_dataset import populate_traces_linear
 from collect_data import collect_data
 import linalg_helpers as la
 
@@ -34,7 +35,12 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 # from wentinn's code
 def wentinn_compute_errors(config):
     torch.set_default_dtype(torch.float32)
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     logger = logging.getLogger(__name__)  # get the logger
     config = Config()  # get the config
 
@@ -298,7 +304,12 @@ def compute_OLS_and_OLS_analytical_revised(config, ys, sim_objs, ir_length, err_
 
 def compute_OLS_ir(config, ys, sim_objs, max_ir_length, err_lss):
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
 
     # set torch precision to float64
     torch.set_default_dtype(torch.float64)
@@ -439,7 +450,12 @@ def compute_OLS_needle(num_trace_configs, next_start_per_config, seg_lens_per_co
 
 
 def compute_OLS_helper(config, ys, sim_objs, ir_length, ridge):
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
 
     n_positions = ys.shape[-2] - 1
     torch.set_default_device(device)
@@ -683,7 +699,13 @@ def compute_analytical_kf_simulation(config, ys, sim_objs, num_trials):
 
 def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+
     logger = logging.getLogger(__name__)  # get the logger
 
     print("val_dataset_typ:", config.val_dataset_typ)
@@ -953,7 +975,12 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
 
 def compute_errors_conv(config):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
 
     print("val_dataset_typ:", config.val_dataset_typ)
     num_systems = config.num_val_tasks  # number of validation tasks
@@ -1075,7 +1102,10 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
     if sys_dict:
         context_len = config.n_positions + 1 #the length of the context
 
-        segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
+        if not config.val_dataset_typ == "linear":
+            segments = np.zeros((context_len, config.ny + 2*config.max_sys_trace + 2)) #initialize the segments array
+        else:
+            segments = np.zeros((context_len, config.nx + config.ny + 2*config.max_sys_trace + 3)) #initialize the segments array
         segments[0, 2*config.max_sys_trace] = np.sqrt(2) #set the start token for the first segment
 
         #initialize a dictionary to hold the next starting index for each system trace
@@ -1142,8 +1172,9 @@ def populate_val_traces_helper(config, trial, ys_trial, sys_choices=None, sys_di
                 segment = sys_trace_obs[next_start[sys]:next_start[sys] + seg_len, :] #get the segment from the next starting index to the next starting index plus the segment length
 
                 #concatenate 1 column of ones to the segment
-                ones = np.ones((segment.shape[0], 1))
-                segment = np.concatenate((ones, segment), axis=1)
+                if not config.val_dataset_typ == "linear":
+                    ones = np.ones((segment.shape[0], 1))
+                    segment = np.concatenate((ones, segment), axis=1)
                 #concatenate 2*max_sys_trace + 1 columns of zeros to the segment
                 zeros = np.zeros((segment.shape[0], 2*config.max_sys_trace + 1))
                 segment = np.concatenate((zeros, segment), axis=1)
@@ -1291,7 +1322,12 @@ def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choi
 
 def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=True):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     logger = logging.getLogger(__name__)  # get the logger
 
     num_systems = config.num_val_tasks  # number of validation tasks
@@ -1651,7 +1687,12 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
 
 def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=None):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():  # check if cuda is available
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
 
     num_systems = config.num_val_tasks  # number of validation tasks
     
@@ -1692,8 +1733,10 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
     if config.datasource == "backstory_train":
         multi_sys_ys_context_len += config.backstory_len*min(config.num_sys_haystack,10)
 
-
-    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+    if not config.val_dataset_typ == "linear":
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+    else:
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.nx + config.ny + 2*config.max_sys_trace + 3)).astype(np.float32) #set up the array to hold the test traces
         
 
     sys_choices_per_config = []
@@ -1818,7 +1861,7 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
     for trace_config in range(num_test_traces_configs):
         sim_obj_conf = {}
         for sys_ind in sys_inds_per_config[trace_config]:
-            sim_obj_conf[sys_ind] = sim_objs[sys_ind] 
+            sim_obj_conf[sys_ind] = sim_objs[sys_ind] if not config.val_dataset_typ == "linear" else None
 
         sim_objs_per_config.append(sim_obj_conf)  
 
@@ -1827,7 +1870,12 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
 
 def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_loc):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
-    device = "cuda" if torch.cuda.is_available() else "cpu"  # check if cuda is available
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     
     if (config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
@@ -1864,7 +1912,6 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
     err_lss = collections.OrderedDict()
     # print(f"\n err_lss does not exist yet for step {ckpt_steps}")
 
-
     multi_sys_ys_context_len = config.n_positions + 1
 
     if config.datasource == "backstory_train":
@@ -1876,7 +1923,8 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
         interleaving = f"multi_cut"
 
     #load multi_sys_ys from interleaved_traces file
-    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    #interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
+    interleave_traces_dict_path = os.path.join(f"./data/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}_{interleaving}.pkl")
     with open(interleave_traces_dict_path, "rb") as f:
         interleave_traces_dict = pickle.load(f)
         orig_multi_sys_ys = interleave_traces_dict["multi_sys_ys"]
@@ -1987,8 +2035,6 @@ def tf_preds(multi_sys_ys, model, device, config):
     return preds_tf
 
 def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None, sim_objs=None):
-
-
     if (config.datasource == "val" or config.datasource == "train_systems"):
         num_trials = config.num_traces["val"]
     elif config.datasource == "train" or config.datasource == "backstory_train":
@@ -2004,8 +2050,10 @@ def interleave_traces(config, ys, num_test_traces_configs, num_trials, ex=None, 
     if config.datasource == "backstory_train":
         multi_sys_ys_context_len += config.backstory_len*min(config.num_sys_haystack,10)
 
-    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
-        
+    if not config.val_dataset_typ == "linear":
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+    else:
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, multi_sys_ys_context_len, config.nx + config.ny + 2*config.max_sys_trace + 3)).astype(np.float32) #set up the array to hold the test traces
 
     sys_choices_per_config = []
     sys_dict_per_config = []
@@ -2090,7 +2138,6 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
     with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)
 
-    return None
     # raise NotImplementedError("writing optimized version")
 
     err_lss_examples = {}

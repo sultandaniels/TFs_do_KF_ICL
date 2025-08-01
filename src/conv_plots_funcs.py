@@ -16,14 +16,19 @@ from data_processing import gen_ckpt_steps, move_dict_to_device, get_other_err, 
 # sys.path.append(os.path.abspath('..'))
 
 from check_ecdf import get_empirical_cdf
-
 # Check if GPU is available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
 print("Using device:", device)
 
 def get_seg_starts_per_config(experiment, valA, valC, state_dim, ckpt, print_seg_starts=False, nope=False, needle=False, fin_seg_ext=False, haystack_len=19, train_conv=False, datasource="val", paren_swap=False, fix_needle=False, opposite_ortho=False, irrelevant_tokens=False, same_tokens=False, new_hay_insert=False):
     # load the sys choices etc
-    errs_dir = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
+    errs_dir = "./outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/prediction_errors{valC}_step={ckpt}.ckpt"
     # + ("train_conv_" if needle else "")
     errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if not needle else "") + (f"needle_haystack_len_{haystack_len}_{datasource}_" if needle else "") + ("fin_seg_ext_" if needle and fin_seg_ext else "") + f"{valA}_state_dim_{state_dim}_" + ("fix_needle_" if fix_needle else "") + ("opposite_ortho_" if opposite_ortho else "") + ("new_hay_insert_" if new_hay_insert else "") + ("irrelevant_tokens_" if irrelevant_tokens else "") + ("same_tokens_" if same_tokens else "") + ("paren_swap_" if paren_swap else "")  + f"sys_choices_sys_dict_tok_seg_lens_seg_starts" + ("_example_0" if needle else "") + ".pkl"
 
@@ -51,9 +56,9 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
     fig, ax = plt.subplots(1, 1, figsize=(5, 5), sharex=True)
     filename = f'training_dist_comparison_val_{valA}_state_dim_{nx}_val_sys_{num_val_systems}_{time.time()}.pdf'
 
-    parent_path = "../outputs/GPT2" + ("_NoPE" if nope else "") + "/"
+    parent_path = "./outputs/GPT2" + ("_NoPE" if nope else "") + "/"
 
-    filepath = os.path.abspath(f"../outputs/train_conv/{filename}")
+    filepath = os.path.abspath(f"./outputs/train_conv/{filename}")
     print(filepath)
 
     print(f"quantiles 5 path exists?: {os.path.exists(parent_path + experiments[0] + "/train_conv/quantiles_5.npz")}")
@@ -285,9 +290,9 @@ def train_conv_plots(experiments, trainAs, kal_ckpt, valA, C_dist, num_val_syste
         # fig.text(0.5, 0.01, f'Generated at {plot_time}', ha='center')
 
         plt.tight_layout()
-        os.makedirs(os.path.dirname(f"../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + "/figures/"), exist_ok=True)
+        os.makedirs(os.path.dirname(f"./outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + "/figures/"), exist_ok=True)
         #save the figures
-        fig.savefig(f"../outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/figures/" + ("nope_" if nope else "") + f"{valA}_train_conv_single_sys.pdf", format='pdf', bbox_inches='tight')
+        fig.savefig(f"./outputs/GPT2" + ("_NoPE" if nope else "") + "/" + experiment + f"/figures/" + ("nope_" if nope else "") + f"{valA}_train_conv_single_sys.pdf", format='pdf', bbox_inches='tight')
         if i ==0:
             lr_med = quantiles[1,:]
             lr_pred_ckpts = pred_ckpts
