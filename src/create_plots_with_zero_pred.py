@@ -739,10 +739,10 @@ def compute_errors(config, C_dist, run_deg_kf_test, wentinn_data, tf):
 
         print("getting the validation data")
         # open fsim file
-        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
-        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
             samples = pickle.load(f)
             # for every 2000 entries in samples, get the observation values and append them to the ys list
             ys = np.stack(
@@ -1024,10 +1024,10 @@ def compute_errors_conv(config):
 
     print("getting the validation data")
     # open fsim file
-    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
         sim_objs = pickle.load(f)
 
-    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+    with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
         samples = pickle.load(f)
         # for every 2000 entries in samples, get the observation values and append them to the ys list
         ys = np.stack(
@@ -1320,7 +1320,7 @@ def interleave_kf_OLS_needle(config, ys, errs_all, seg_lens_per_config, sys_choi
 
     return err_lss
 
-def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=True):
+def compute_errors_multi_sys(config, tf, errs_dir, errs_loc, data_dir, run_OLS=True, train_conv=False, run_kf=True):
     # a function to compute the test errors for the GPT2 model, kalman filter, and zero predictions
     if torch.cuda.is_available():
         device = "cuda"
@@ -1357,8 +1357,8 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     ckpt_steps = get_step_number(config.ckpt_path)
     
     #create a directory to save the prediction errors
-    errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
-    errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
+    #errs_dir = parent_parent_dir + f"/prediction_errors" + ("_spec_C" if config.needle_in_haystack and config.datasource == "train_systems" and config.multi_sys_trace else f"{config.C_dist}") + f"_step={ckpt_steps}.ckpt"
+    #errs_loc = errs_dir + f"/" + ("train_conv_" if train_conv else "") + ("single_system_" if config.single_system else "") + ("zero_cut_" if config.zero_cut else "") + (f"needle_haystack_len_{config.num_sys_haystack}_{config.datasource}_" if config.needle_in_haystack else "") + f"{config.val_dataset_typ}_state_dim_{config.nx}_err_lss.pkl"
 
     if os.path.exists(errs_loc):
         with open(errs_loc, 'rb') as f:
@@ -1375,8 +1375,10 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
     # Transformer Predictions
     # if not ("MOP" in err_lss.keys()):
 
-
-    multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+    if not config.val_dataset_typ == "linear":
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.ny + 2*config.max_sys_trace + 2)).astype(np.float32) #set up the array to hold the test traces
+    else:
+        multi_sys_ys = np.zeros((num_test_traces_configs, num_trials, config.n_positions + 1, config.nx+config.ny + 2*config.max_sys_trace + 3)).astype(np.float32) #set up the array to hold the test traces
 
     #get the ys and sim_objs for the test data 
     if ((not config.needle_in_haystack) or config.datasource == "val"):
@@ -1384,16 +1386,18 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
         print(f"getting test data from datasource {config.datasource}")
 
         # get the sim objs for the validation data
-        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(data_dir + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
+        trace_len = config.n_positions + 1 if not config.val_dataset_typ == "linear" else config.n_positions
+        trace_dim = config.ny if not config.val_dataset_typ == "linear" else config.nx + config.ny + 2
         #set ys to be the validation data
-        with open(parent_parent_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(data_dir + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
             samples = pickle.load(f)
             # for every 2000 entries in samples, get the observation values and append them to the ys list
             ys = np.stack(
                 [entry["obs"] for entry in samples], axis=0
-            ).reshape((num_systems, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+            ).reshape((num_systems, config.num_traces["val"], trace_len, trace_dim)).astype(np.float32)
 
             gc.collect()  # Start the garbage collector
 
@@ -1402,16 +1406,19 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
         print(f"getting test data from datasource {config.datasource}")
 
         #get the sim_objs for the training data
-        with open (parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open (data_dir + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
+        
+        trace_len = config.n_positions + 1 if not config.dataset_typ == "linear" else config.n_positions
+        trace_dim = config.ny if not config.dataset_typ == "linear" else config.nx + config.ny + 2
         #set ys to be the training data
-        with open(parent_parent_dir + f"/data/train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(data_dir + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
             #get train traces
             samples = pickle.load(f)
             ys = np.stack(
                 [entry["obs"] for entry in samples], axis=0
-            ).reshape((config.num_tasks, config.num_traces["train"], config.n_positions + 1, config.ny)).astype(np.float32)
+            ).reshape((config.num_tasks, config.num_traces["train"], trace_len, trace_dim)).astype(np.float32)
             gc.collect()  # Start the garbage collector
 
     elif config.datasource == "train_systems":
@@ -1419,13 +1426,13 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
         print(f"getting test data from datasource {config.datasource}")
 
         #get the sim_objs for the training data
-        with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(parent_parent_dir + f"/data/train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #generate traces from the training systems
         collect_data(config, parent_parent_dir, "val", False, False, False, sim_objs) 
 
-        with open(parent_parent_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(parent_parent_dir + f"/data/{config.datasource}_val_specA_spec_C_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
             #get train traces
             samples = pickle.load(f)
             ys = np.stack(
@@ -1509,6 +1516,16 @@ def compute_errors_multi_sys(config, tf, run_OLS=True, train_conv=False, run_kf=
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
             if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count]] = np.inf
+
+            if config.val_dataset_typ == "linear":
+                # also set all 'x' entries (every second value inside the segment after the start token) to infinite
+                x_indices = np.arange(
+                    seg_start + 1,
+                    seg_start + real_seg_lens_per_config[trace_config][seg_count],
+                    2,
+                )
+                if x_indices.size > 0:
+                    errs_tf[trace_config, :, x_indices] = np.inf
             seg_count += 1
 
 
@@ -1820,6 +1837,16 @@ def compute_errors_needle(config, model, ys, sim_objs, errs_dir, errs_loc, ex=No
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count] - 1] = np.inf
             if seg_start + tok_seg_lens_per_config[trace_config][seg_count] <= config.n_positions:
                 errs_tf[trace_config, :, seg_start + tok_seg_lens_per_config[trace_config][seg_count]] = np.inf
+
+            if config.val_dataset_typ == "linear":
+                # also set all 'x' entries (every second value inside the segment after the start token) to infinite
+                x_indices = np.arange(
+                    seg_start + 1,
+                    seg_start + real_seg_lens_per_config[trace_config][seg_count],
+                    2,
+                )
+                if x_indices.size > 0:
+                    errs_tf[trace_config, :, x_indices] = np.inf
             seg_count += 1
 
 
@@ -1923,8 +1950,7 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
         interleaving = f"multi_cut"
 
     #load multi_sys_ys from interleaved_traces file
-    #interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
-    interleave_traces_dict_path = os.path.join(f"./data/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}_{interleaving}.pkl")
+    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/" + ("backstory_" if config.mem_suppress and config.backstory else "") + ("masked_" if config.mem_suppress and config.masking else "") + ("unmasked_" if config.mem_suppress and not config.masking else "") + f"{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
     with open(interleave_traces_dict_path, "rb") as f:
         interleave_traces_dict = pickle.load(f)
         orig_multi_sys_ys = interleave_traces_dict["multi_sys_ys"]
@@ -1971,6 +1997,16 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
                 errs_tf[:, trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] - 1] = np.inf
             if seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count] <= config.n_positions:
                 errs_tf[:, trace_config, :, seg_start + tok_seg_lens_all_ex[0][trace_config][seg_count]] = np.inf
+
+            if config.val_dataset_typ == "linear":
+                # also set all 'x' entries (every second value inside the segment after the start token) to infinite
+                x_indices = np.arange(
+                    seg_start + 1,
+                    seg_start + real_seg_lens_all_ex[0][trace_config][seg_count],
+                    2,
+                )
+                if x_indices.size > 0:
+                    errs_tf[:, trace_config, :, x_indices] = np.inf
             seg_count += 1
 
 
@@ -1991,12 +2027,21 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
         for i in range(len(sys_choices_all_ex[0])):
             print(f"trace config: {i}")
             print(f"len of sys_choices: {len(sys_choices_all_ex[0][i])}")
-            print("sum of zero err:", np.sum(errs_zero[i]))
+            #print("sum of zero err:", np.sum(errs_zero[i]))
 
     del errs_zero
 
     torch.cuda.empty_cache()
-    gc.collect() 
+    gc.collect()
+
+    if config.val_dataset_typ == "linear":
+        errs_lstsq = compute_lstsq_errs(config, interleave_traces_dict)
+        err_lss["LSTSQ"] = errs_lstsq
+
+    del errs_lstsq
+
+    torch.cuda.empty_cache()
+    gc.collect()
 
     # #create a list of sim_objs for each trace configuration by accessing the sim_objs using the system indices
     # sim_objs_per_config = []
@@ -2007,8 +2052,142 @@ def compute_errors_needle_or_multi_cut(config, model, sim_objs, errs_dir, errs_l
 
     #     sim_objs_per_config.append(sim_obj_conf)  
 
+    print(f"err_lss: {err_lss.keys()}")
+
     return err_lss
 
+def compute_lstsq_errs(config, interleave_traces_dict):
+    orig_multi_sys_ys = interleave_traces_dict["multi_sys_ys"]
+    sys_choices_all_ex = interleave_traces_dict["sys_choices_per_config"]
+    sys_dict_all_ex = interleave_traces_dict["sys_dict_per_config"]
+    tok_seg_lens_all_ex = interleave_traces_dict["tok_seg_lens_per_config"]
+    seg_starts_all_ex = interleave_traces_dict["seg_starts_per_config"]
+    real_seg_lens_all_ex = interleave_traces_dict["real_seg_lens_per_config"]
+    sys_inds_all_ex = interleave_traces_dict["sys_inds_per_config"]
+
+    multi_sys_ys = np.reshape(orig_multi_sys_ys, (orig_multi_sys_ys.shape[0] * orig_multi_sys_ys.shape[1], orig_multi_sys_ys.shape[-3], orig_multi_sys_ys.shape[-2], orig_multi_sys_ys.shape[-1]))
+    errs_lstsq = np.zeros((multi_sys_ys.shape[0], multi_sys_ys.shape[1], multi_sys_ys.shape[2]))
+    
+    # For each trace configuration
+    for trace_config in range(orig_multi_sys_ys.shape[0]):
+        sys_choices = sys_choices_all_ex[trace_config][0]
+        tok_seg_lens = tok_seg_lens_all_ex[trace_config][0]
+        seg_starts = seg_starts_all_ex[trace_config][0]
+        real_seg_lens = real_seg_lens_all_ex[trace_config][0]
+        sys_inds = sys_inds_all_ex[trace_config][0]
+        
+        # Set the errors for the start token to be infinite (same as other error computations)
+        errs_lstsq[trace_config, :, 0] = np.inf
+        errs_lstsq[trace_config, :, 1] = np.inf
+        
+        # For each trial
+        for trial in range(orig_multi_sys_ys.shape[1]):
+            # Initialize history for each system
+            # Each system's history will store (x, y) pairs from previous segments
+            system_histories = {sys_ind: {'x': [], 'y': []} for sys_ind in sys_inds}
+            
+            # Process each segment in the trace
+            for seg_count in range(len(seg_starts)):
+                seg_start = seg_starts[seg_count]
+                tok_seg_len = tok_seg_lens[seg_count]
+                real_seg_len = real_seg_lens[seg_count]
+                sys_ind = sys_choices[seg_count]
+                
+                # Set the errors of the end of the segment to be infinite (same as other error computations)
+                if real_seg_len < tok_seg_len - 1:
+                    errs_lstsq[trace_config, trial, seg_start + tok_seg_len - 1] = np.inf
+                if seg_start + tok_seg_len < errs_lstsq.shape[-1]:
+                    errs_lstsq[trace_config, trial, seg_start + tok_seg_len] = np.inf
+                
+                # Set all 'x' entries (every second value inside the segment after the start token) to infinite
+                x_indices = np.arange(
+                    seg_start + 1,
+                    seg_start + real_seg_len,
+                    2,
+                )
+                if x_indices.size > 0:
+                    errs_lstsq[trace_config, trial, x_indices] = np.inf
+                
+                # Skip segments with no real data (special tokens only)
+                if real_seg_len == 0:
+                    continue
+                
+                # Extract the actual data segment (skip special tokens)
+                # The segment structure is: [start_paren, data, end_paren]
+                # So we need to skip the first and last tokens
+                data_start = seg_start + 1  # Skip start paren
+                data_end = seg_start + tok_seg_len - 1  # Skip end paren
+                
+                if data_end <= data_start:
+                    continue
+                
+                # Extract x and y from the segment
+                #data is structured as alternating x and y values
+                # Skip the zeros and ones columns
+                data_start_col = 2 * config.max_sys_trace + 1
+                x_cols = config.nx
+                y_cols = config.ny
+                
+                # Extract x and y data from alternating positions
+                segment_data = multi_sys_ys[trace_config, trial, data_start:data_end, data_start_col:]
+                
+                # For linear dataset, data alternates between x and y
+                # Even indices (0, 2, 4, ...) are x values, odd indices (1, 3, 5, ...) are y values
+                x_indices = np.arange(0, segment_data.shape[0], 2)
+                y_indices = np.arange(1, segment_data.shape[0], 2)
+                
+                if len(x_indices) > 0 and len(y_indices) > 0:
+                    x_data = segment_data[x_indices, 1:x_cols+1]
+                    y_data = segment_data[y_indices, x_cols+2:x_cols+y_cols+2]
+                else:
+                    x_data = np.empty((0, x_cols))
+                    y_data = np.empty((0, y_cols))
+                
+                # For each timestep in the segment, compute prediction using history
+                if x_data.shape[0] == 0 or y_data.shape[0] == 0:
+                    continue
+                    
+                for t in range(min(x_data.shape[0], y_data.shape[0])):
+                    x_t = x_data[t]
+                    y_t = y_data[t]
+                    
+                    # Get the system's history
+                    history = system_histories[sys_ind]
+                    
+                    if len(history['x']) > 0:
+                        # We have history, compute least squares prediction
+                        X = np.array(history['x'])  # Shape: (n_prev, x_dim)
+                        y = np.array(history['y'])  # Shape: (n_prev, y_dim)
+                        
+                        # Solve least squares: X @ w = y
+                        # For each output dimension
+                        y_pred = np.zeros_like(y_t)
+                        for y_dim in range(y.shape[1]):
+                            try:
+                                # Use numpy's least squares solver
+                                w, residuals, rank, s = np.linalg.lstsq(X, y[:, y_dim])
+                                y_pred[y_dim] = x_t @ w
+                            except np.linalg.LinAlgError:
+                                # If the system is underdetermined or singular, use zero prediction
+                                y_pred[y_dim] = 0.0
+                        
+                        # Compute error
+                        error = np.linalg.norm(y_t - y_pred) ** 2
+                        
+                        # Map back to the original segment indices
+                        original_t = data_start + 2 * t + 1  # y values are at odd indices
+                        errs_lstsq[trace_config, trial, original_t] = error
+                    else:
+                        # No history yet, predict 0
+                        error = np.linalg.norm(y_t) ** 2
+                        original_t = data_start + 2 * t + 1
+                        errs_lstsq[trace_config, trial, original_t] = error
+                    
+                    # Add current (x, y) pair to history for future predictions
+                    history['x'].append(x_t)
+                    history['y'].append(y_t)
+    
+    return errs_lstsq
 
 def tf_preds(multi_sys_ys, model, device, config):
     with torch.no_grad():  # no gradients
@@ -2138,7 +2317,7 @@ def needle_in_haystack_preds(config, model, ckpt_steps, parent_parent_dir, errs_
     with open(save_errs_loc + "err_lss_examples.pkl", 'wb') as f:
         pickle.dump(err_lss_examples, f)
 
-    # raise NotImplementedError("writing optimized version")
+    #return None
 
     err_lss_examples = {}
     for ex in range(config.num_haystack_examples):
@@ -2206,6 +2385,8 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, out
     # parent_parent_dir = os.path.dirname(parent_dir)
     parent_parent_dir = output_dir
 
+    data_dir = "/data/shared/ICL_Kalman_Experiments/train_and_test_data/" + config.val_dataset_typ + "/"
+
     ckpt_steps = get_step_number(config.ckpt_path)
     print("ckpt_steps:", ckpt_steps)
 
@@ -2222,10 +2403,9 @@ def save_preds(run_deg_kf_test, config, model, train_conv, tf, ys, sim_objs, out
         return None
 
 
-
     elif not train_conv and config.multi_sys_trace:
         if not config.needle_in_haystack:
-            err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf)
+            err_lss, sys_choices_per_config, sys_dict_per_config, tok_seg_lens_per_config, seg_starts_per_config = compute_errors_multi_sys(config, tf, errs_dir, errs_loc, data_dir)
             
             #save the system indices, starting indices, and token segment lengths to pickle file
             with open(errs_loc + "sys_choices_sys_dict_tok_seg_lens_seg_starts.pkl", 'wb') as f:

@@ -12,3 +12,4 @@ wandb
 statsmodels
 netCDF4
 tensorboard
+huggingface_hub

@@ -833,7 +833,14 @@ def gen_ckpt_pred_steps(model_name): #change this function to use the model name
 
     elif model_name == "linear_medium":
         minval = 1000
-        maxval = 120000
+        maxval = 230000
+        train_int = 1000
+
+        ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
+
+    elif model_name == "linear_medium_ny_5":
+        minval = 1000
+        maxval = 200000
         train_int = 1000
 
         ckpt_pred_steps = np.arange(minval, maxval + train_int, train_int)
@@ -937,8 +944,7 @@ def predict_all_checkpoints(config, ckpt_dir, output_dir, logscale, ys, sim_objs
 
     
     #save the interleave_traces_dict to a file
-    #interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
-    interleave_traces_dict_path = os.path.join(f"./data/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}_{interleaving}.pkl")
+    interleave_traces_dict_path = os.path.join(f"/data/shared/ICL_Kalman_Experiments/train_and_test_data/{dataset_typ}/{config.datasource}_interleaved_traces_{dataset_typ}{config.C_dist}_{interleaving}.pkl")
     with open(interleave_traces_dict_path, "wb") as f:
         pickle.dump(interleave_traces_dict, f)
     print(f"interleave_traces_dict saved to {interleave_traces_dict_path}")
@@ -1207,7 +1213,7 @@ def set_config_params(config, model_name):
 
         output_dir = f"../outputs/{config.model_type}/{experiment_name}"
 
-        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints//{config.model_type}/{experiment_name}"
+        ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
     elif model_name == "ident":
         print("\n\nIDENTITY MEDIUM MODEL\n\n")
@@ -2217,7 +2223,7 @@ def set_config_params(config, model_name):
         config.override("learning_rate", np.sqrt((len(config.devices) * config.batch_size)/512)*(0.833333333)*1.584893192461114e-05)
 
     elif model_name == "linear_medium":
-        experiment_name = "250722_144731.5c4971_multi_sys_trace_linear_state_dim_5_lr_1.0e-04_num_train_sys_40000"
+        experiment_name = "250811_153304.c3b82b_multi_sys_trace_linear_state_dim_5_lr_1.584893192461114e-05_num_train_sys_40000"
 
         print("\n\nLINEAR MEDIUM MODEL\n\n")
 
@@ -2232,14 +2238,14 @@ def set_config_params(config, model_name):
         config.override("changing", False)  # used only for plotting
         
         # Training settings
-        config.override("devices", [0])  # which GPU
+        config.override("devices", [0, 1])  # which GPU
         config.override("train_steps", 1000000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
         config.override("num_epochs", 1)  # minimum number of epochs to train for
         config.override("train_int",1000)  # number of steps between logging (train interval)
         config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
-        config.override("batch_size", 64)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
-        config.override("train_data_workers", 10)  # set to 1 (check if it changes the speed of the training process)
-        config.override("test_batch_size", 64)
+        config.override("batch_size", 256)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
         config.override("test_data_workers", 1)  # keep at 1
         
         # Model settings
@@ -2252,14 +2258,50 @@ def set_config_params(config, model_name):
         config.override("n_dims_in", int(config.nx + config.ny + (2*config.max_sys_trace) + 3))  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
         config.override("n_dims_out", 1)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
         
-        config.override("learning_rate", 1e-4)
+        config.override("learning_rate", 1.584893192461114e-05)
+    elif model_name == "linear_medium_ny_5":
+        experiment_name = "250821_163004.4d2600_multi_sys_trace_linear_state_dim_5_obs_dim_5_lr_1.584893192461114e-05_num_train_sys_40000"
+        
+        print("\n\nLINEAR MEDIUM OBS DIM 5 MODEL\n\n")
+
+        # Dataset settings
+        config.override("num_tasks", 40000)  # number of training systems
+        config.override("num_val_tasks", 100)  # number of test systems
+        config.override("dataset_typ", "linear")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"upperTriA_gauss" #"ident" #"ortho"
+        config.override("val_dataset_typ", "linear")  # "unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho"
+        config.override("nx", 5)
+        config.override("ny", 5)
+        config.override("num_traces", {"train": 1, "val": 1000})
+        config.override("changing", False)  # used only for plotting
+        
+        # Training settings
+        config.override("devices", [0, 1])  # which GPU
+        config.override("train_steps", 1000000)  # number of training steps (27000x3 = 81000 effective single GPU iterations) (num_tasks*num_traces[train])/batch_size
+        config.override("num_epochs", 1)  # minimum number of epochs to train for
+        config.override("train_int",1000)  # number of steps between logging (train interval)
+        config.override("use_true_len", False)  # Flag for a dataset length to be num_tasks
+        config.override("batch_size", 256)  # 2048 #512 #usually 512 (~35GB) tune this to fit into GPU memory
+        config.override("train_data_workers", 128)  # set to 1 (check if it changes the speed of the training process)
+        config.override("test_batch_size", 256)
+        config.override("test_data_workers", 1)  # keep at 1
+        
+        # Model settings
+        config.override("model_type", "GPT2")  # "GPT2" #"transfoXL" #"olmo"
+        config.override("use_pos_emb", True)  # use positional embeddings
+        config.override("n_positions", 500)  # 500 for extended OLS #250 #context length
+        config.override("n_embd", 128)
+        config.override("n_layer", 12)
+        config.override("n_head", 8)
+        config.override("n_dims_in", int(config.nx + config.ny + (2*config.max_sys_trace) + 3))  # input dimension is the observation dimension + special token parentheses + special start token + payload identifier
+        config.override("n_dims_out", config.ny)  # (IMPORTANT TO KEEP THIS AT 5 FOR NOW) TODO: this used to be 10 but needs to be fixed to match lin_sys.yaml
+        
+        config.override("learning_rate", 1.584893192461114e-05)
     else:
         raise ValueError("Model name not recognized. Please choose from the following: gauss, gauss_tiny, gauss_small, gauss_big, gauss_nope, ortho, ortho_tiny, ortho_small, ortho_big, ortho_nope, ident, ident_tiny, ident_small, ident_big, ident_nope")
 
     output_dir = f"./outputs/{config.model_type}/{experiment_name}"
 
-    #ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
-    ckpt_dir = f"./data/model_checkpoints/{config.model_type}/{experiment_name}"
+    ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/{config.model_type}/{experiment_name}"
 
     return output_dir, ckpt_dir, experiment_name
 
@@ -2302,7 +2344,7 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
 
         print(f"getting test data from datasource {config.datasource}")
 
-        data_path = path + ("for_multi_cut_" if config.multi_cut_val else "") + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "")
+        data_path = path + ("for_multi_cut_" if config.multi_cut_val else "") + ("opposite_ortho_" if config.opposite_ortho else "") + f"val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}" +("_sync_ind_10" if config.val_dataset_typ == "ortho_sync" else "")
         
         #check if the data path exists
         if not os.path.exists(data_path + "_sim_objs.pkl"):
@@ -2330,11 +2372,11 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
         max_num_sys = num_haystack_ex + config.max_sys_trace #max number of systems to use for testing
 
         #get the sim_objs for the training data
-        with open (path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open (path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #set ys to be the training data
-        with open(path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + f"train_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
             #get train traces
             # samples = pickle.load(f)
             # ys = np.stack(
@@ -2362,13 +2404,13 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
         path = path + f"/{config.dataset_typ}/"
 
         #get the sim_objs for the training data
-        with open(path + f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+        with open(path + f"train_{config.dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
             sim_objs = pickle.load(f)
 
         #generate traces from the training systems
         collect_data(config, output_dir, "val", False, False, False, sim_objs) 
 
-        with open(path + f"{config.datasource}_val_specA_spec_C_state_dim_{config.nx}.pkl", "rb") as f:
+        with open(path + f"{config.datasource}_val_specA_spec_C_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
             #get train traces
             # samples = pickle.load(f)
             # ys = np.stack(
@@ -2381,28 +2423,6 @@ def get_test_data(config, experiment_name, num_haystack_ex=50):
         raise ValueError("Datasource not recognized. Please choose from the following: val, train, train_systems")
 
     return ys, sim_objs
-
-def get_test_data_linear(config, experiment_name):
-    # load the validation data
-
-    path = "./data/train_and_test_data"
-    if config.datasource == "val":
-        path = path + f"/{config.val_dataset_typ}/"
-
-        print(f"getting test data from datasource {config.datasource}")
-
-        data_path = path + f"val_{config.val_dataset_typ}_state_dim_{config.nx}"
-
-        #check if the data path exists
-        if not os.path.exists(data_path + ".pkl"):
-            print(f"data path {data_path} does not exist")
-            collect_data(config, path, "val", False, False, False) #collect the data if it does not exist
-
-        with open(data_path + ".pkl", "rb") as f:
-            entries = get_entries(config, f)
-            gc.collect()  # Start the garbage collector to free up memory
-
-    return entries, None
 
 def get_kal_step(output_dir, model_name):
     #get kal_step
@@ -2697,7 +2717,8 @@ if __name__ == '__main__':
         output_dir, ckpt_dir, experiment_name = set_config_params(config, model_name)
         print(f"output_dir: {output_dir}")
         
-        ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=135000.ckpt" #normal training run
+        #ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250804_155434.bff5b8_multi_sys_trace_linear_state_dim_5_lr_0.0003_num_train_sys_40000/checkpoints/step=8000.ckpt" #normal training run
+        ckpt_path = config.ckpt_path
 
         # ckpt_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/backstory_masked_250501_221900.f583e5_multi_sys_trace_ortho_haar_state_dim_5_ident_C_lr_1.4766370475008905e-05_num_train_sys_40000/checkpoints/step=139000.ckpt" #masked_backstories
         
@@ -2760,7 +2781,7 @@ if __name__ == '__main__':
 
             # steps_in = [1,2,3,5,10]
             # steps_in = [1,2,3,7,8]
-            steps_in = [2,4,6,8,10,12,14]
+            steps_in = [2,4,6,12,14]
             #steps_in = list(range(1,9))
 
             colors=['#000000', '#005CAB', '#E31B23', '#FFC325', '#00A651', '#9B59B6']
@@ -2769,15 +2790,15 @@ if __name__ == '__main__':
                 if fix_needle or opposite_ortho:
                     num_sys_haystacks = [2] #only run for 2 systems in the haystack for the fixed needle paren swap experiment
                 else:
-                    num_sys_haystacks = [1] #only run for 2 systems in the haystack for the paren swap experiment
+                    num_sys_haystacks = [5] #only run for 2 systems in the haystack for the paren swap experiment
                     # num_sys_haystacks = list(range(2,last_haystack_len+1))
             elif config.same_tokens or config.irrelevant_tokens:
                 # num_sys_haystacks = list(range(2,last_haystack_len+1))
-                num_sys_haystacks = [2]
+                num_sys_haystacks = [2,5]
                 
             else:
-                num_sys_haystacks = list(range(7,last_haystack_len+1))
-                #num_sys_haystacks = [1]
+                #num_sys_haystacks = list(range(1,last_haystack_len+1))
+                num_sys_haystacks = [1,2,5]
 
             print("num_sys_haystacks:", num_sys_haystacks)
 
@@ -2839,7 +2860,7 @@ if __name__ == '__main__':
                         errs_dir = model_dir + experiment + f"/prediction_errors{config.C_dist}_step={ckpt_step}.ckpt"
                         errs_loc = errs_dir + f"/train_conv_needle_haystack_len_{num_sys}_{config.datasource}_{config.val_dataset_typ}_state_dim_{config.nx}_" + ("fix_needle_" if config.fix_needle else "") + ("opposite_ortho_" if config.opposite_ortho else "") + ("irrelevant_tokens_" if config.irrelevant_tokens else "") + ("same_tokens_" if config.same_tokens else "") + ("paren_swap_" if config.paren_swap else "")  + ("new_hay_insert_" if config.new_hay_insert else "")
 
-
+                        print(f"errs_loc: {errs_loc}")
                         if os.path.exists(errs_loc + "err_lss_examples.pkl"):
                             print(f"err_lss_examples.pkl exists for haystack length {num_sys}")
 
@@ -2909,10 +2930,8 @@ if __name__ == '__main__':
                 print(f"output dir: {output_dir}")
                 print(f"config.use_pos_emb: {config.use_pos_emb}")
 
-                if not config.val_dataset_typ == "linear":
-                    ys, sim_objs = get_test_data(config, output_dir, num_haystack_examples)           
-                else:
-                    ys, sim_objs = get_test_data_linear(config, output_dir)
+                
+                ys, sim_objs = get_test_data(config, output_dir)
                 print(f"shape of ys before predict_all_checkpoints: {ys.shape}")
 
                 if not only_needle_pos:
@@ -2935,7 +2954,7 @@ if __name__ == '__main__':
                     # last_ckpt = get_last_checkpoint(output_dir + "/checkpoints/")
 
                     if paren_swap:
-                        pred_ckpt_step = 27000
+                        pred_ckpt_step = 1000
 
                     if hard_coded_ckpt is not None:
                         pred_ckpt_step = hard_coded_ckpt
@@ -3047,16 +3066,18 @@ if __name__ == '__main__':
 
         if not config.acc:
             # get the sim objs for the validation data
-            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_sim_objs.pkl", "rb") as f:
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}_sim_objs.pkl", "rb") as f:
                 sim_objs = pickle.load(f)
 
             #set ys to be the validation data
-            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", "rb") as f:
+            with open(output_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", "rb") as f:
                 samples = pickle.load(f)
                 # for every 2000 entries in samples, get the observation values and append them to the ys list
+                dim = config.ny if config.dataset_typ != "linear" else config.nx + config.ny + 2
+                context_len = config.n_positions + 1 if config.dataset_typ != "linear" else config.n_positions
                 ys = np.stack(
-                    [entry["obs"][:config.n_positions + 1] for entry in samples], axis=0
-                ).reshape((config.num_val_tasks, config.num_traces["val"], config.n_positions + 1, config.ny)).astype(np.float32)
+                    [entry["obs"][:context_len] for entry in samples], axis=0
+                ).reshape((config.num_val_tasks, config.num_traces["val"], context_len, dim)).astype(np.float32)
 
                 gc.collect()  # Start the garbage collector
 

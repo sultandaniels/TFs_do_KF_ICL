@@ -139,7 +139,7 @@ def mem_suppress_ckpt_path(config, output_dir, experiment_ind=59):
     return output_dir
 
 def get_callbacks_and_loggers(config, output_dir, train_int): #add emb_dim as a parameter
-    #lr_monitor = pl_callbacks.LearningRateMonitor(logging_interval='epoch')
+    lr_monitor = pl_callbacks.LearningRateMonitor(logging_interval='epoch')
     tb_logger = pl_loggers.TensorBoardLogger(output_dir)
     loggers = [tb_logger]
 
@@ -191,7 +191,7 @@ def get_callbacks_and_loggers(config, output_dir, train_int): #add emb_dim as a 
             ckpt_path.split(os.path.sep)[-1]))
 
     #callbacks = [checkpoint_callback, lr_monitor]
-    callbacks = [checkpoint_callback]
+    callbacks = [checkpoint_callback, lr_monitor]
     return callbacks, loggers
 
 

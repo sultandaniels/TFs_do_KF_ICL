@@ -32,7 +32,7 @@ def find_smallest_step_subdir(base_dir):
     min_step_dir = None
 
     for subdir in os.listdir(base_dir):
-        if subdir.startswith("prediction_errors_gauss_C_step="):
+        if subdir.startswith("prediction_errors_step="):
             step_str = subdir.split("step=")[1].split(".ckpt")[0]
             try:
                 step = int(step_str)

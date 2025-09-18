@@ -75,7 +75,7 @@ def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False,
     pred_ckpt = None
     #print the absolute path of the experiment
 
-    path = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/"+ ("train_conv_" if train_conv else "") + ("zero_cut_" if zero_cut else "") + ("single_system_" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
+    path = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{exper}/prediction_errors{C_dist}_step={str(ckpt_step)}.ckpt/"+ ("train_conv_" if train_conv else "") + ("zero_cut_" if zero_cut else "") + "mult_cut_val_linear" + ("_single_system" if single_system else "") + f"{valA}_state_dim_{nx}_err_lss.pkl"
     if os.path.exists(path):
         print(os.path.abspath(path))
         #load prediction errors
@@ -98,6 +98,27 @@ def get_mop_ratios_ckpt(valA, C_dist, ckpt_step, exper, nx, single_system=False,
     else:
         print(f"path does not exist: {path}")
     return mop_err, pred_ckpt
+
+def get_lstsq_errs(ckpt_step, exper, nx, single_system=False, nope=False, zero_cut=False, train_conv=False):
+    path = f"../outputs/GPT2" + ("_NoPE" if nope else "") + f"/{exper}/prediction_errors_step={str(ckpt_step)}.ckpt/"+ ("train_conv_" if train_conv else "") + ("zero_cut_" if zero_cut else "") + "mult_cut_val_linear" + ("_single_system" if single_system else "") + f"_state_dim_{nx}_err_lss_examples.pkl"
+    if os.path.exists(path):
+        print(os.path.abspath(path))
+        with open(path, 'rb') as f:
+            err_lss = pickle.load(f)
+            err_lss = move_dict_to_device(err_lss, device)
+
+        lstsq_errs = err_lss["LSTSQ"]
+        del err_lss
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        if not (lstsq_errs == None):
+            print("Loaded LSTSQ Errors")
+        else:
+            raise ValueError("LSTSQ Preds do not exist for this checkpoint")
+    else:
+        print(f"path does not exist: {path}")
+    return lstsq_errs
 
 def compute_ratio(ind, err, kalman_err, single_system=False):
     
@@ -129,7 +150,6 @@ def compute_ratio(ind, err, kalman_err, single_system=False):
 
     if ind == None:
         ratios_percentiles = torch.quantile(ratios, percentiles, dim=0)
-
     else:
         ratios_percentiles = torch.quantile(ratios[:,ind], percentiles)
         # ratios_med = torch.median(ratios[:, ind])

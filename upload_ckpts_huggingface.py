@@ -1,23 +1,19 @@
 import os
-from huggingface_hub import HfApi, HfFolder, hf_hub_download
+from huggingface_hub import HfApi, HfFolder, hf_hub_download, snapshot_download
 
 api = HfApi(token=os.getenv("HF_TOKEN"))
 
 
 #download a file from the hub
-target_path = "/data/shared/ICL_Kalman_Experiments/train_and_test_data/"
-repo_id = "sultan-daniels/train_and_test_data"
-file_name = "val_ortho_haar_ident_C_state_dim_5.pkl"
-subfolder = "ortho_haar"
-file_path = hf_hub_download(
+target_path = "/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250722_144731.5c4971_multi_sys_trace_linear_state_dim_5_lr_1.0e-04_num_train_sys_40000"
+repo_id = "leonallinger/linear_medium"
+file_path = snapshot_download(
     repo_id=repo_id,
-    filename=file_name,
-    repo_type="dataset",
+    repo_type="model",
     revision="main",
-    subfolder=subfolder,
     local_dir=target_path,
 )
-print(f"Downloaded {file_name} to {file_path}")
+print(f"Downloaded {repo_id} to {file_path}")
 
 
 # api.upload_folder(

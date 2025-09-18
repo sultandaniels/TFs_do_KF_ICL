@@ -12,7 +12,7 @@ import numpy as np
 # /checkpoints/step=10000.ckpt
 
 class Config(object, metaclass=Singleton):
-    ckpt_path = "" #"./data/model_checkpoints/GPT2/250722_144731.5c4971_multi_sys_trace_linear_state_dim_5_lr_1.0e-04_num_train_sys_40000/checkpoints/step=120000.ckpt" #"./models/checkpoints/step=10000.ckpt"
+    ckpt_path = ""#"/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250821_163004.4d2600_multi_sys_trace_linear_state_dim_5_obs_dim_5_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=149000.ckpt" #"/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250811_153304.c3b82b_multi_sys_trace_linear_state_dim_5_lr_1.584893192461114e-05_num_train_sys_40000/checkpoints/step=175000.ckpt" #/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250804_155434.bff5b8_multi_sys_trace_linear_state_dim_5_lr_0.0003_num_train_sys_40000/checkpoints/step=80000.ckpt" #"/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/250801_131009.2f9672_multi_sys_trace_linear_state_dim_5_lr_9.33907269497812e-06_num_train_sys_40000/checkpoints/step=9000.ckpt" #"./models/checkpoints/step=10000.ckpt"
     seed = 0
     fully_reproducible = False
 
@@ -23,9 +23,9 @@ class Config(object, metaclass=Singleton):
     max_cond_num = 100
     distinct_cond_nums = 10
     val_dataset_typ = "linear"#"unifA" #"gaussA" #"gaussA_noscale" #"rotDiagA" #"rotDiagA_unif" #"rotDiagA_gauss" #"upperTriA" #"single_system" #"cond_num" #"ident" #"ortho" #"ortho_haar" #"ortho_sync"
-    C_dist = "_ident_C" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
+    C_dist = "" #"_unif_C" #"_gauss_C" #"_gauss_C_large_var" #"_single_system" #"upperTriA_gauss" #"_ident_C"
     nx = 5
-    ny = 1
+    ny = 5
     n_noise = 1
     num_traces = {"train": 1, "val": 1000}
     changing = False #used only for plotting
@@ -53,15 +53,15 @@ class Config(object, metaclass=Singleton):
     num_test_traces_configs = num_sys_haystack if needle_in_haystack and (not needle_final_seg_extended) else (1 if needle_in_haystack and needle_final_seg_extended else (num_val_tasks if zero_cut else 1)) #number of test traces configurations to generate
 
     # Training settings
-    devices=[0] #which GPU
+    devices=[0, 1] #which GPU
     train_steps = 1000000 #number of training steps (27000x3 = 81000 effective single GPU iterations)      (num_tasks*num_traces[train])/batch_size
     num_epochs = 1 #minimum number of epochs to train for
     train_int = 1000 #number of steps between logging (train interval)
     use_true_len = False #Flag for a dataset length to be num_tasks
-    batch_size = 64 #usually 512 (~35GB) tune this to fit into GPU memory
+    batch_size = 256 #usually 512 (~35GB) tune this to fit into GPU memory
     acc_grad_batch = 1 #number of batches to accumulate gradients over
-    train_data_workers = 10 #set to 1 (check if it changes the speed of the training process)
-    test_batch_size = 64
+    train_data_workers = 128 #set to 1 (check if it changes the speed of the training process)
+    test_batch_size = 256
     test_data_workers = 1 #keep at 1
 
     # Model settings
@@ -85,7 +85,7 @@ class Config(object, metaclass=Singleton):
     # clamp_len = 1000
 
     # Optimizer parameters
-    learning_rate = 1e-4 #np.sqrt((len(devices) * batch_size)/512)*(0.833333333)*1.584893192461114e-05 #1.9054607179632464e-05
+    learning_rate = np.sqrt((len(devices) * batch_size)/512)*1.584893192461114e-05 #1.9054607179632464e-05
     weight_decay = 1e-2
 
     # Gradient Clipping

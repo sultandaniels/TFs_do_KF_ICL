@@ -15,6 +15,7 @@ from pytorch_lightning.loggers import WandbLogger
 # from pytorch_lightning.utilities.exceptions import _TunerExitException
 import json
 import torch
+import hashlib
 
 ##DO NOT MIX pytorch_lightning with lightning.pytorch in the import statements (it causes weird bugs with the boiler plate code)
 
@@ -64,17 +65,16 @@ def train_gpt2(model, config, ckpt_dir, train_mix_dist=False, train_mix_state_di
     
 
     #for BLISS server
-    main_dir = f"./data/train_and_test_data"
+    main_dir = f"/data/shared/ICL_Kalman_Experiments/train_and_test_data"
 
-    val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}.pkl") else None
-    #datamodule = DataModuleWrapper(config, LinearDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + f"_n_pos_{config.n_positions}" + ".pkl"))
+    val_dset = FilterDataset(main_dir + f"/{config.val_dataset_typ}/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl", use_true_len=True) if os.path.exists(main_dir + f"/data/val_{config.val_dataset_typ}{config.C_dist}_state_dim_{config.nx}_obs_dim_{config.ny}.pkl") else None
 
-    datamodule = DataModuleWrapper(config, FilterDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
+    datamodule = DataModuleWrapper(config, FilterDataset(main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}_obs_dim_{config.ny}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl"), val_dset)
 
     # Define model
     # output_dir = training.setup_train(model)
 
-    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}" + (f"{config.C_dist}" if config.dataset_typ != "linear" else "") + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl")
+    print("training data dir:", main_dir + f"/{config.dataset_typ}/train_{config.dataset_typ}{config.C_dist}" + f"_state_dim_{config.nx}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + ".pkl")
 
     
     callbacks, loggers = training.get_callbacks_and_loggers(config, ckpt_dir, config.train_int)
@@ -165,5 +165,11 @@ if __name__ == '__main__':
     model = GPT2(config.n_dims_in, config.n_positions, n_dims_out=config.n_dims_out,
                  n_embd=config.n_embd, n_layer=config.n_layer, n_head=config.n_head)
 
-    ckpt_dir = "./data/model_checkpoints/GPT2/250722_144731.5c4971_multi_sys_trace_linear_state_dim_5_lr_1.0e-04_num_train_sys_40000"
+
+    train_mix_dist = False
+    train_mix_state_dim = None
+    timestamp = time.strftime('%y%m%d_%H%M%S') + '.' + hashlib.md5(config.get_full_yaml().encode('utf-8')).hexdigest()[:6]
+    experiment_name = timestamp + ("_multi_sys_trace" if config.multi_sys_trace else "") + ("_zero_cut" if config.zero_cut else "") + f"_{config.dataset_typ}_state_dim_{config.nx}_obs_dim_{config.ny}{config.C_dist}" + ("_dist_mix" if train_mix_dist else "") + ("_state_dim_mix" if train_mix_state_dim else "") + "_lr_" + str(config.learning_rate) + "_num_train_sys_" + str(config.num_tasks)
+    ckpt_dir = f"/data/shared/ICL_Kalman_Experiments/model_checkpoints/GPT2/{experiment_name}"
+
     train_gpt2(model, config, ckpt_dir=ckpt_dir)

@@ -2,8 +2,8 @@ import numpy as np
 from tqdm import tqdm
 
 def generate_linear_sample(n_positions, nx, ny, num_traces):
-    w = np.random.multivariate_normal(np.zeros(nx), np.eye(nx), size=ny)
-    x = np.random.multivariate_normal(np.zeros(nx), np.eye(nx), size=(num_traces, int(n_positions/2)))
+    w = np.random.multivariate_normal(np.zeros(nx), np.eye(nx)/ny, size=ny)
+    x = np.random.multivariate_normal(np.zeros(nx), np.eye(nx)/nx, size=(num_traces, int(n_positions/2)))
     y = x @ w.T
     ones = np.ones((x.shape[0], x.shape[1], 1))
     x = np.concatenate((ones, x), axis=2)
